@@ -17,7 +17,9 @@ const credentials = z.object({
   password: z
     .string()
     .min(PASSWORD_MIN, `A senha precisa ter pelo menos ${PASSWORD_MIN} caracteres.`)
-    .max(PASSWORD_MAX, `A senha pode ter no máximo ${PASSWORD_MAX} caracteres.`),
+    .max(PASSWORD_MAX, `A senha pode ter no máximo ${PASSWORD_MAX} caracteres.`)
+    // o bcrypt só considera os primeiros 72 bytes; acentos e emojis ocupam mais de 1 byte
+    .refine((p) => Buffer.byteLength(p, 'utf8') <= PASSWORD_MAX, 'Senha longa demais.'),
 });
 
 const publicPlayer = (p: { id: string; name: string; createdAt: Date }) => ({ id: p.id, name: p.name, createdAt: p.createdAt.toISOString() });

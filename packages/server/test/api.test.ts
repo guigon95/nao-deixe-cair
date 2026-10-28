@@ -86,6 +86,40 @@ describe('contas', () => {
   });
 });
 
+describe('SQL injection', () => {
+  const evil = [`x'; DROP TABLE "Player"; --`, `' OR '1'='1`, `"; DELETE FROM "Score"; --`, `bolinha' OR 1=1 --`];
+
+  it('apelidos e senhas maliciosos viram texto comum, nunca SQL', async () => {
+    for (const [i, name] of evil.entries()) {
+      const c = new Client(app);
+      const r = await c.post('/api/auth/register', { name: name.slice(0, 14) + i, password: `' OR '1'='1` });
+      expect([201, 422]).toContain(r.statusCode);
+    }
+    // login com "' OR '1'='1" não entra em conta nenhuma
+    await register('Vitima');
+    const hack = await new Client(app).post('/api/auth/login', { name: 'Vitima', password: `' OR '1'='1` });
+    expect(hack.statusCode).toBe(401);
+    // as tabelas continuam lá e intactas
+    expect(await prisma.player.count()).toBeGreaterThan(0);
+    const guest = await new Client(app).post('/api/games/bolinha/scores', { token: oldToken('bolinha', 30), score: 10, name: `a'); DROP TABLE "Score"; --` });
+    expect(guest.statusCode, guest.body).toBe(201);
+    const list = await new Client(app).get('/api/games/bolinha/ranking');
+    expect(list.statusCode).toBe(200);
+    expect(list.data.entries[0].name).toBe(`a'); DROP TABLE "Score"; --`.slice(0, 16).trim());
+  });
+
+  it('o jogo na URL só aceita os ids conhecidos', async () => {
+    for (const g of [`bolinha' OR '1'='1`, `bolinha";--`, encodeURIComponent(`x' UNION SELECT * FROM "Player" --`)]) {
+      expect((await new Client(app).get(`/api/games/${g}/ranking`)).statusCode).toBe(422);
+    }
+  });
+
+  it('senha com mais de 72 bytes é recusada (o bcrypt ignoraria o resto)', async () => {
+    const r = await new Client(app).post('/api/auth/register', { name: 'Longa', password: 'ç'.repeat(40) });
+    expect(r.statusCode).toBe(422);
+  });
+});
+
 describe('ranking', () => {
   it('fluxo completo: conta envia, ranking mostra a melhor de cada um', async () => {
     const gui = await register('Gui');
