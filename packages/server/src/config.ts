@@ -4,7 +4,7 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().default(4000),
   HOST: z.string().default('0.0.0.0'),
-  DATABASE_URL: z.string().min(1, 'DATABASE_URL não definida (conecte um banco Neon ao projeto)'),
+  DATABASE_URL: z.string({ error: 'não definida (conecte um banco Neon ao projeto)' }).min(1, 'não definida (conecte um banco Neon ao projeto)'),
   /** Assina os tokens de partida. Precisa ser longo e aleatório em produção. */
   APP_SECRET: z.string().min(16).default('dev-only-secret-change-me-please'),
   SESSION_TTL_DAYS: z.coerce.number().int().min(1).max(365).default(180),
