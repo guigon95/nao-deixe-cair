@@ -1,4 +1,9 @@
 node_modules
 dist
-e2e/screens
+**/e2e/screens
 *.tsbuildinfo
+.env
+.env.*
+!.env.example
+*.log
+.vercel

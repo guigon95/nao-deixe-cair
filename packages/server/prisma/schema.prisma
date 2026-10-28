@@ -1,0 +1,59 @@
+// Dados do Não Deixe Cair: jogadores (contas), sessões e pontuações.
+
+generator client {
+  provider      = "prisma-client-js"
+  // rhel-openssl-3.0.x = runtime das Vercel Functions
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  // Migrações usam conexão direta (sem pool). A integração Neon na Vercel
+  // define as duas; localmente use a mesma URL nas duas.
+  directUrl = env("DATABASE_URL_UNPOOLED")
+}
+
+/// Conta de jogador. Vale para todos os jogos do hub.
+model Player {
+  id           String    @id @default(cuid())
+  /// Apelido como o jogador digitou (já limpo).
+  name         String
+  /// Apelido normalizado (minúsculas, sem acento) — garante nomes únicos sem diferenciar "Zé" de "ze".
+  nameKey      String    @unique
+  passwordHash String
+  createdAt    DateTime  @default(now())
+  sessions     Session[]
+  scores       Score[]
+}
+
+model Session {
+  /// sha256 do token do cookie (o token em si nunca é guardado).
+  id        String   @id
+  playerId  String
+  player    Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  userAgent String?
+
+  @@index([playerId])
+}
+
+/// Uma partida enviada ao ranking. Com conta: toda partida é guardada e o
+/// ranking usa a melhor. Sem conta ("só meu nome"): só entra se for top 10.
+model Score {
+  id         String   @id @default(cuid())
+  game       String
+  score      Int
+  /// Nome exibido (de convidado; para contas o ranking mostra o nome atual da conta).
+  name       String
+  playerId   String?
+  player     Player?  @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  /// Id da partida vindo do token assinado: cada partida só pode ser enviada uma vez.
+  runId      String   @unique
+  durationMs Int
+  createdAt  DateTime @default(now())
+
+  @@index([game, score(sort: Desc)])
+  @@index([playerId, game, score(sort: Desc)])
+}

@@ -7,49 +7,94 @@ Hub de jogos casuais para navegador (prioridade para celular). Cada jogo fica na
 | **Bolinha** (nome provisório) | `bolinha/` | Segure para subir, solte para cair. Passe pelos vãos das barreiras. |
 | **Acrobata** | `aviao/` | Segure para subir (quanto mais tempo, mais alto), solte para mergulhar, toque + toque e segure dá um loop. Encadeie manobras. |
 
-React 19 + TypeScript estrito + Vite (multi-página) + Canvas 2D. Sem backend, sem contas reais, sem anúncios, sem analytics. Sons sintetizados com Web Audio (sem arquivos de terceiros). Funciona offline depois de carregado.
+React 19 + TypeScript estrito + Vite (multi-página) + Canvas 2D no front; **API Fastify + Prisma + Postgres** para contas e ranking de todos os jogadores (mesmo padrão do AquaOps). Sem anúncios, sem analytics. Sons sintetizados com Web Audio. Sem servidor (offline ou hospedagem estática) tudo continua funcionando com ranking e perfil locais.
+
+```
+packages/web      hub + jogos (Vite)          → serviço "web" na Vercel
+packages/server   API: contas, sessões, ranking → serviço "server" na Vercel (/api/*)
+```
 
 ## Rodar no Windows (ou em qualquer sistema)
 
 ```bash
 npm install
-npm run dev          # http://localhost:5173 → hub; /bolinha/ e /aviao/ são os jogos
+npm run dev:web      # só o front: http://localhost:5173 (sem API → ranking local)
 ```
 
-O `npm run dev` também abre na rede local (`server.host`), então dá para testar no celular pelo IP do computador (ex.: `http://192.168.0.10:5173`).
+Com o backend (precisa de um Postgres — local, Docker ou um banco Neon de desenvolvimento):
+
+```bash
+copy packages\server\.env.example packages\server\.env   # (cp no Linux/macOS) e ajuste DATABASE_URL
+npm run db:migrate   # cria as tabelas
+npm run dev          # API em :4000 + front em :5173 (o Vite repassa /api para a API)
+```
+
+O front abre também na rede local (`server.host`), então dá para testar no celular pelo IP do computador (ex.: `http://192.168.0.10:5173`).
 
 ## Testes e qualidade
 
 ```bash
-npm test             # Vitest: física, colisão, geradores, manobras, combo, estados, migração de chaves
+npm test             # Vitest: jogos + cliente online (web) e API contra Postgres real (server)
 npm run lint         # ESLint
 npm run typecheck    # TypeScript estrito
 ```
 
+Os testes do servidor usam o banco de `TEST_DATABASE_URL` (padrão `postgresql://postgres:postgres@localhost:5432/ndc_test`) e apagam os dados dele a cada teste — nunca aponte para produção.
+
 Testes em navegador real (Python + Playwright com Chromium):
 
 ```bash
-npm run build && npx vite preview --port 4173      # em outro terminal
+cd packages/web
+npm run build && npx vite preview --port 4173      # em outro terminal; sem API = modo local
 python e2e/hub.py http://localhost:4173 e2e/screens             # hub, migração, perfil compartilhado
 python e2e/bolinha_smoke.py http://localhost:4173 e2e/screens   # bolinha: controles, pausa, layouts
-python e2e/bolinha_ranking.py http://localhost:4173 e2e/screens # bolinha: ranking, perfil, sons
+python e2e/bolinha_ranking.py http://localhost:4173 e2e/screens # bolinha: ranking local, perfil, sons
 python e2e/aviao.py http://localhost:4173 e2e/screens           # acrobata: controle, loop, fim, ranking, layouts
+
+# modo online (API rodando em :4000 com um banco de teste vazio)
+API_PROXY_TARGET=http://localhost:4000 npx vite preview --port 4174
+python e2e/online.py http://localhost:4174 e2e/screens          # contas, sessão, ranking entre 2 aparelhos
 ```
 
 (No Windows use `python`; no Linux/macOS, `python3`. Primeira vez: `pip install playwright` e `python -m playwright install chromium`.)
 
+## Backend: contas e ranking online
+
+API em `packages/server` (Fastify 5 + Prisma 6 + Postgres), no mesmo formato do AquaOps.
+
+| Rota | O quê |
+|---|---|
+| `GET /api/health` | 200 só quando API **e** banco respondem — o front usa isso para decidir entre modo online e local |
+| `POST /api/auth/register` · `login` · `logout`, `GET /api/auth/me` | conta com apelido + senha (bcrypt), sessão em cookie `httpOnly` |
+| `GET /api/games/:jogo/ranking` | top 10 do jogo (melhor de cada conta + convidados) e, com sessão, a posição do jogador |
+| `POST /api/games/:jogo/runs` | token assinado do início da partida |
+| `POST /api/games/:jogo/scores` | envia a pontuação com o token |
+
+Regras:
+
+- **Apelido único** sem diferenciar maiúscula nem acento ("Zé" = "ze"); 2–16 caracteres, as mesmas regras do front. Senha com 6+ caracteres.
+- **Com conta**, toda partida é guardada e o ranking usa a melhor; a posição aparece mesmo fora do top 10. **Sem conta** ("Só meu nome"), a pontuação só entra se for top 10, e o nome não pode ser o de uma conta.
+- **Anti-trapaça simples**: cada partida pega um token assinado (HMAC com `APP_SECRET`) ao começar; o envio confere assinatura, jogo, validade (6 h), uso único e um teto de pontos por segundo de partida por jogo (`src/lib/games.ts`). Não impede um trapaceiro determinado (o jogo roda no navegador), mas barra o `fetch` com 99999 pontos.
+- Proteções do AquaOps: header anti-CSRF (`x-ndc-csrf`) em toda escrita, limite de tentativas (10/min no login), helmet, logs sem cookies.
+- O front pede o token **antes** da partida (pré-busca) para o JOGAR nunca esperar a rede. Se o servidor cair no meio, a pontuação é salva neste aparelho e o jogo avisa.
+
+Variáveis (`packages/server/.env.example`): `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, `APP_SECRET`, `SESSION_TTL_DAYS` (padrão 180).
+
 ## Build de produção e publicação
 
 ```bash
-npm run build        # gera dist/ com o hub e TODOS os jogos
-npm run preview      # confere o build localmente
+npm run build        # gera o Prisma Client, empacota a API e gera packages/web/dist com o hub e TODOS os jogos
 ```
 
-`dist/` é 100 % estático e usa caminhos relativos (`base: './'`), então funciona em qualquer hospedagem estática, inclusive em subpasta. **Publique sempre a pasta `dist/` inteira** — o deploy é de tudo junto:
+**Vercel (recomendado):** o `vercel.json` define dois serviços — `web` (Vite, `packages/web`) e `server` (Fastify, `packages/server`) — e manda `/api/*` para a API. Para o ranking online funcionar:
 
-- **Netlify / Cloudflare Pages / Vercel:** comando `npm run build`, pasta de saída `dist`.
-- **GitHub Pages:** action oficial `actions/deploy-pages` com `path: dist` (ou envie o conteúdo de `dist/` para a branch `gh-pages`).
-- **itch.io:** compacte o conteúdo de `dist/` em .zip e envie como projeto HTML.
+1. No projeto da Vercel: **Storage → Create Database → Neon** e conecte ao projeto (cria `DATABASE_URL` e `DATABASE_URL_UNPOOLED`).
+2. Defina `APP_SECRET` (string longa e aleatória, ex.: `openssl rand -base64 48`).
+3. Faça o deploy. Em produção o build aplica as migrações (`prisma migrate deploy`); previews não mexem no banco.
+
+Sem banco conectado o deploy continua funcionando: a API responde 503 e os jogos usam ranking local.
+
+**Hospedagem estática (Netlify, GitHub Pages, itch.io):** publique `packages/web/dist` — os jogos funcionam no modo local (sem contas nem ranking global).
 
 ## Dados dos jogadores (localStorage)
 
@@ -61,11 +106,15 @@ npm run preview      # confere o build localmente
 
 Na primeira abertura depois da atualização, `migrateLegacyKeys` copia **uma única vez** as chaves antigas `nao-deixe-cair:*` para as novas (sem apagar as antigas e sem sobrescrever valores novos). Ninguém perde recorde, ranking nem perfil.
 
-Ranking e perfil seguem as interfaces `RankingService` (`src/shared/ranking/Ranking.ts`) e `AuthProvider` (`src/shared/auth/auth.ts`): um backend futuro implementa as mesmas interfaces sem mudar as telas.
+| `ndc:account` | nome da última conta online (só para mostrar na hora; a sessão de verdade é o cookie) |
+
+Front online em `packages/web/src/shared/online/`: `api.ts` (cliente HTTP), `services.ts` (rotas), `player.ts` (conta online ou perfil local), `RankingController.ts` (ranking online/local, tokens, fallback) e `hooks.ts` (`usePlayer`, `useRanking`, usados pelo hub e pelos dois jogos).
 
 ## Arquitetura
 
 ```
+packages/server/        API (Fastify + Prisma): src/modules/{auth,ranking}.routes.ts, prisma/schema.prisma, test/
+packages/web/
 index.html              hub (escolha de jogos)
 bolinha/index.html      entrada do jogo da bolinha
 aviao/index.html        entrada do Acrobata
@@ -85,7 +134,7 @@ src/
 e2e/                    testes de navegador (hub + um por jogo)
 ```
 
-Para adicionar um jogo: uma pasta em `src/games/`, um `<jogo>/index.html`, uma entrada em `vite.config.ts` (`build.rollupOptions.input`) e uma em `src/shared/games.ts`.
+Para adicionar um jogo: uma pasta em `packages/web/src/games/`, um `<jogo>/index.html`, uma entrada em `vite.config.ts` (`build.rollupOptions.input`), uma em `src/shared/games.ts` e, para ranking online, o id em `packages/server/src/lib/games.ts` (com o teto de pontos por segundo).
 
 URLs de diagnóstico (nos dois jogos): `?debug` expõe `window.__NDC__`; `?seed=N` fixa a semente. No Acrobata: `?controle=a` ou `?controle=b` ligam os esquemas antigos e `?debug&piloto` liga o piloto automático.
 
@@ -165,4 +214,5 @@ Parâmetros em `src/games/bolinha/game/config.ts` e `Difficulty.ts`. Detalhes do
 - A calibragem do Acrobata foi feita com simulação e testes em Chromium (desktop e emulação de celular), **não em aparelho físico**. O ajuste fino de sensação (força da puxada, rasante, sons no alto-falante do iPhone) precisa de partidas reais.
 - A duração das partidas foi estimada com um "jogador casual" simulado (reação de 0,15–0,25 s e erros aleatórios): mediana entre ~27 s (descuidado) e ~85 s (cuidadoso). Jogadores reais podem diferir.
 - iOS não tem `navigator.vibrate`: lá a vibração simplesmente não acontece.
-- Ranking e perfil são locais ao aparelho/navegador (sem backend).
+- O recorde pessoal mostrado no menu ainda é o deste aparelho; o melhor da conta aparece no ranking online.
+- O anti-trapaça é básico (token + teto por tempo): quem editar o jogo no navegador ainda consegue enviar pontuações plausíveis.

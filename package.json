@@ -1,32 +1,34 @@
 {
   "name": "nao-deixe-cair",
-  "version": "1.0.0",
-  "description": "Não Deixe Cair — arcade casual de sobrevivência infinita para navegador",
+  "version": "1.1.0",
+  "description": "Não Deixe Cair — hub de jogos de um toque para navegador, com contas e ranking online",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/web",
+    "packages/server"
+  ],
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview",
-    "test": "vitest run",
-    "lint": "eslint .",
-    "typecheck": "tsc -b"
-  },
-  "dependencies": {
-    "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "dev": "concurrently -n api,web -c blue,green \"npm run dev -w @ndc/server\" \"npm run dev -w @ndc/web\"",
+    "dev:web": "npm run dev -w @ndc/web",
+    "build": "npm run build -w @ndc/server && npm run build -w @ndc/web",
+    "preview": "npm run preview -w @ndc/web",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "db:migrate": "npm run db:migrate -w @ndc/server",
+    "db:migrate:dev": "npm run db:migrate:dev -w @ndc/server"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@types/react": "^19.3.0",
-    "@types/react-dom": "^19.3.0",
-    "@vitejs/plugin-react": "^6.1.2",
+    "concurrently": "^10.0.6",
     "eslint": "^10.13.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.13.0",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.72.1",
-    "vite": "^8.3.5",
-    "vitest": "^5.0.5"
+    "typescript-eslint": "^8.72.1"
   },
-  "private": true,
-  "type": "module"
+  "engines": {
+    "node": ">=20"
+  }
 }

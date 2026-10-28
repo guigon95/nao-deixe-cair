@@ -1,0 +1,399 @@
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { isValidName, NAME_MAX, NAME_MIN, type RankingEntry } from '../ranking/Ranking';
+import type { Profile } from '../auth/auth';
+import type { SaveState } from '../online/hooks';
+import { PASSWORD_MIN } from '../online/player';
+
+/** Formata a posição: 1º, 2º... */
+export const ordinal = (n: number) => `${n}º`;
+
+/** 'online' = ranking de todos os jogadores (com servidor); 'local' = deste aparelho. */
+export type Scope = 'online' | 'local' | 'checking';
+
+export function RankingList({
+  entries,
+  highlightId,
+  youId,
+}: {
+  entries: RankingEntry[];
+  highlightId?: string;
+  /** Conta logada: destaca a linha dela. */
+  youId?: string;
+}) {
+  if (entries.length === 0) {
+    return (
+      <p className="rank-empty">
+        Ninguém no ranking ainda.
+        <br />
+        Jogue uma partida e seja o primeiro.
+      </p>
+    );
+  }
+  return (
+    <ol className="rank-list">
+      {entries.map((e, i) => (
+        <li
+          key={e.id}
+          className={e.id === highlightId || (youId && e.profileId === youId) ? 'is-you' : undefined}
+          data-pos={i + 1}
+        >
+          <span className="rank-pos">{ordinal(i + 1)}</span>
+          <span className="rank-name">
+            {e.name}
+            {e.profileId && (
+              <span className="rank-tag" title="Conta">
+                ●
+              </span>
+            )}
+          </span>
+          <span className="rank-score">{e.score}</span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+export function RankingPanel({
+  entries,
+  highlightId,
+  scope = 'local',
+  me,
+  youId,
+  onClose,
+}: {
+  entries: RankingEntry[];
+  highlightId?: string;
+  scope?: Scope;
+  /** Melhor do jogador logado (online), para mostrar a posição mesmo fora do top 10. */
+  me?: { best: number; position: number } | null;
+  youId?: string;
+  onClose: () => void;
+}) {
+  const closeRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => closeRef.current?.focus({ preventScroll: true }), []);
+  return (
+    <section className="panel ranking" data-ui role="dialog" aria-modal="true" aria-labelledby="rank-title">
+      <h2 id="rank-title" className="panel-title">
+        Ranking
+      </h2>
+      <p className="rank-scope" data-scope={scope}>
+        {scope === 'online' ? 'Melhores de todos os jogadores' : 'Melhores pontuações neste aparelho'}
+      </p>
+      <RankingList entries={entries} highlightId={highlightId} youId={youId} />
+      {scope === 'online' && me && me.position > entries.length && (
+        <p className="rank-me">
+          Você: <strong>{ordinal(me.position)}</strong> lugar com <strong>{me.best}</strong>
+        </p>
+      )}
+      <button ref={closeRef} className="btn btn-secondary" onClick={onClose}>
+        Voltar
+      </button>
+    </section>
+  );
+}
+
+/**
+ * Formulário de apelido (e senha, quando há servidor).
+ * `onSubmit` devolve a mensagem de erro, ou null se deu certo.
+ */
+function NameForm({
+  title,
+  hint,
+  submitLabel,
+  initial,
+  withPassword = false,
+  onSubmit,
+  onCancel,
+  footer,
+}: {
+  title: string;
+  hint: string;
+  submitLabel: string;
+  initial: string;
+  withPassword?: boolean;
+  onSubmit: (name: string, password: string) => Promise<string | null> | string | null | void;
+  onCancel: () => void;
+  footer?: ReactNode;
+}) {
+  const [name, setName] = useState(initial);
+  const [password, setPassword] = useState('');
+  const [touched, setTouched] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    inputRef.current?.focus({ preventScroll: true });
+    inputRef.current?.select();
+  }, []);
+  const validName = isValidName(name);
+  const validPassword = !withPassword || password.length >= PASSWORD_MIN;
+  const submit = async (ev: FormEvent) => {
+    ev.preventDefault();
+    setTouched(true);
+    setError(null);
+    if (!validName || !validPassword || busy) return;
+    setBusy(true);
+    try {
+      const err = await onSubmit(name, password);
+      if (err) setError(err);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const nameMsg = touched && !validName ? `Use de ${NAME_MIN} a ${NAME_MAX} caracteres, com pelo menos uma letra ou número.` : null;
+  const pwMsg = touched && !validPassword ? `A senha precisa ter pelo menos ${PASSWORD_MIN} caracteres.` : null;
+  const message = error ?? nameMsg ?? pwMsg;
+  return (
+    <form className="name-form" onSubmit={submit} noValidate aria-busy={busy}>
+      <label className="name-label" htmlFor="player-name">
+        {title}
+      </label>
+      <input
+        ref={inputRef}
+        id="player-name"
+        name="player-name"
+        className="name-input"
+        type="text"
+        inputMode="text"
+        autoComplete={withPassword ? 'username' : 'nickname'}
+        autoCapitalize="words"
+        enterKeyHint={withPassword ? 'next' : 'done'}
+        maxLength={NAME_MAX}
+        value={name}
+        placeholder="Seu apelido"
+        aria-invalid={!!nameMsg}
+        aria-describedby="name-hint"
+        onChange={(e) => setName(e.target.value)}
+      />
+      {withPassword && (
+        <input
+          id="player-password"
+          name="player-password"
+          className="name-input"
+          type="password"
+          autoComplete="current-password"
+          enterKeyHint="done"
+          maxLength={72}
+          value={password}
+          placeholder="Senha"
+          aria-label="Senha"
+          aria-invalid={!!pwMsg}
+          aria-describedby="name-hint"
+          onChange={(e) => setPassword(e.target.value)}
+        />
+      )}
+      <p id="name-hint" className={`name-hint${message ? ' is-error' : ''}`} role={error ? 'alert' : undefined}>
+        {message ?? hint}
+      </p>
+      <div className="form-row">
+        <button type="button" className="btn btn-link" onClick={onCancel}>
+          Cancelar
+        </button>
+        <button type="submit" className="btn btn-save" disabled={busy}>
+          {busy ? 'Aguarde…' : submitLabel}
+        </button>
+      </div>
+      {footer}
+    </form>
+  );
+}
+
+/** Formulário de entrada: conta online (apelido + senha) ou perfil local (só apelido). */
+function AccountForm({
+  online,
+  initial,
+  saveAfter,
+  onSignIn,
+  onCancel,
+}: {
+  online: boolean;
+  initial: string;
+  /** No fim da partida: os botões dizem "… e salvar". */
+  saveAfter: boolean;
+  onSignIn: (name: string, password: string, create: boolean) => Promise<string | null> | string | null | void;
+  onCancel: () => void;
+}) {
+  const [create, setCreate] = useState(true);
+  const suffix = saveAfter ? ' e salvar' : '';
+  if (!online) {
+    return (
+      <NameForm
+        title="Entrar com um perfil"
+        hint={
+          saveAfter
+            ? 'Seu perfil fica salvo neste aparelho e as próximas pontuações entram sozinhas.'
+            : 'Seu perfil fica salvo neste aparelho e suas pontuações entram no ranking sozinhas.'
+        }
+        submitLabel={`Entrar${suffix}`}
+        initial={initial}
+        onSubmit={(n) => onSignIn(n, '', false)}
+        onCancel={onCancel}
+      />
+    );
+  }
+  return (
+    <NameForm
+      key={create ? 'create' : 'login'}
+      title={create ? 'Criar sua conta' : 'Entrar na sua conta'}
+      hint={
+        create
+          ? 'Escolha um apelido e uma senha. Sua conta vale em qualquer aparelho e suas pontuações entram no ranking sozinhas.'
+          : 'Use o apelido e a senha da sua conta.'
+      }
+      submitLabel={create ? `Criar conta${suffix}` : `Entrar${suffix}`}
+      initial={initial}
+      withPassword
+      onSubmit={(n, p) => onSignIn(n, p, create)}
+      onCancel={onCancel}
+      footer={
+        <button type="button" className="btn btn-link btn-tiny account-switch" onClick={() => setCreate((c) => !c)}>
+          {create ? 'Já tenho conta' : 'Não tem conta? Criar conta'}
+        </button>
+      }
+    />
+  );
+}
+
+type SaveMode = 'choose' | 'login' | 'guest';
+
+/**
+ * Bloco do fim de jogo: envia a pontuação ao ranking.
+ * - Com conta/perfil: salva sozinho e mostra a posição.
+ * - Sem: oferece “Entrar” (salva agora e nas próximas) ou “Só meu nome”.
+ */
+export function SaveScore({
+  score,
+  qualifies,
+  threshold,
+  profile,
+  save,
+  online,
+  guestName,
+  onSignIn,
+  onGuest,
+  onShowRanking,
+}: {
+  score: number;
+  qualifies: boolean;
+  threshold: number;
+  profile: Profile | null;
+  save: SaveState;
+  online: boolean;
+  guestName: string;
+  /** Entra (ou cria conta) e salva esta partida; devolve erro ou null. */
+  onSignIn: (name: string, password: string, create: boolean) => Promise<string | null> | string | null | void;
+  /** Salva só com o nome; devolve erro ou null. */
+  onGuest: (name: string) => Promise<string | null> | string | null | void;
+  onShowRanking: () => void;
+}) {
+  const [mode, setMode] = useState<SaveMode>('choose');
+  const result = save.outcome?.result ?? null;
+
+  if (save.status === 'saved' && result) {
+    const kept = result.personalBest === false;
+    return (
+      <div className="save-box is-saved" role="status">
+        <p className="save-title">{ordinal(result.position)} lugar no ranking</p>
+        <p className="save-sub">
+          {kept ? `Seu melhor continua ${result.entry.score} pontos` : `Salvo como ${result.entry.name}`}
+          {save.outcome?.message ? ` · ${save.outcome.message}` : ''}
+        </p>
+        <button className="btn btn-link" onClick={onShowRanking}>
+          Ver ranking
+        </button>
+      </div>
+    );
+  }
+
+  // Envio automático (com conta): o formulário do convidado mostra o próprio "Aguarde…".
+  if (save.status === 'saving' && profile) {
+    return (
+      <div className="save-box" role="status">
+        <p className="save-sub">Salvando no ranking…</p>
+      </div>
+    );
+  }
+
+  // Envio automático (com conta) que falhou: mostra o motivo.
+  if (save.status === 'error' && profile) {
+    return (
+      <div className="save-box" role="alert">
+        <p className="save-sub is-error">{save.outcome?.message ?? 'Não deu para salvar.'}</p>
+        <button className="btn btn-link" onClick={onShowRanking}>
+          Ver ranking
+        </button>
+      </div>
+    );
+  }
+
+  if (!qualifies || score <= 0) {
+    return (
+      <div className="save-box">
+        {score > 0 && threshold > 1 && <p className="save-sub">Faltaram {threshold - score} pontos para entrar no ranking.</p>}
+        <button className="btn btn-link" onClick={onShowRanking}>
+          Ver ranking
+        </button>
+      </div>
+    );
+  }
+
+  // Com perfil o salvamento é automático (o hook envia); este estado é só transitório.
+  if (profile) return null;
+
+  if (mode === 'login') {
+    return (
+      <div className="save-box">
+        <AccountForm online={online} initial={guestName} saveAfter onSignIn={onSignIn} onCancel={() => setMode('choose')} />
+      </div>
+    );
+  }
+
+  if (mode === 'guest') {
+    return (
+      <div className="save-box">
+        <NameForm
+          title="Seu nome no ranking"
+          hint="Só para esta pontuação. Nada de cadastro."
+          submitLabel="Salvar"
+          initial={guestName}
+          onSubmit={(n) => onGuest(n)}
+          onCancel={() => setMode('choose')}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="save-box">
+      <p className="save-title">Sua pontuação entra no ranking!</p>
+      <div className="form-row">
+        <button className="btn btn-save" onClick={() => setMode('login')}>
+          Entrar
+        </button>
+        <button className="btn btn-secondary btn-inline" onClick={() => setMode('guest')}>
+          Só meu nome
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Tela de login a partir do menu inicial (ou do hub). */
+export function LoginPanel({
+  initial,
+  online,
+  onSignIn,
+  onClose,
+}: {
+  initial: string;
+  online: boolean;
+  /** Devolve a mensagem de erro, ou null se entrou (quem chama fecha o painel). */
+  onSignIn: (name: string, password: string, create: boolean) => Promise<string | null> | string | null | void;
+  onClose: () => void;
+}) {
+  return (
+    <section className="panel" data-ui role="dialog" aria-modal="true" aria-label="Entrar">
+      <AccountForm online={online} initial={initial} saveAfter={false} onSignIn={onSignIn} onCancel={onClose} />
+    </section>
+  );
+}
