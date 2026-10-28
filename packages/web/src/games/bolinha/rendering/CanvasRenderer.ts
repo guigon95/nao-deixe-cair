@@ -4,6 +4,7 @@ import type { GameEngine } from '../game/GameEngine';
 import { GameState } from '../game/types';
 import type { Effects } from './effects';
 import { computeLayout, type Layout } from '../../../shared/layout/layout';
+import { blendPalette, drawCanopy, drawJungle, sceneryAt, weightOf, type Palette } from './scenery';
 
 export const COLORS = {
   page: '#070b1c',
@@ -36,6 +37,9 @@ export class CanvasRenderer {
   private arenaGradient: CanvasGradient | null = null;
   private barrierGradient: CanvasGradient | null = null;
   private glowSprite: HTMLCanvasElement | null = null;
+  /** Paleta do quadro atual (mistura dos cenários) e chave dos gradientes em cache. */
+  private palette: Palette = blendPalette(sceneryAt(0));
+  private gradientKey = '';
 
   constructor(private canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext('2d', { alpha: false });
@@ -53,13 +57,7 @@ export class CanvasRenderer {
     this.canvas.style.width = `${cssWidth}px`;
     this.canvas.style.height = `${cssHeight}px`;
 
-    const ctx = this.ctx;
-    this.arenaGradient = ctx.createLinearGradient(0, 0, 0, ARENA.height);
-    this.arenaGradient.addColorStop(0, COLORS.arenaTop);
-    this.arenaGradient.addColorStop(1, COLORS.arenaBottom);
-    this.barrierGradient = ctx.createLinearGradient(0, 0, PHYSICS.ballRadius * 4.5, 0);
-    this.barrierGradient.addColorStop(0, COLORS.barrier);
-    this.barrierGradient.addColorStop(1, COLORS.barrierDark);
+    this.gradientKey = ''; // recria os gradientes no próximo quadro
     this.glowSprite = makeGlowSprite(Math.ceil(PHYSICS.ballRadius * 4 * this.layout.scale * dpr));
   }
 
@@ -86,15 +84,21 @@ export class CanvasRenderer {
     ctx.beginPath();
     roundRect(ctx, 0, 0, ARENA.width, ARENA.height, 18);
     ctx.clip();
-    ctx.fillStyle = this.arenaGradient ?? COLORS.arenaBottom;
+    // Cenário: mistura gradual conforme a pontuação (noite → selva → ...).
+    const scene = sceneryAt(engine.score.score);
+    this.usePalette(blendPalette(scene));
+    const jungle = weightOf(scene, 'selva');
+    ctx.fillStyle = this.arenaGradient ?? this.palette.skyBottom;
     ctx.fillRect(0, 0, ARENA.width, ARENA.height);
 
-    this.drawStars(fx);
+    this.drawStars(fx, weightOf(scene, 'noite'));
+    drawJungle(ctx, jungle, fx.scroll, fx.clock, !fx.reducedMotion);
     this.drawBands();
-    this.drawBarriers(engine);
+    drawCanopy(ctx, jungle, fx.scroll);
+    this.drawBarriers(engine, jungle);
     this.drawTrail(engine, fx);
     this.drawParticles(fx);
-    if (engine.state !== GameState.GAME_OVER || fx.flash > 0.6) this.drawBall(engine, fx);
+    if (engine.state !== GameState.GAME_OVER || fx.flash > 0.6) this.drawBall(engine, fx, jungle);
     this.drawFloaters(fx);
 
     if (fx.flash > 0) {
@@ -107,11 +111,27 @@ export class CanvasRenderer {
     if (engine.state === GameState.RESUMING) this.drawCountdown(engine.resumeCountdown);
   }
 
-  private drawStars(fx: Effects) {
+  /** Gradientes dependem da paleta: só são recriados quando ela muda. */
+  private usePalette(p: Palette) {
+    this.palette = p;
+    const key = `${p.skyTop}${p.skyBottom}${p.barrier}${p.barrierDark}`;
+    if (key === this.gradientKey) return;
+    this.gradientKey = key;
+    const ctx = this.ctx;
+    this.arenaGradient = ctx.createLinearGradient(0, 0, 0, ARENA.height);
+    this.arenaGradient.addColorStop(0, p.skyTop);
+    this.arenaGradient.addColorStop(1, p.skyBottom);
+    this.barrierGradient = ctx.createLinearGradient(0, 0, PHYSICS.ballRadius * 4.5, 0);
+    this.barrierGradient.addColorStop(0, p.barrier);
+    this.barrierGradient.addColorStop(1, p.barrierDark);
+  }
+
+  private drawStars(fx: Effects, visibility: number) {
+    if (visibility <= 0.01) return;
     const ctx = this.ctx;
     ctx.fillStyle = COLORS.star;
     for (const s of fx.stars) {
-      ctx.globalAlpha = 0.15 + s.z * 0.35;
+      ctx.globalAlpha = (0.15 + s.z * 0.35) * visibility;
       const size = 0.8 + s.z * 1.2;
       ctx.fillRect(s.x, s.y, size, size);
     }
@@ -121,10 +141,10 @@ export class CanvasRenderer {
   private drawBands() {
     const ctx = this.ctx;
     const { top, bottom } = playfield();
-    ctx.fillStyle = COLORS.band;
+    ctx.fillStyle = this.palette.band;
     ctx.fillRect(0, 0, ARENA.width, top);
     ctx.fillRect(0, bottom, ARENA.width, ARENA.height - bottom);
-    ctx.strokeStyle = COLORS.bandLine;
+    ctx.strokeStyle = this.palette.bandLine;
     ctx.lineWidth = 1;
     ctx.setLineDash([6, 6]);
     ctx.beginPath();
@@ -136,7 +156,7 @@ export class CanvasRenderer {
     ctx.setLineDash([]);
   }
 
-  private drawBarriers(engine: GameEngine) {
+  private drawBarriers(engine: GameEngine, jungle: number) {
     const ctx = this.ctx;
     const a = engine.alpha;
     for (const b of engine.obstacles.barriers) {
@@ -144,7 +164,7 @@ export class CanvasRenderer {
       if (x > ARENA.width + 4 || x + b.width < -4) continue;
       ctx.save();
       ctx.translate(x, 0);
-      ctx.fillStyle = this.barrierGradient ?? COLORS.barrier;
+      ctx.fillStyle = this.barrierGradient ?? this.palette.barrier;
       // Parte superior e inferior; cantos arredondados só no lado do vão.
       ctx.beginPath();
       roundRect(ctx, 0, -20, b.width, b.gapTop + 20, 10);
@@ -154,7 +174,9 @@ export class CanvasRenderer {
       // Listras diagonais: a barreira se distingue por textura, não só pela cor.
       ctx.save();
       ctx.clip();
-      ctx.strokeStyle = 'rgba(255,255,255,0.09)';
+      // noite: listras claras; selva: veios escuros de casca de árvore
+      ctx.strokeStyle = this.palette.stripe;
+      ctx.globalAlpha = 0.09 + 0.2 * jungle;
       ctx.lineWidth = 6;
       ctx.beginPath();
       for (let yy = -40; yy < ARENA.height + 40; yy += 22) {
@@ -162,11 +184,12 @@ export class CanvasRenderer {
         ctx.lineTo(b.width + 10, yy - 20);
       }
       ctx.stroke();
+      ctx.globalAlpha = 1;
       ctx.restore();
 
       // Bordas do vão, mais claras, para ler a abertura de longe.
       const glow = b.passed ? Math.max(0, 1 - b.passGlow * 2.5) : 0;
-      ctx.fillStyle = glow > 0 ? mix(COLORS.barrierEdge, COLORS.passed, glow) : COLORS.barrierEdge;
+      ctx.fillStyle = glow > 0 ? mix(this.palette.barrierEdge, COLORS.passed, glow) : this.palette.barrierEdge;
       ctx.beginPath();
       roundRect(ctx, 0, b.gapTop - 6, b.width, 6, 3);
       roundRect(ctx, 0, b.gapBottom, b.width, 6, 3);
@@ -195,7 +218,7 @@ export class CanvasRenderer {
     ctx.globalAlpha = 1;
   }
 
-  private drawBall(engine: GameEngine, fx: Effects) {
+  private drawBall(engine: GameEngine, fx: Effects, daylight: number) {
     const ctx = this.ctx;
     const b = engine.ball;
     const y = b.prevY + (b.y - b.prevY) * engine.alpha;
@@ -216,6 +239,12 @@ export class CanvasRenderer {
     ctx.beginPath();
     ctx.arc(0, 0, r, 0, Math.PI * 2);
     ctx.fill();
+    if (daylight > 0.01) {
+      // contorno para a bolinha amarela não sumir no céu claro
+      ctx.strokeStyle = `rgba(90, 50, 0, ${0.55 * daylight})`;
+      ctx.lineWidth = 1.6;
+      ctx.stroke();
+    }
     ctx.fillStyle = COLORS.ballCore;
     ctx.beginPath();
     ctx.arc(-r * 0.3, -r * 0.3, r * 0.38, 0, Math.PI * 2);

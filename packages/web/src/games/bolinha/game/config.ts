@@ -79,6 +79,18 @@ export const CONTINUES = {
   clearAhead: 240,
 } as const;
 
+/**
+ * Cenários por pontuação. Cada um começa a aparecer em `at` pontos e leva
+ * `over` pontos para tomar a tela inteira (transição gradual). Para um novo
+ * cenário (ex.: neve), acrescente aqui e crie a paleta/decoração em
+ * rendering/scenery.ts. Puramente visual: não muda a física nem as barreiras.
+ */
+export type SceneId = 'noite' | 'selva';
+export const SCENERY: readonly { id: SceneId; at: number; over: number }[] = [
+  { id: 'noite', at: 0, over: 0 },
+  { id: 'selva', at: 60, over: 40 },
+];
+
 export const STORAGE_KEYS = {
   best: gameKey('bolinha', 'best'),
   settings: HUB_KEYS.settings,

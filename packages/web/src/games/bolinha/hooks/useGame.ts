@@ -10,6 +10,7 @@ import { Sfx } from '../audio';
 import { loadSettings, saveSettings, type Settings } from '../../../shared/settings/settings';
 import { CanvasRenderer, COLORS } from '../rendering/CanvasRenderer';
 import { Effects } from '../rendering/effects';
+import { SCENE_NAMES, sceneryAt } from '../rendering/scenery';
 import { effectiveDpr } from '../../../shared/layout/layout';
 
 export interface UiState {
@@ -86,6 +87,8 @@ export function useGame() {
 
     let combo = 0;
     let lastTick = 0;
+    /** Último cenário anunciado nesta partida ("SELVA!" quando ela começa a chegar). */
+    let sceneShown = sceneryAt(0).to;
     const unsubscribe = engine.on((e) => {
       switch (e.type) {
         case 'state':
@@ -99,6 +102,7 @@ export function useGame() {
           input.setEnabled(e.state === GameState.PLAYING || e.state === GameState.RESUMING);
           if (e.state === GameState.PLAYING && e.previous !== GameState.RESUMING && e.previous !== GameState.PAUSED) {
             fx.clear();
+            sceneShown = sceneryAt(0).to;
           }
           if (e.state === GameState.PLAYING) engine.setHolding(input.isHolding);
           setUi((u) => ({ ...u, state: e.state, best: engine.score.best, liveRunId: engine.runId, livesLeft: engine.livesLeft }));
@@ -133,6 +137,11 @@ export function useGame() {
       const frozen = st === GameState.PAUSED || st === GameState.RESUMING;
       const fdt = Math.min(dt, 0.1);
       if (st === GameState.PLAYING) {
+        const scene = sceneryAt(engine.score.score).to;
+        if (scene !== sceneShown) {
+          sceneShown = scene;
+          fx.float(ARENA.width / 2, ARENA.height * 0.36, SCENE_NAMES[scene], true);
+        }
         fx.recordTrail(engine.ball.y, fdt);
         if (engine.holding) fx.thrust(engine.ball.x, engine.ball.y, engine.ball.radius, fdt);
         sfx.thrust(engine.holding, Math.max(0, Math.min(1, -engine.ball.vy / 430)));

@@ -46,6 +46,10 @@ export class Effects {
   pressPulse = 0;
   recordGlow = 0;
   reducedMotion = false;
+  /** Distância percorrida pelo cenário (u) — parallax da decoração de fundo. */
+  scroll = 0;
+  /** Relógio dos efeitos (s) — balanço de cipós, macacos e folhas. */
+  clock = 0;
   private trailTimer = 0;
   private thrustTimer = 0;
 
@@ -137,6 +141,8 @@ export class Effects {
   }
 
   update(dt: number, scrollSpeed: number): void {
+    this.scroll += scrollSpeed * dt;
+    this.clock += dt;
     for (const p of this.particles) {
       if (!p.active) continue;
       p.life -= dt;

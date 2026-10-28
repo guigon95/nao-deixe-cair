@@ -215,6 +215,12 @@ Uma versão anterior do C usava dois toques rápidos para o loop; com o mergulho
 - **Anúncio para continuar (futuro):** o botão chama `rewardedAds.show('continue')` (`packages/web/src/shared/ads/rewarded.ts`). Hoje `NoAds` libera na hora; para ligar anúncios, implemente `RewardedAds` com a rede escolhida e troque `rewardedAds` — o botão passa a dizer "▶ ASSISTIR E CONTINUAR" e só continua se o anúncio for assistido até o fim.
 - Ajustes em `CONTINUES` (`src/games/bolinha/game/config.ts`): `lives` (vidas por partida) e `clearAhead` (espaço livre à frente ao continuar).
 
+### Cenários (noite → selva)
+
+- O cenário muda com a pontuação, aos poucos: a partir de **60 pontos** a selva começa a aparecer e em **100 pontos** já tomou a tela (céu claro com sol, morros, palmeiras, cipós com macaquinhos balançando, copa de folhas, barreiras viram troncos). Aparece "BEM-VINDO À SELVA!" quando ela começa a chegar.
+- É só visual: a decoração fica atrás das barreiras, com pouco contraste, e não colide com nada. Com **Menos movimento**, cipós e macacos ficam parados.
+- Agenda em `SCENERY` (`game/config.ts`); paletas e desenhos em `rendering/scenery.ts`. Para um cenário novo (ex.: neve): uma entrada em `SCENERY`, uma paleta em `PALETTES`, um nome em `SCENE_NAMES` e uma função de decoração.
+
 Parâmetros em `src/games/bolinha/game/config.ts` e `Difficulty.ts`. Detalhes do jogo, do ranking e do som estão nos comentários do código e nos testes (`src/games/bolinha/__tests__`).
 
 ## Limitações conhecidas
