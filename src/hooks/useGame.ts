@@ -71,6 +71,10 @@ export function useGame() {
         fx.pressPulse = 1;
         sfx.unlock();
       }
+      if (engine.state === GameState.PLAYING) {
+        if (holding) sfx.press();
+        else sfx.release();
+      }
     });
     input.setEnabled(false);
 

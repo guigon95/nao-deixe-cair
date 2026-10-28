@@ -82,9 +82,10 @@ with sync_playwright() as p:
 
     y_before = state(page)["y"]
     touch("touchStart")
-    page.wait_for_timeout(350)
+    # A bolinha pode estar caindo no instante do toque: espera ela inverter e subir.
+    page.wait_for_timeout(500)
     s1 = state(page)
-    check("segurar faz a bolinha subir", s1["y"] < y_before - 20 and s1["vy"] < 0, f"{y_before:.0f}→{s1['y']:.0f}")
+    check("segurar faz a bolinha subir", s1["y"] < y_before - 10 and s1["vy"] < 0, f"{y_before:.0f}→{s1['y']:.0f}")
     page.screenshot(path=str(OUT / "02-playing-hold.png"))
     touch("touchEnd")
     page.wait_for_timeout(450)
@@ -112,7 +113,10 @@ with sync_playwright() as p:
     page.wait_for_timeout(250)
     check("retomada passa por contagem", state(page)["state"] == "RESUMING")
     page.screenshot(path=str(OUT / "04-resuming.png"))
-    page.wait_for_timeout(1300)
+    for _ in range(30):  # contagem de ~1,2 s; o tempo real do navegador sem tela varia
+        if state(page)["state"] == "PLAYING":
+            break
+        page.wait_for_timeout(100)
     check("após a contagem volta a jogar", state(page)["state"] == "PLAYING")
 
     # Deixar cair até colidir (sem tocar).
