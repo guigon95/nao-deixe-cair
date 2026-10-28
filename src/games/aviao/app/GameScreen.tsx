@@ -129,7 +129,7 @@ export function GameScreen() {
               <br />
               <strong>Solte</strong> para mergulhar e ganhar velocidade.
               <br />
-              <strong>Dois toques</strong> rápidos dão um <strong>loop</strong>.
+              <strong>Loop:</strong> toque e, logo em seguida, <strong>toque e segure</strong>.
             </p>
             <button ref={primaryRef} className="btn btn-primary" onClick={start}>
               DECOLAR

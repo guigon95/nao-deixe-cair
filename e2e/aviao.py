@@ -5,7 +5,8 @@ Uso:  npm run build && npx vite preview --port 4173   (em outro terminal)
       python3 e2e/aviao.py [http://localhost:4173] [pasta_de_capturas]
 
 Verifica com Pointer Events reais: segurar acelera e sobe cada vez mais alto
-sem virar loop, soltar desacelera, dois toques rápidos registram um loop, a batida leva ao fim de jogo, o reinício é
+sem virar loop, soltar desacelera, toque + toque-e-segure registra um loop (toques curtos
+em ritmo não), a batida leva ao fim de jogo, o reinício é
 imediato, o ranking funciona (Só meu nome), pausa ao ocultar a aba, um único
 laço de animação, sem erros de console e layouts em vários tamanhos.
 """
@@ -80,15 +81,22 @@ with sync_playwright() as p:
     page.wait_for_timeout(350)
     s2 = st(page)
     check("soltar desacelera (potência cai)", s2["throttle"] < 0.5, f"{s2['throttle']:.2f}")
-    # Dois toques rápidos com Pointer Events reais → loop.
+    # Dois toques curtos (ritmo frenético) NÃO dão loop.
+    for _ in range(4):
+        page.mouse.down(); page.wait_for_timeout(70); page.mouse.up(); page.wait_for_timeout(110)
+    page.wait_for_timeout(300)
+    check("toques rápidos curtos não dão loop", st(page)["loops"] == 0)
+    page.mouse.down(); page.wait_for_timeout(500); page.mouse.up()
+    page.wait_for_timeout(500)
+    # Toque + toque-e-segure com Pointer Events reais → loop.
     page.mouse.down(); page.wait_for_timeout(80); page.mouse.up()
-    page.wait_for_timeout(90)
-    page.mouse.down(); page.wait_for_timeout(80); page.mouse.up()
-    page.wait_for_timeout(900)
+    page.wait_for_timeout(100)
+    page.mouse.down(); page.wait_for_timeout(500); page.mouse.up()
+    page.wait_for_timeout(600)
     page.screenshot(path=str(OUT / "aviao-02b-loop.png"))
     page.wait_for_function("() => window.__NDC__.engine.score.loops >= 1", timeout=4000)
     s2b = st(page)
-    check("dois toques registram um loop", s2b["loops"] >= 1, f"loops={s2b['loops']} pontos={s2b['score']}")
+    check("toque + toque-e-segure registra um loop", s2b["loops"] >= 1, f"loops={s2b['loops']} pontos={s2b['score']}")
     page.wait_for_timeout(300)
     page.screenshot(path=str(OUT / "aviao-03-pos-loop.png"))
 

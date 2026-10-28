@@ -35,7 +35,7 @@ const VMAX = maxLevelSpeed();
 const HINT = [
   ['Segure: sobe', 132],
   ['Solte: mergulha', 110],
-  ['2 toques: LOOP!', 88],
+  ['Toque + toque e segure: LOOP!', 88],
 ] as const;
 
 /** Morros de fundo: parallax, cor, amplitude, base. */

@@ -80,20 +80,20 @@ export function compareControls(trials = 40): ControlReport[] {
 
     // 2) Loop de propósito. A: segura por 1,3–3,0 s ("segure até dar a volta").
     //    B: segura e desliza para cima com velocidade de 500–2000 u/s de tela.
-    //    C: dois toques (60–160 ms cada, intervalo de 80–220 ms).
+    //    C: toque (60–180 ms), intervalo de 80–260 ms, toque segurado por 0,4–0,8 s.
     const rng = createRng(1234);
     let ok = 0;
     for (let i = 0; i < trials; i++) {
-      const t1 = 0.06 + rng() * 0.1;
-      const gap = 0.08 + rng() * 0.14;
-      const t2 = 0.06 + rng() * 0.1;
+      const t1 = 0.06 + rng() * 0.12;
+      const gap = 0.08 + rng() * 0.18;
+      const hold = 0.4 + rng() * 0.4;
       const ev: Event[] =
         id === 'c'
           ? [
               { t: 0.1, kind: 'press' },
               { t: 0.1 + t1, kind: 'release' },
               { t: 0.1 + t1 + gap, kind: 'press' },
-              { t: 0.1 + t1 + gap + t2, kind: 'release' },
+              { t: 0.1 + t1 + gap + hold, kind: 'release' },
             ]
           : id === 'a'
           ? [

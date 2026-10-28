@@ -29,30 +29,39 @@ describe('esquemas de controle', () => {
     expect(Math.abs(c.command(1.1, p).pull)).toBeLessThan(0.05);
   });
 
-  it('C: dois toques rápidos = loop (puxada total até completar a volta)', () => {
+  it('C: toque + toque-e-segure = loop (puxada total até passar da volta)', () => {
     const c = createScheme('c');
     const p = createPlane(0, 0, 250);
     c.press(0);
     c.release(0.1);
     c.press(0.25);
-    expect(c.command(0.25, p)).toEqual({ throttle: 1, pull: 1 });
-    c.release(0.3);
+    // Ainda não confirmou: é um "segurar" normal (no ângulo de subida, quase não puxa).
+    p.phi = SCHEME_C.climbAngle;
+    p.speed = 400; // rápido: o ângulo de subida é o máximo
+    expect(Math.abs(c.command(0.3, p).pull)).toBeLessThan(0.1);
+    expect(c.gestures).toBe(0);
+    expect(c.command(0.25 + SCHEME_C.holdConfirm, p)).toEqual({ throttle: 1, pull: 1 });
+    expect(c.gestures).toBe(1);
+    c.release(0.8);
     p.phi = 3; // no meio do loop, mesmo sem tocar, continua puxando
-    expect(c.command(0.5, p).pull).toBe(1);
-    p.phi = Math.PI * 2 - 0.05; // quase: continua puxando até passar da volta
-    expect(c.command(0.6, p).pull).toBe(1);
-    p.phi = Math.PI * 2 + SCHEME_C.loopOvershoot; // completou: volta ao controle normal (solto = mergulho)
-    expect(c.command(0.7, p).throttle).toBe(0);
+    expect(c.command(0.9, p).pull).toBe(1);
+    const start = SCHEME_C.climbAngle; // ângulo em que o loop começou
+    p.phi = start + Math.PI * 2 - 0.05; // quase: continua puxando até passar da volta
+    expect(c.command(1, p).pull).toBe(1);
+    p.phi = start + Math.PI * 2 + SCHEME_C.loopOvershoot; // completou: volta ao controle normal (solto = mergulho)
+    expect(c.command(1.1, p).throttle).toBe(0);
   });
 
-  it('C: toques espaçados ou um toque longo não dão loop', () => {
+  it('C: dois toques curtos (ritmo frenético) não dão loop', () => {
     const c = createScheme('c');
-    c.press(0);
-    c.release(0.1);
-    c.press(0.1 + SCHEME_C.doubleTapGap + 0.1);
-    expect(c.gestures).toBe(0);
-    c.release(1.5);
-    c.press(1.6); // logo depois de um toque LONGO: não é toque duplo
+    const p = createPlane(0, 0, 250);
+    for (let i = 0; i < 20; i++) {
+      const t = i * 0.25;
+      c.press(t);
+      c.command(t + 0.05, p);
+      c.command(t + 0.12, p);
+      c.release(t + 0.14);
+    }
     expect(c.gestures).toBe(0);
   });
 
@@ -85,13 +94,14 @@ describe('esquemas de controle', () => {
     const [a, b, c] = compareControls(30);
     // resposta imediata (≤ 50 ms até o nariz girar 5°)
     expect(c.responseMs).toBeLessThanOrEqual(50);
-    // loop de propósito com dois toques
+    // loop de propósito com toque + toque-e-segure
     expect(c.loopSuccess).toBeGreaterThanOrEqual(0.95);
     // segurar sobe alto e nunca vira loop (o problema do esquema A)
     expect(c.hold3Loop).toBe(false);
     expect(a.hold3Loop).toBe(true);
     expect(c.hold3Climb).toBeGreaterThan(a.hold3Climb * 2);
-    // toques frenéticos disparam menos manobras sem querer que os gestos do B
+    // toques frenéticos quase não disparam loop sem querer
+    expect(c.accidentalPerMinute).toBeLessThan(3);
     expect(c.accidentalPerMinute).toBeLessThan(b.accidentalPerMinute);
   });
 });

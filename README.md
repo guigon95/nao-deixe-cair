@@ -5,7 +5,7 @@ Hub de jogos casuais para navegador (prioridade para celular). Cada jogo fica na
 | Jogo | Pasta / rota | Como se joga |
 |---|---|---|
 | **Bolinha** (nome provisório) | `bolinha/` | Segure para subir, solte para cair. Passe pelos vãos das barreiras. |
-| **Acrobata** | `aviao/` | Segure para subir (quanto mais tempo, mais alto), solte para mergulhar, dois toques rápidos dão um loop. Encadeie manobras. |
+| **Acrobata** | `aviao/` | Segure para subir (quanto mais tempo, mais alto), solte para mergulhar, toque + toque e segure dá um loop. Encadeie manobras. |
 
 React 19 + TypeScript estrito + Vite (multi-página) + Canvas 2D. Sem backend, sem contas reais, sem anúncios, sem analytics. Sons sintetizados com Web Audio (sem arquivos de terceiros). Funciona offline depois de carregado.
 
@@ -93,11 +93,11 @@ URLs de diagnóstico (nos dois jogos): `?debug` expõe `window.__NDC__`; `?seed=
 
 ## Acrobata (jogo do avião)
 
-### Controle: esquema C — "segurar sobe, dois toques dão o loop"
+### Controle: esquema C — "segurar sobe, toque + toque e segure dá o loop"
 
 - **Segurar** = motor no máximo e o nariz sobe até ~35–40° e **fica lá**: quanto mais tempo segurar, mais alto o avião vai (~200 u por segundo, 3 s ≈ 540 u). Nunca vira loop sem querer. Se o avião estiver lento, o ângulo diminui sozinho para não estolar.
 - **Soltar** = marcha lenta e o nariz desce na hora até um mergulho firme (~43°), como a bolinha caindo: aponta para baixo em ~0,24 s e desce a ~200 u/s. Segurar de novo inverte para cima em ~0,27 s.
-- **Dois toques rápidos** (cada um até 0,18 s, com no máximo 0,24 s entre eles) = **loop**: puxada total até passar da volta completa (~2 s). O loop começa na hora do segundo toque. Segurando depois do segundo toque, o avião sai do loop subindo.
+- **Loop = toque + toque e segure**: um toque curto (até 0,2 s) e, em até 0,3 s, outro toque que fica pressionado por 0,25 s. Aí começa a puxada total até passar da volta completa (~2 s). Até o loop começar o avião já está subindo, e quem continua segurando sai do loop subindo. Dois toques curtos em ritmo (o jeito de jogar a bolinha) **não** dão loop.
 - **Estol**: devagar e de nariz alto (por exemplo, um loop sem velocidade), a asa para de sustentar; aparece "ESTOL!", o nariz cai e o avião se recupera sozinho se houver altura.
 - Nos primeiros segundos de cada partida, uma dica na tela lembra os três gestos.
 
@@ -108,11 +108,11 @@ Comparação em `src/games/aviao/game/testing/compareControls.ts`, com jogadores
 | Critério | A (puxar) | B (gestos) | **C (atual)** |
 |---|---|---|---|
 | Toque → nariz gira 5° | 42 ms | 92 ms | **42 ms** |
-| Loops de propósito bem-sucedidos | 100 % (segurando) | 75 % (deslize) | **100 % (dois toques)** |
+| Loops de propósito bem-sucedidos | 100 % (segurando) | 75 % (deslize) | **100 % (toque + toque e segure)** |
 | Segurar 3 s: quanto sobe / vira loop? | 179 u / **sim** | 421 u / não | **552 u / não** |
-| Manobras sem querer por minuto de toques frenéticos | 0 | 36,4 tonneaus | 20,6 loops |
+| Manobras sem querer por minuto de toques frenéticos | 0 | 36,4 tonneaus | **0** |
 
-O ponto fraco do C: quem bate na tela muito rápido, em ritmo (o jeito de jogar a bolinha), pode disparar um loop sem querer. Apertar os tempos do toque duplo não resolve: com toques ≤ 0,14 s e intervalo ≤ 0,18 s os acidentais caem para ~10/min, mas só 54 % dos loops de propósito são reconhecidos.
+Uma versão anterior do C usava dois toques rápidos para o loop; com o mergulho firme, o ritmo frenético disparava ~20 loops sem querer por minuto. Exigir que o segundo toque fique pressionado resolveu: 0 acidentais e 100 % dos loops de propósito. O custo é ~0,25 s entre o segundo toque e o início do loop (nesse tempo o avião já está subindo).
 
 ### Manobras e pontuação
 

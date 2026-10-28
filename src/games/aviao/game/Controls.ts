@@ -152,9 +152,15 @@ export const SCHEME_C = {
   damping: 0.3,
   /** No mergulho o nariz desce com ganho próprio (resposta rápida ao soltar). */
   diveGain: 8,
-  /** Toque duplo: o primeiro toque é curto e o segundo vem logo depois (s). */
-  tapMax: 0.18,
-  doubleTapGap: 0.24,
+  /**
+   * Loop = toque + toque-e-segure: o primeiro toque é curto (≤ tapMax), o
+   * segundo vem logo depois (≤ doubleTapGap) e fica pressionado por
+   * holdConfirm. Quem bate na tela em ritmo raramente segura o segundo
+   * toque, então quase não dispara loops sem querer.
+   */
+  tapMax: 0.2,
+  doubleTapGap: 0.3,
+  holdConfirm: 0.25,
   /**
    * Loop assistido: termina um pouco DEPOIS de 360° (rad) ou se estolar.
    * Passar da volta garante que o loop conte antes de o mergulho assumir.
@@ -168,15 +174,15 @@ function wrapAngle(phi: number): number {
 }
 
 /**
- * Esquema C — "segurar sobe, dois toques dão o loop" (padrão).
+ * Esquema C — "segurar sobe, toque + toque-e-segure dá o loop" (padrão).
  * - Segurar = motor no máximo e o nariz sobe até um ângulo de subida firme
  *   e fica lá: quanto mais tempo segurar, mais alto o avião vai. Nunca vira
  *   loop sem querer.
  * - Soltar = marcha lenta e o nariz desce rápido até um mergulho firme
  *   (~43°), como a bolinha caindo; segurar de novo inverte na hora.
- * - Dois toques rápidos = loop: puxada total até completar a volta. A
- *   resposta é imediata no segundo toque (o primeiro já sobe o nariz).
- *   Segurando depois do segundo toque, o avião sai do loop subindo.
+ * - Toque + toque-e-segure = loop: puxada total até passar da volta. Até
+ *   o loop começar o avião já está subindo (o segundo toque é um "segurar"),
+ *   e quem continua segurando sai do loop subindo.
  */
 export class SchemeC implements ControlScheme {
   readonly id = 'c' as const;
@@ -187,13 +193,13 @@ export class SchemeC implements ControlScheme {
   private lastTapEnd = -10;
   private loopStart: number | null = null;
   private loopArmed = false;
+  /** Segundo toque em andamento: vira loop se ficar pressionado por holdConfirm. */
+  private pendingAt: number | null = null;
 
   press(t: number): void {
     this.holding = true;
-    // Segundo toque logo depois de um toque curto → loop.
     if (t - this.lastTapEnd <= SCHEME_C.doubleTapGap && this.loopStart === null) {
-      this.loopArmed = true;
-      this.gestures++;
+      this.pendingAt = t;
       this.lastTapEnd = -10;
     }
     this.pressAt = t;
@@ -201,6 +207,7 @@ export class SchemeC implements ControlScheme {
 
   release(t: number): void {
     this.holding = false;
+    this.pendingAt = null; // soltou cedo: era só um toque
     if (t - this.pressAt <= SCHEME_C.tapMax) this.lastTapEnd = t;
     else this.lastTapEnd = -10;
   }
@@ -212,7 +219,12 @@ export class SchemeC implements ControlScheme {
     return this.loopStart !== null || this.loopArmed;
   }
 
-  command(_t: number, plane: PlaneState): FlightCommand {
+  command(t: number, plane: PlaneState): FlightCommand {
+    if (this.pendingAt !== null && this.holding && t - this.pendingAt >= SCHEME_C.holdConfirm) {
+      this.pendingAt = null;
+      this.loopArmed = true;
+      this.gestures++;
+    }
     if (this.loopArmed) {
       this.loopArmed = false;
       this.loopStart = plane.phi;
@@ -245,6 +257,7 @@ export class SchemeC implements ControlScheme {
     this.lastTapEnd = -10;
     this.loopStart = null;
     this.loopArmed = false;
+    this.pendingAt = null;
   }
 }
 

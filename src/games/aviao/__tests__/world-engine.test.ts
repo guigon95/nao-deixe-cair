@@ -112,13 +112,13 @@ describe('motor da partida', () => {
     for (let i = 0; i < Math.round(up * 60); i++) e.advance(1 / 60);
   };
 
-  it('dois toques rápidos fazem um loop e dão pontos', () => {
+  it('toque + toque-e-segure faz um loop e dá pontos', () => {
     const e = mk();
     const got: string[] = [];
     e.on((ev: GameEvent) => ev.type === 'maneuver' && got.push(ev.m.kind));
     e.start();
     tap(e, 0.1, 0.12);
-    tap(e, 0.1, 2.5);
+    tap(e, 0.45, 2.5);
     expect(got).toContain('loop');
     expect(e.score.maneuverPoints).toBeGreaterThanOrEqual(100);
   });
@@ -195,7 +195,7 @@ describe('motor da partida', () => {
       tap(e, 0.1, 0.12);
       e.setHolding(true);
       let saw = 0;
-      for (let i = 0; i < 6; i++) e.advance(1 / 60);
+      for (let i = 0; i < 27; i++) e.advance(1 / 60);
       e.setHolding(false);
       for (let i = 0; i < 180; i++) {
         e.advance(1 / 60);
