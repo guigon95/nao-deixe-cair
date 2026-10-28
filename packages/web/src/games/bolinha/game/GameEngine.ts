@@ -1,4 +1,4 @@
-import { BALL_X, playfield, PHYSICS } from './config';
+import { BALL_X, ballBounds, CONTINUES, playfield, PHYSICS } from './config';
 import { ballHitsBarrier, substepsFor } from './Collision';
 import { difficultyAt } from './Difficulty';
 import { ObstacleManager } from './ObstacleManager';
@@ -14,6 +14,8 @@ export interface EngineOptions {
   physics?: PhysicsParams;
   /** Duração da contagem antes de retomar (s). */
   resumeDelay?: number;
+  /** Vidas por partida para continuar de onde parou (padrão: CONTINUES.lives; 0 = sem continuar). */
+  lives?: number;
 }
 
 type Listener = (e: GameEvent) => void;
@@ -21,7 +23,8 @@ type Listener = (e: GameEvent) => void;
 /** Transições permitidas da máquina de estados. */
 const TRANSITIONS: Record<GameState, readonly GameState[]> = {
   READY: [GameState.PLAYING],
-  PLAYING: [GameState.PAUSED, GameState.GAME_OVER, GameState.READY],
+  PLAYING: [GameState.PAUSED, GameState.CONTINUE, GameState.GAME_OVER, GameState.READY],
+  CONTINUE: [GameState.RESUMING, GameState.GAME_OVER],
   PAUSED: [GameState.RESUMING, GameState.PLAYING, GameState.READY],
   RESUMING: [GameState.PLAYING, GameState.PAUSED, GameState.READY],
   GAME_OVER: [GameState.PLAYING, GameState.READY],
@@ -44,6 +47,8 @@ export class GameEngine {
   alpha = 0;
   /** Segundos restantes da contagem de retomada. */
   resumeCountdown = 0;
+  /** Vidas que ainda podem ser gastas para continuar nesta partida. */
+  livesLeft = 0;
   /** Contador de partidas iniciadas (útil para efeitos e testes). */
   runId = 0;
   /** Total de passos fixos executados (diagnóstico/testes). */
@@ -54,8 +59,11 @@ export class GameEngine {
   private readonly physics: PhysicsParams;
   private readonly fixedSeed?: number;
   private readonly resumeDelay: number;
+  readonly lives: number;
 
   constructor(opts: EngineOptions) {
+    this.lives = Math.max(0, Math.floor(opts.lives ?? CONTINUES.lives));
+    this.livesLeft = this.lives;
     this.physics = opts.physics ?? DEFAULT_PHYSICS;
     this.fixedSeed = opts.seed;
     this.resumeDelay = opts.resumeDelay ?? 1.2;
@@ -94,11 +102,41 @@ export class GameEngine {
     this.alpha = 0;
     this.resumeCountdown = 0;
     this.runId++;
+    this.livesLeft = this.lives;
     this.score.reset();
     const seed = this.fixedSeed !== undefined ? this.fixedSeed + this.runId - 1 : randomSeed();
     this.obstacles.reset(createRng(seed));
     this.obstacles.fill(difficultyAt(0));
     this.setState(GameState.PLAYING);
+  }
+
+  /**
+   * Gasta uma vida e continua de onde bateu: mesma pontuação, mesmo tempo
+   * (mesma dificuldade), barreiras próximas removidas, bolinha alinhada ao
+   * próximo vão e contagem curta antes de voltar.
+   */
+  continueRun(): boolean {
+    if (this.state !== GameState.CONTINUE || this.livesLeft <= 0) return false;
+    this.livesLeft--;
+    this.holding = false;
+    const center = this.obstacles.clearAround(this.ball.x, CONTINUES.clearAhead);
+    const { minY, maxY } = ballBounds(this.ball.radius);
+    this.ball.y = this.ball.prevY = Math.min(maxY, Math.max(minY, center));
+    this.ball.vy = 0;
+    this.alpha = 0;
+    this.score.unfreeze();
+    this.emit({ type: 'continue', livesLeft: this.livesLeft });
+    this.resumeCountdown = this.resumeDelay;
+    this.setState(GameState.RESUMING);
+    if (this.resumeDelay <= 0) this.setState(GameState.PLAYING);
+    return true;
+  }
+
+  /** Desiste de continuar: a partida termina de vez com a pontuação atual. */
+  endRun(): void {
+    if (this.state !== GameState.CONTINUE) return;
+    this.livesLeft = 0;
+    this.setState(GameState.GAME_OVER);
   }
 
   pause(): void {
@@ -198,8 +236,9 @@ export class GameEngine {
 
   private crash(): void {
     this.holding = false;
+    // Salva o recorde já na batida (mesmo que o jogador feche a aba na tela de continuar).
     const result = this.score.finish();
-    this.setState(GameState.GAME_OVER);
-    this.emit({ type: 'crash', x: this.ball.x, y: this.ball.y, ...result });
+    this.setState(this.livesLeft > 0 ? GameState.CONTINUE : GameState.GAME_OVER);
+    this.emit({ type: 'crash', x: this.ball.x, y: this.ball.y, ...result, livesLeft: this.livesLeft });
   }
 }

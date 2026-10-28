@@ -119,13 +119,30 @@ with sync_playwright() as p:
         page.wait_for_timeout(100)
     check("após a contagem volta a jogar", state(page)["state"] == "PLAYING")
 
-    # Deixar cair até colidir (sem tocar).
-    for _ in range(100):
-        if state(page)["state"] == "GAME_OVER":
-            break
-        page.wait_for_timeout(100)
+    # Deixar cair até colidir (sem tocar): com vidas, oferece continuar de onde parou.
+    def wait_state(target, tries=100):
+        for _ in range(tries):
+            if state(page)["state"] == target:
+                return True
+            page.wait_for_timeout(100)
+        return False
+    check("colisão com vidas leva à tela de continuar", wait_state("CONTINUE"))
+    page.wait_for_timeout(300)
+    page.screenshot(path=str(OUT / "05a-continue.png"))
+    check("tela de continuar mostra 3 vidas e os botões",
+          page.locator(".lives .heart.is-full").count() == 3 and page.locator(".continue >> text=CONTINUAR").count() == 1
+          and page.locator("text=Encerrar partida").count() == 1)
+    before = state(page)["score"]
+    page.tap(".continue >> text=CONTINUAR"); page.wait_for_timeout(150)
+    check("continuar passa pela contagem e mantém os pontos", state(page)["state"] == "RESUMING" and state(page)["score"] == before)
+    check("volta a jogar depois da contagem", wait_state("PLAYING", 40))
+    lives = page.evaluate("window.__NDC__.engine.livesLeft")
+    check("continuar gasta uma vida", lives == 2, f"vidas={lives}")
+    page.screenshot(path=str(OUT / "05b-after-continue.png"))
+    check("bateu de novo → continuar com 2 vidas", wait_state("CONTINUE") and page.locator(".lives .heart.is-full").count() == 2)
+    page.tap("text=Encerrar partida")
     sg = state(page)
-    check("colisão leva ao fim de jogo", sg["state"] == "GAME_OVER")
+    check("encerrar leva ao fim de jogo", sg["state"] == "GAME_OVER")
     page.wait_for_timeout(300)
     page.screenshot(path=str(OUT / "05-gameover.png"))
     check("fim de jogo mostra pontos, recorde e JOGAR DE NOVO",

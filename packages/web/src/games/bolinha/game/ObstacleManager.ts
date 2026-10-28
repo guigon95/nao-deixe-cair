@@ -99,6 +99,23 @@ export class ObstacleManager {
     this.fill(diff);
   }
 
+  /**
+   * Abre espaço para continuar depois de uma batida: tira as barreiras que
+   * estão em cima ou logo à frente da bolinha. Retorna o centro do vão da
+   * próxima barreira que ficou (para posicionar a bolinha alinhada a ele).
+   */
+  clearAround(ballX: number, ahead: number): number {
+    for (let i = this.barriers.length - 1; i >= 0; i--) {
+      const b = this.barriers[i];
+      if (b.x < ballX + ahead) {
+        this.barriers.splice(i, 1);
+        this.pool.push(b);
+      }
+    }
+    const next = this.barriers[0];
+    return next ? (next.gapTop + next.gapBottom) / 2 : this.lastCenter;
+  }
+
   /** Gera barreiras até a próxima ficar fora da tela, à direita. */
   fill(diff: DifficultyParams): void {
     for (let guard = 0; guard < 4; guard++) {

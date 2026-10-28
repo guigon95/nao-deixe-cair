@@ -63,6 +63,11 @@ export class ScoreManager {
     return { score, best: this.best, isNewRecord: isNewRecord && this.bestAtStart > 0 };
   }
 
+  /** Continuar depois de bater: a pontuação volta a contar de onde parou. */
+  unfreeze(): void {
+    this.frozen = false;
+  }
+
   get isFrozen() {
     return this.frozen;
   }

@@ -21,7 +21,7 @@ def check(name, cond, detail=""):
 def die(page, barriers=2):
     """Leva a partida a GAME_OVER com alguns pontos (passa N barreiras e depois cai)."""
     page.evaluate("""(n) => new Promise(res => { const e = window.__NDC__.engine;
-      function f(){ if (e.state === 'GAME_OVER') return res();
+      function f(){ if (e.state === 'GAME_OVER') return res(); if (e.state === 'CONTINUE') e.endRun();
         if (e.score.barriers < n) { const b = e.obstacles.barriers.find(b => b.x + b.width > e.ball.x - 14);
           if (b) { e.ball.y = (b.gapTop + b.gapBottom) / 2; e.ball.vy = 0; } }
         requestAnimationFrame(f); } requestAnimationFrame(f); })""", barriers)

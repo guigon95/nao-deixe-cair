@@ -83,7 +83,7 @@ describe('Estados da partida', () => {
   });
 
   it('reiniciar zera a partida (bolinha, tempo, barreiras, pontos)', () => {
-    const e = new GameEngine({ storage: new MemoryStorage(), seed: 1 });
+    const e = new GameEngine({ storage: new MemoryStorage(), seed: 1, lives: 0 });
     e.start();
     for (let i = 0; i < 600; i++) {
       cheat(e);
@@ -266,7 +266,7 @@ describe('Persistência do recorde', () => {
         throw new Error('QuotaExceededError');
       },
     };
-    const e = new GameEngine({ storage: new SafeStorage(broken), seed: 4 });
+    const e = new GameEngine({ storage: new SafeStorage(broken), seed: 4, lives: 0 });
     e.start();
     for (let i = 0; i < 240; i++) {
       cheat(e);

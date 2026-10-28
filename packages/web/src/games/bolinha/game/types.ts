@@ -1,6 +1,8 @@
 export const GameState = {
   READY: 'READY',
   PLAYING: 'PLAYING',
+  /** Bateu, mas ainda há vidas: o jogador escolhe continuar de onde parou ou encerrar. */
+  CONTINUE: 'CONTINUE',
   PAUSED: 'PAUSED',
   RESUMING: 'RESUMING',
   GAME_OVER: 'GAME_OVER',
@@ -50,5 +52,6 @@ export type { Storage } from '../../../shared/storage/storage';
 export type GameEvent =
   | { type: 'state'; state: GameState; previous: GameState }
   | { type: 'pass'; barrier: Barrier; score: number }
-  | { type: 'crash'; x: number; y: number; score: number; best: number; isNewRecord: boolean }
+  | { type: 'crash'; x: number; y: number; score: number; best: number; isNewRecord: boolean; livesLeft: number }
+  | { type: 'continue'; livesLeft: number }
   | { type: 'newRecord'; score: number };

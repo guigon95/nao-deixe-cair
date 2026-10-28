@@ -282,6 +282,13 @@ export class CanvasRenderer {
       ctx.fillText(bestLabel, ARENA.width - 16, top / 2 + 2);
     }
 
+    // Vidas para continuar: corações à esquerda (depois do botão de pausa).
+    if (engine.lives > 0) {
+      for (let i = 0; i < engine.lives; i++) {
+        drawHeart(ctx, 66 + i * 17, top / 2 + 2, 6.5, i < engine.livesLeft);
+      }
+    }
+
     // Indicador discreto de progresso: barra fina de “intensidade” no rodapé.
     const level = difficultyAt(engine.elapsed).level;
     const { bottom } = playfield();
@@ -309,6 +316,23 @@ export class CanvasRenderer {
     ctx.font = `600 14px ${FONT}`;
     ctx.fillStyle = COLORS.hudDim;
     ctx.fillText('Prepare-se…', ARENA.width / 2, ARENA.height / 2 + 6);
+  }
+}
+
+/** Coração centrado em (x, y); cheio = vida disponível, vazado = vida usada. */
+function drawHeart(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, filled: boolean) {
+  ctx.beginPath();
+  ctx.moveTo(x, y + r * 0.95);
+  ctx.bezierCurveTo(x - r * 1.5, y - r * 0.1, x - r * 0.9, y - r * 1.25, x, y - r * 0.45);
+  ctx.bezierCurveTo(x + r * 0.9, y - r * 1.25, x + r * 1.5, y - r * 0.1, x, y + r * 0.95);
+  ctx.closePath();
+  if (filled) {
+    ctx.fillStyle = COLORS.barrier;
+    ctx.fill();
+  } else {
+    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = COLORS.hudDim;
+    ctx.stroke();
   }
 }
 

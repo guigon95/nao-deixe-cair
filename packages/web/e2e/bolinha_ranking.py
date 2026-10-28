@@ -22,7 +22,7 @@ def die(page):
     """Leva a partida a GAME_OVER com alguns pontos (passa 2 barreiras e depois cai)."""
     page.evaluate("""() => new Promise(res => { const e = window.__NDC__.engine; let n = 0;
       function f(){ n++;
-        if (e.state === 'GAME_OVER') return res();
+        if (e.state === 'GAME_OVER') return res(); if (e.state === 'CONTINUE') e.endRun();
         if (e.score.barriers < 2) { const b = e.obstacles.barriers.find(b => b.x + b.width > e.ball.x - 14);
           if (b) { e.ball.y = (b.gapTop + b.gapBottom) / 2; e.ball.vy = 0; } }
         requestAnimationFrame(f); } requestAnimationFrame(f); })""")

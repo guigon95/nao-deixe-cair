@@ -207,6 +207,14 @@ Uma versão anterior do C usava dois toques rápidos para o loop; com o mergulho
 
 ## Bolinha
 
+### Continuar de onde parou (3 vidas)
+
+- Cada partida começa com **3 vidas** (corações no topo, ao lado da pausa). Ao bater com vida sobrando, aparece a tela **Bateu!**: **CONTINUAR** gasta uma vida e volta de onde parou — mesmos pontos, mesmo tempo (mesma velocidade), barreiras próximas removidas, bolinha alinhada ao próximo vão e contagem de "Prepare-se". **Encerrar partida** termina ali.
+- Batendo sem vidas, a partida acaba; a próxima começa do zero, com 3 vidas de novo.
+- O ranking recebe **uma** pontuação por partida, no fim de verdade (continuar não gera envios extras). O recorde pessoal é salvo já em cada batida.
+- **Anúncio para continuar (futuro):** o botão chama `rewardedAds.show('continue')` (`packages/web/src/shared/ads/rewarded.ts`). Hoje `NoAds` libera na hora; para ligar anúncios, implemente `RewardedAds` com a rede escolhida e troque `rewardedAds` — o botão passa a dizer "▶ ASSISTIR E CONTINUAR" e só continua se o anúncio for assistido até o fim.
+- Ajustes em `CONTINUES` (`src/games/bolinha/game/config.ts`): `lives` (vidas por partida) e `clearAhead` (espaço livre à frente ao continuar).
+
 Parâmetros em `src/games/bolinha/game/config.ts` e `Difficulty.ts`. Detalhes do jogo, do ranking e do som estão nos comentários do código e nos testes (`src/games/bolinha/__tests__`).
 
 ## Limitações conhecidas

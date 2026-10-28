@@ -85,7 +85,7 @@ describe('Prevenção de tunelamento', () => {
 
 describe('Colisão no motor', () => {
   it('colisão válida encerra a partida e congela a pontuação', () => {
-    const e = new GameEngine({ storage: new MemoryStorage(), seed: 3 });
+    const e = new GameEngine({ storage: new MemoryStorage(), seed: 3, lives: 0 });
     e.start();
     const b = e.obstacles.barriers[0];
     b.x = BALL_X + 2; // coloca a barreira em cima da bolinha

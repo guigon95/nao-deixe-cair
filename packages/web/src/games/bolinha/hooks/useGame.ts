@@ -22,6 +22,8 @@ export interface UiState {
   runId: number;
   /** runId da partida em andamento (muda quando uma partida começa) — usado pelo ranking online. */
   liveRunId: number;
+  /** Vidas restantes para continuar de onde parou (nesta partida). */
+  livesLeft: number;
 }
 
 /**
@@ -47,6 +49,7 @@ export function useGame() {
     landscape: false,
     runId: 0,
     liveRunId: 0,
+    livesLeft: 0,
   });
 
   useEffect(() => {
@@ -98,7 +101,7 @@ export function useGame() {
             fx.clear();
           }
           if (e.state === GameState.PLAYING) engine.setHolding(input.isHolding);
-          setUi((u) => ({ ...u, state: e.state, best: engine.score.best, liveRunId: engine.runId }));
+          setUi((u) => ({ ...u, state: e.state, best: engine.score.best, liveRunId: engine.runId, livesLeft: engine.livesLeft }));
           break;
         case 'pass': {
           const b = e.barrier;
@@ -119,7 +122,7 @@ export function useGame() {
           fx.flash = 1;
           sfx.crash();
           combo = 0;
-          setUi((u) => ({ ...u, score: e.score, best: e.best, isNewRecord: e.isNewRecord, runId: engine.runId }));
+          setUi((u) => ({ ...u, score: e.score, best: e.best, isNewRecord: e.isNewRecord, runId: engine.runId, livesLeft: e.livesLeft }));
           break;
       }
     });
@@ -223,6 +226,13 @@ export function useGame() {
     engineRef.current?.resume();
   }, []);
   const toMenu = useCallback(() => engineRef.current?.toMenu(), []);
+  /** Gasta uma vida e continua de onde bateu (depois do anúncio, quando houver). */
+  const continueRun = useCallback(() => {
+    sfxRef.current?.unlock();
+    return engineRef.current?.continueRun() ?? false;
+  }, []);
+  /** Encerra a partida sem continuar. */
+  const endRun = useCallback(() => engineRef.current?.endRun(), []);
   const playSound = useCallback((name: 'click' | 'success') => {
     sfxRef.current?.unlock();
     sfxRef.current?.[name]();
@@ -248,5 +258,5 @@ export function useGame() {
     [storage],
   );
 
-  return { surfaceRef, canvasRef, ui, settings, updateSettings, start, pause, resume, toMenu, playSound, storage };
+  return { surfaceRef, canvasRef, ui, settings, updateSettings, start, pause, resume, toMenu, continueRun, endRun, playSound, storage };
 }

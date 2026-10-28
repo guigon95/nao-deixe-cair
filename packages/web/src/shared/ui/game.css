@@ -592,3 +592,34 @@ button:focus-visible {
 .btn-save:disabled {
   opacity: 0.6;
 }
+
+/* --- continuar de onde parou (bolinha) --- */
+.lives {
+  margin: 0;
+  display: flex;
+  justify-content: center;
+  gap: 0.35em;
+  font-size: 1.5em;
+  line-height: 1;
+}
+
+.lives .heart {
+  color: transparent;
+  -webkit-text-stroke: 1.5px var(--dim);
+}
+
+.lives .heart.is-full {
+  color: var(--barrier);
+  -webkit-text-stroke: 0;
+}
+
+.continue-hint {
+  margin: 0;
+  font-size: 0.85em;
+  color: var(--dim);
+  line-height: 1.4;
+}
+
+.btn-primary:disabled {
+  opacity: 0.7;
+}

@@ -67,6 +67,18 @@ export const SCORING = {
   pointsPerBarrier: 5,
 } as const;
 
+/**
+ * Continuar de onde parou. Cada partida começa com `lives` vidas; ao bater
+ * com vida sobrando, o jogador pode gastar uma para continuar (no futuro,
+ * assistindo a um anúncio). Sem vidas, a batida encerra a partida e a
+ * próxima começa do zero.
+ */
+export const CONTINUES = {
+  lives: 3,
+  /** Distância livre à frente da bolinha ao continuar (u): remove as barreiras mais próximas. */
+  clearAhead: 240,
+} as const;
+
 export const STORAGE_KEYS = {
   best: gameKey('bolinha', 'best'),
   settings: HUB_KEYS.settings,
