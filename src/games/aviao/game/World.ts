@@ -42,18 +42,22 @@ export interface DifficultyParams {
   density: number;
   /** Chance de pássaros (que se movem). */
   birdChance: number;
+  /** Folga extra entre obstáculos e o corredor (grande no começo, some no fim). */
+  clearance: number;
 }
 
-/** Curva de dificuldade por distância (u). Chega ao máximo em ~30 000 u (~2 min). */
+/** Curva de dificuldade por distância (u). Chega ao máximo em ~36 000 u (~2,5 min). */
 export function difficultyAt(x: number): DifficultyParams {
-  const level = Math.min(1, Math.max(0, (x - WORLD.freeStart) / 28000));
-  const e = level * (2 - level); // sobe rápido no começo, suaviza no fim
+  const level = Math.min(1, Math.max(0, (x - WORLD.freeStart) / 36000));
+  // Começo gentil (aprender a voar), meio crescendo, fim estável.
+  const e = level * level * (3 - 2 * level);
   return {
     level,
-    gap: 330 - 150 * e,
-    maxShift: 90 + 100 * e,
-    density: 2.2 + 3.3 * e,
+    gap: 380 - 180 * e,
+    maxShift: 80 + 110 * e,
+    density: 1.3 + 4.2 * e,
     birdChance: 0.1 + 0.4 * e,
+    clearance: 80 * (1 - e),
   };
 }
 
@@ -254,7 +258,7 @@ export class World {
       o.x = ox;
       const towerR = randRange(this.rng, 13, 18);
       const tb = this.bandRange(ox - towerR - 4, ox + towerR + 4);
-      const towerRoom = tb.bottom - m - groundAt;
+      const towerRoom = tb.bottom - m - d.clearance - groundAt;
       if (pick < 0.3 && towerRoom > 70) {
         o.kind = 'tower';
         o.r = towerR;
@@ -269,8 +273,8 @@ export class World {
         o.top = ox;
         // Fica fora do corredor em todo o caminho da patrulha.
         const b = this.bandRange(ox - BIRD_RANGE - o.r - 4, ox + o.r + 4);
-        const top = b.top + o.r + 8 + m;
-        const bottom = b.bottom - o.r - 8 - m;
+        const top = b.top + o.r + 8 + m + d.clearance;
+        const bottom = b.bottom - o.r - 8 - m - d.clearance;
         const groundMax = this.terrain.maxHeight(ox - BIRD_RANGE - o.r, ox + o.r);
         const below = bottom - groundMax > 60 && this.rng() < 0.45;
         o.baseY = below
@@ -279,9 +283,9 @@ export class World {
         o.y = o.baseY;
       } else {
         o.kind = 'balloon';
-        o.r = randRange(this.rng, 19, 25);
+        o.r = randRange(this.rng, 17, 23);
         const b = this.bandRange(ox - o.r, ox + o.r);
-        o.baseY = b.top + o.r + 4 + m + near(this.rng) * 240;
+        o.baseY = b.top + o.r + 4 + m + d.clearance + near(this.rng) * 240;
         o.y = o.baseY;
       }
       o.active = true;

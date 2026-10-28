@@ -1,85 +1,165 @@
-# Não Deixe Cair
+# Não Deixe Cair — hub de jogos de um toque
 
-Arcade casual de sobrevivência infinita para navegador (prioridade para celular).
-**Segure para subir. Solte para cair. Passe pelos vãos das barreiras.**
+Hub de jogos casuais para navegador (prioridade para celular). Cada jogo fica na sua pasta e **um único build publica todos**.
 
-React 19 + TypeScript + Vite + Canvas 2D. Sem backend, sem contas, sem anúncios, sem dependências de execução além de React. Funciona offline depois de carregado.
+| Jogo | Pasta / rota | Como se joga |
+|---|---|---|
+| **Bolinha** (nome provisório) | `bolinha/` | Segure para subir, solte para cair. Passe pelos vãos das barreiras. |
+| **Acrobata** | `aviao/` | Segure para acelerar e puxar o nariz, solte para mergulhar. Faça loops e encadeie manobras. |
 
-## Rodar localmente
+React 19 + TypeScript estrito + Vite (multi-página) + Canvas 2D. Sem backend, sem contas reais, sem anúncios, sem analytics. Sons sintetizados com Web Audio (sem arquivos de terceiros). Funciona offline depois de carregado.
+
+## Rodar no Windows (ou em qualquer sistema)
 
 ```bash
 npm install
-npm run dev          # http://localhost:5173 (também acessível pela rede local, para testar no celular)
+npm run dev          # http://localhost:5173 → hub; /bolinha/ e /aviao/ são os jogos
 ```
+
+O `npm run dev` também abre na rede local (`server.host`), então dá para testar no celular pelo IP do computador (ex.: `http://192.168.0.10:5173`).
 
 ## Testes e qualidade
 
 ```bash
-npm test             # testes unitários (Vitest): física, colisão, gerador, estados, pontuação, entrada, layout
+npm test             # Vitest: física, colisão, geradores, manobras, combo, estados, migração de chaves
 npm run lint         # ESLint
 npm run typecheck    # TypeScript estrito
 ```
 
-Testes em navegador real (opcional, requer Python + Playwright com Chromium):
+Testes em navegador real (Python + Playwright com Chromium):
 
 ```bash
-npm run build && npx vite preview --port 4173
-python3 e2e/smoke.py http://localhost:4173 e2e/screens     # jogo, controles, pausa, layouts
-python3 e2e/ranking.py http://localhost:4173 e2e/screens   # ranking, perfil e sons
+npm run build && npx vite preview --port 4173      # em outro terminal
+python e2e/hub.py http://localhost:4173 e2e/screens             # hub, migração, perfil compartilhado
+python e2e/bolinha_smoke.py http://localhost:4173 e2e/screens   # bolinha: controles, pausa, layouts
+python e2e/bolinha_ranking.py http://localhost:4173 e2e/screens # bolinha: ranking, perfil, sons
+python e2e/aviao.py http://localhost:4173 e2e/screens           # acrobata: controle, loop, fim, ranking, layouts
 ```
 
-## Ranking e perfil
-
-- No fim da partida, se a pontuação entra no top 10, o jogador escolhe **Entrar** (cria um perfil;
-  as próximas pontuações entram sozinhas) ou **Só meu nome** (salva só aquela pontuação).
-- Por enquanto **não há backend**: ranking e perfil ficam no `localStorage` deste navegador/aparelho.
-  O "login" é um perfil local, sem senha.
-- Para ligar um servidor depois, implemente as interfaces `RankingService` (`src/game/Ranking.ts`)
-  e `AuthProvider` (`src/platform/auth.ts`) — as telas já falam só com essas interfaces.
-
-## Som
-
-Sons sintetizados com Web Audio (sem arquivos): propulsor contínuo ao segurar, início, contagem,
-passagem (sobe de tom em sequência), recorde, colisão e botões. O botão **Som** toca um bipe de teste.
-No iPhone, a chave de silencioso pode calar o áudio da web; no iOS 17+ o jogo pede o modo
-"playback", que toca mesmo assim. Em versões anteriores, desligue o silencioso.
+(No Windows use `python`; no Linux/macOS, `python3`. Primeira vez: `pip install playwright` e `python -m playwright install chromium`.)
 
 ## Build de produção e publicação
 
 ```bash
-npm run build        # gera dist/
+npm run build        # gera dist/ com o hub e TODOS os jogos
 npm run preview      # confere o build localmente
 ```
 
-`dist/` é 100 % estático e usa caminhos relativos (`base: './'`), então pode ser publicado em qualquer subpasta:
+`dist/` é 100 % estático e usa caminhos relativos (`base: './'`), então funciona em qualquer hospedagem estática, inclusive em subpasta. **Publique sempre a pasta `dist/` inteira** — o deploy é de tudo junto:
 
-- **Netlify / Cloudflare Pages / Vercel:** comando de build `npm run build`, pasta de saída `dist`.
-- **GitHub Pages:** envie o conteúdo de `dist/` para a branch `gh-pages` (ou use a action oficial `actions/deploy-pages` com `path: dist`).
+- **Netlify / Cloudflare Pages / Vercel:** comando `npm run build`, pasta de saída `dist`.
+- **GitHub Pages:** action oficial `actions/deploy-pages` com `path: dist` (ou envie o conteúdo de `dist/` para a branch `gh-pages`).
 - **itch.io:** compacte o conteúdo de `dist/` em .zip e envie como projeto HTML.
 
-## Parâmetros de ajuste
+## Dados dos jogadores (localStorage)
 
-Tudo que afeta a sensação de jogo está centralizado:
+| Chave | O quê |
+|---|---|
+| `ndc:profile`, `ndc:guest-name` | perfil local e último nome — **do hub, vale para todos os jogos** |
+| `ndc:settings` | som e "menos movimento" (compartilhado) |
+| `ndc:<jogo>:best`, `ndc:<jogo>:ranking` | recorde e top 10 **de cada jogo** |
 
-- `src/game/config.ts` — física (gravidade, propulsão, reforço de inversão, velocidades máximas, raio, hitbox), barreiras e pontuação.
-- `src/game/Difficulty.ts` — curva de dificuldade (velocidade, espaçamento, vão, deslocamento vertical).
+Na primeira abertura depois da atualização, `migrateLegacyKeys` copia **uma única vez** as chaves antigas `nao-deixe-cair:*` para as novas (sem apagar as antigas e sem sobrescrever valores novos). Ninguém perde recorde, ranking nem perfil.
 
-URL de diagnóstico: `?debug` expõe `window.__NDC__` (motor, laço) e `?seed=N` fixa a semente das barreiras.
+Ranking e perfil seguem as interfaces `RankingService` (`src/shared/ranking/Ranking.ts`) e `AuthProvider` (`src/shared/auth/auth.ts`): um backend futuro implementa as mesmas interfaces sem mudar as telas.
 
 ## Arquitetura
 
 ```
+index.html              hub (escolha de jogos)
+bolinha/index.html      entrada do jogo da bolinha
+aviao/index.html        entrada do Acrobata
 src/
-  app/        App.tsx, GameScreen.tsx, RankingUi.tsx   telas (menu, pausa, fim, ranking) em React
-  hooks/      useGame.ts                    integra motor ↔ React ↔ canvas ↔ entrada
-  game/       GameEngine, Physics, Collision, ObstacleManager, Difficulty,
-              ScoreManager, Ranking, GameLoop, config, types, random
-  game/testing/autopilot.ts                 piloto automático usado nos testes de justiça
-  rendering/  CanvasRenderer, effects, layout
-  input/      InputController.ts            Pointer Events + teclado
-  platform/   audio.ts (Web Audio sintetizado), auth.ts (perfil local), settings.ts
-  __tests__/  testes Vitest
-e2e/smoke.py  teste em navegador real (Playwright)
+  hub/                  tela do hub: cartões com ilustração em SVG, recorde e perfil
+  shared/               o que os jogos compartilham
+    loop/               GameLoop (rAF único e idempotente)
+    input/              InputController (Pointer Events + teclado, pointercancel, perda de foco)
+    audio/              SynthAudio (desbloqueio, iOS em modo "playback", sons de interface)
+    layout/             arena lógica 360×640 escalada sem esticar, devicePixelRatio
+    storage/            SafeStorage + chaves + migração
+    ranking/ auth/ settings/ ui/   ranking local, perfil, configurações, telas de ranking, botão "Jogos"
+    games.ts            catálogo do hub
+  games/
+    bolinha/            motor, física, obstáculos, render e telas da bolinha
+    aviao/              motor, física de voo, mundo, manobras, render, som e telas do Acrobata
+e2e/                    testes de navegador (hub + um por jogo)
 ```
 
-A simulação (`game/`) não conhece DOM nem React. O React só re-renderiza quando o estado da partida muda; pontuação e HUD são desenhados no canvas.
+Para adicionar um jogo: uma pasta em `src/games/`, um `<jogo>/index.html`, uma entrada em `vite.config.ts` (`build.rollupOptions.input`) e uma em `src/shared/games.ts`.
+
+URLs de diagnóstico (nos dois jogos): `?debug` expõe `window.__NDC__`; `?seed=N` fixa a semente. No Acrobata: `?controle=b` liga o esquema de controle B e `?debug&piloto` liga o piloto automático.
+
+---
+
+## Acrobata (jogo do avião)
+
+### Controle escolhido: esquema A — "acelerar é puxar o nariz"
+
+- **Segurar** = motor no máximo **e** puxar o manche. Com velocidade, o avião sobe em curva; segurando ~1,6 s ou mais, o nariz continua girando e **o loop se fecha sozinho** (em ~1,7 s).
+- **Soltar** = marcha lenta. A correção de nivelamento deixa o nariz cair e o avião mergulha ganhando velocidade — energia para a próxima manobra.
+- **Toques curtos** mantêm o voo nivelado (0,1 s levanta o nariz ~15°).
+- **Estol**: devagar e de nariz alto, a asa para de sustentar; aparece "ESTOL!", o nariz cai e o avião se recupera sozinho se houver altura.
+
+Comparação com o esquema B ("toque = impulso, gestos = manobras": segurar sobe de leve, toque duplo = tonneau, deslizar para cima = loop assistido), medida em `src/games/aviao/game/testing/compareControls.ts` com jogadores **simulados** (perfis de toque supostos, não medições com pessoas):
+
+| Critério | Esquema A | Esquema B |
+|---|---|---|
+| Toque → nariz gira 5° | **42 ms** | 92 ms |
+| Loops de propósito bem-sucedidos (40 tentativas) | **100 %** | 72,5 % (deslize lento não é reconhecido) |
+| Manobras acidentais por minuto de toques para manter o voo | **0** | 36,4 tonneaus |
+| Precisa reconhecer gesto antes de responder | não | sim |
+
+O critério "entender em menos de 10 segundos" não foi medido com pessoas; o A tem uma regra só (segure = suba/gire), mostrada no menu.
+
+### Manobras e pontuação
+
+| Manobra | Como é detectada | Pontos base |
+|---|---|---|
+| Loop | trajetória sobe 360° líquidos (sobe-desce não soma; giro ajudado pelo estol não conta) | 100 |
+| Meio loop | 180° e saída nivelada por 0,35 s | 40 |
+| Voo invertido | ≥ 0,6 s de cabeça para baixo (pago ao endireitar) | 30 por segundo |
+| Rasante | < 34 u do chão acima de 300 u/s e depois subir acima de 90 u | 40 |
+| Recuperação de estol | sair de um estol e voltar a voar | 60 |
+| Raspão | passar a menos de 16 u de um obstáculo sem bater (uma vez por obstáculo) | 25 |
+| Anel | atravessar a abertura (anel alto, que pede loop: ×2) | 50 / 100 |
+
+- Distância: 1 ponto a cada 40 u.
+- **Combo**: cada manobra a menos de 4 s da anterior sobe o multiplicador (×2, ×3… até ×8). Passar 4 s sem manobra zera; a batida encerra a partida.
+- Recorde pessoal e top 10 próprios do Acrobata; o fluxo de fim de partida é o mesmo da bolinha (**Entrar** ou **Só meu nome**).
+
+### Mundo e dificuldade
+
+- O mundo é gerado em trechos de 420 u. Cada trecho tem um **corredor livre** cujo centro varia no máximo uma rampa voável; entre trechos ele é interpolado. Obstáculos (balões, pássaros que patrulham, torres) só nascem fora do **envelope** do corredor — um teste confere isso em 25 sementes, e um piloto automático que só segue o corredor sobrevive 120 s em 20 sementes.
+- Chão: rasante permitido (até ~30° de ângulo com o relevo, com 0,12 s de tolerância); bico no chão, voo invertido no chão ou perder a velocidade de voo encostado no chão = batida.
+- Teto suave: acima de 1050 u o ar fica rarefeito e o motor perde força (sem parede).
+- Começo livre (1600 u) com anéis no caminho; depois a curva sobe até ~36 000 u (~2,5 min): corredor de 380 → 200 u, 1,3 → 5,5 obstáculos por trecho, mais pássaros, menos folga.
+
+### Parâmetros finais (`src/games/aviao/game/config.ts`)
+
+| Física | Valor | | Mundo (`World.ts`) | Valor |
+|---|---|---|---|---|
+| gravidade | 400 u/s² | | largura do trecho | 420 u |
+| motor máx. | 560 u/s² | | corredor (início → fim) | 380 → 200 u |
+| arrasto | 0,0028·v² (vel. máx. nivelada ≈ 447 u/s) | | variação máx. do centro | 80 → 190 u/trecho |
+| correção de nível | 0,0068·v² (sustenta sozinha a ≈ 243 u/s) | | obstáculos por trecho | 1,3 → 5,5 |
+| puxada | 0,0115·v², limite 6 g | | folga extra no começo | 80 → 0 u |
+| estol | < 105 u/s (transição até 136 u/s) | | início livre | 1600 u |
+| potência | sobe 5/s, cai 3,2/s, marcha lenta 12 % | | rampa até o máximo | 36 000 u |
+
+### Sensação de jogo
+
+- Motor contínuo baseado no "zumbido do propulsor" original (serra grave num passa-baixa com Q≈6), com base de 62–100 Hz, seno sub-oitava e LFO de 8–15 Hz no volume (as pás da hélice); sobe de tom e brilho com potência e velocidade.
+- Um som por manobra (subindo um semitom por nível de combo), sininho nos anéis, "fiu" no raspão, aviso de estol, combo perdido, batida grave e abafada (sem ruído alto).
+- Fumaça de acrobacia que fica no céu e desenha o loop, escapamento, faíscas, linhas de velocidade, câmera que se afasta com velocidade e altura sem girar, hélice e "squash" no toque, tremida no estol, câmera lenta de 0,16 s nas manobras grandes (desligada com **Menos movimento**), vibração no Android.
+- Pools de tamanho fixo para fumaça, partículas, textos, obstáculos e anéis.
+
+## Bolinha
+
+Parâmetros em `src/games/bolinha/game/config.ts` e `Difficulty.ts`. Detalhes do jogo, do ranking e do som estão nos comentários do código e nos testes (`src/games/bolinha/__tests__`).
+
+## Limitações conhecidas
+
+- A calibragem do Acrobata foi feita com simulação e testes em Chromium (desktop e emulação de celular), **não em aparelho físico**. O ajuste fino de sensação (força da puxada, rasante, sons no alto-falante do iPhone) precisa de partidas reais.
+- A duração das partidas foi estimada com um "jogador casual" simulado (reação de 0,15–0,25 s e erros aleatórios): mediana entre ~27 s (descuidado) e ~85 s (cuidadoso). Jogadores reais podem diferir.
+- iOS não tem `navigator.vibrate`: lá a vibração simplesmente não acontece.
+- Ranking e perfil são locais ao aparelho/navegador (sem backend).

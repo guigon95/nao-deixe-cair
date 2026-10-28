@@ -56,6 +56,7 @@ export class Renderer {
   private viewR: number = ARENA.width;
   private viewT = 0;
   private viewB: number = ARENA.height;
+  private skyCache: (CanvasGradient | undefined)[] = [];
 
   constructor(private canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext('2d', { alpha: false });
@@ -75,6 +76,7 @@ export class Renderer {
     this.viewR = (cssWidth - l.offsetX) / l.scale;
     this.viewT = -l.offsetY / l.scale;
     this.viewB = (cssHeight - l.offsetY) / l.scale;
+    this.skyCache = [];
   }
 
   /** Atualiza a câmera (chamar uma vez por quadro, antes de desenhar). */
@@ -129,9 +131,15 @@ export class Renderer {
     const ctx = this.ctx;
     // Quanto mais alto, mais escuro o céu (e o ar rarefeito aparece).
     const h = Math.min(1, Math.max(0, (planeY - 500) / (FLIGHT.thinAirEnd - 500)));
-    const g = ctx.createLinearGradient(0, this.viewT, 0, this.viewB);
-    g.addColorStop(0, mix(COLORS.skyTop, COLORS.skyHighTop, h));
-    g.addColorStop(1, mix(COLORS.skyBottom, '#6f8fd8', h * 0.8));
+    // Gradiente em cache por faixa de altura (32 níveis): nada é criado a cada quadro.
+    const q = Math.round(h * 32);
+    let g = this.skyCache[q];
+    if (!g) {
+      g = ctx.createLinearGradient(0, this.viewT, 0, this.viewB);
+      g.addColorStop(0, mix(COLORS.skyTop, COLORS.skyHighTop, q / 32));
+      g.addColorStop(1, mix(COLORS.skyBottom, '#6f8fd8', (q / 32) * 0.8));
+      this.skyCache[q] = g;
+    }
     ctx.fillStyle = g;
     ctx.fillRect(this.viewL, this.viewT, this.viewR - this.viewL, this.viewB - this.viewT);
     // Sol com parallax quase nulo.

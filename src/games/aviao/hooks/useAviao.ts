@@ -107,14 +107,16 @@ export function useAviao() {
     input.setEnabled(false);
 
     // Deslize vertical (só o esquema B usa): velocidade em unidades de arena por segundo.
-    let lastMove = { y: 0, t: 0 };
+    let lastY = 0;
+    let lastT = 0;
     const onMove = (ev: PointerEvent) => {
       if (engine.scheme.id !== 'b' || !engine.holding) return;
       const t = ev.timeStamp / 1000;
-      const dt = t - lastMove.t;
+      const dt = t - lastT;
       const y = ev.clientY / renderer.layout.scale;
-      if (dt > 0 && dt < 0.1) engine.swipe((y - lastMove.y) / dt);
-      lastMove = { y, t };
+      if (dt > 0 && dt < 0.1) engine.swipe((y - lastY) / dt);
+      lastY = y;
+      lastT = t;
     };
     surface.addEventListener('pointermove', onMove);
 

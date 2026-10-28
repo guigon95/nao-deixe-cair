@@ -87,7 +87,7 @@ export const FLIGHT: FlightParams = {
   cTrim: 0.0068,
   invertedTrim: 0.55,
   diveRecoveryMin: 0.8,
-  cPull: 0.013,
+  cPull: 0.0115,
   maxG: 6,
   stallSpeed: 105,
   stallBand: 0.3,
