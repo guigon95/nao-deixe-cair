@@ -69,7 +69,39 @@
   color: var(--text);
 }
 
+/* Modo bolinha: o aviãozinho sobe e desce, como a bolinha do outro jogo. */
+.demo-jet.demo-bob {
+  animation: demo-bob 1.4s ease-in-out infinite;
+  transform: none;
+}
+
+@keyframes demo-bob {
+  0% {
+    translate: 0 0.9em;
+    rotate: 0deg;
+  }
+  25% {
+    translate: 0 0;
+    rotate: -30deg;
+  }
+  50% {
+    translate: 0 -0.9em;
+    rotate: 0deg;
+  }
+  75% {
+    translate: 0 0;
+    rotate: 30deg;
+  }
+  100% {
+    translate: 0 0.9em;
+    rotate: 0deg;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .demo-jet.demo-bob {
+    animation: none;
+  }
   .demo-jet {
     animation: none;
     transform: translateY(1.7em);

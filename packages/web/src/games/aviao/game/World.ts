@@ -46,18 +46,52 @@ export interface DifficultyParams {
   clearance: number;
 }
 
-/** Curva de dificuldade por distância (u). Chega ao máximo em ~36 000 u (~2,5 min). */
-export function difficultyAt(x: number): DifficultyParams {
-  const level = Math.min(1, Math.max(0, (x - WORLD.freeStart) / 36000));
+export interface DifficultyProfile {
+  /** Distância (u) depois do início livre até a dificuldade máxima. */
+  ramp: number;
+  gap: readonly [number, number];
+  maxShift: readonly [number, number];
+  density: readonly [number, number];
+  birdChance: readonly [number, number];
+  clearance: number;
+}
+
+/** Física de voo (`?fisica=voo`): velocidade alta, rampa longa (~2,5 min). */
+export const FLIGHT_DIFFICULTY: DifficultyProfile = {
+  ramp: 36000,
+  gap: [380, 200],
+  maxShift: [80, 190],
+  density: [1.3, 5.5],
+  birdChance: [0.1, 0.5],
+  clearance: 80,
+};
+
+/**
+ * Física da bolinha (padrão): o avião anda a 150 → 285 u/s, então a rampa
+ * é mais curta em distância. Calibrada com um jogador casual simulado.
+ */
+export const ARCADE_DIFFICULTY: DifficultyProfile = {
+  ramp: 16000,
+  gap: [300, 165],
+  maxShift: [90, 210],
+  density: [1.6, 5.5],
+  birdChance: [0.15, 0.5],
+  clearance: 50,
+};
+
+/** Curva de dificuldade por distância (u). */
+export function difficultyAt(x: number, prof: DifficultyProfile = FLIGHT_DIFFICULTY): DifficultyParams {
+  const level = Math.min(1, Math.max(0, (x - WORLD.freeStart) / prof.ramp));
   // Começo gentil (aprender a voar), meio crescendo, fim estável.
   const e = level * level * (3 - 2 * level);
+  const lerp = (r: readonly [number, number]) => r[0] + (r[1] - r[0]) * e;
   return {
     level,
-    gap: 380 - 180 * e,
-    maxShift: 80 + 110 * e,
-    density: 1.3 + 4.2 * e,
-    birdChance: 0.1 + 0.4 * e,
-    clearance: 80 * (1 - e),
+    gap: lerp(prof.gap),
+    maxShift: lerp(prof.maxShift),
+    density: lerp(prof.density),
+    birdChance: lerp(prof.birdChance),
+    clearance: prof.clearance * (1 - e),
   };
 }
 
@@ -83,9 +117,15 @@ export class World {
   private pendingCenter = START_CENTER;
   private ids = 0;
   private readonly band: Band = { bottom: 0, top: 0 };
+  /** Teto dos corredores (u). Menor no modo "bolinha", que tem tela fixa. */
+  readonly corridorCeiling: number;
 
-  constructor(rng: Rng, seed = 1) {
+  readonly profile: DifficultyProfile;
+
+  constructor(rng: Rng, seed = 1, corridorCeiling: number = WORLD.corridorCeiling, profile: DifficultyProfile = FLIGHT_DIFFICULTY) {
     this.rng = rng;
+    this.corridorCeiling = corridorCeiling;
+    this.profile = profile;
     this.terrain = new Terrain(seed);
     for (let i = 0; i < WORLD.pool; i++)
       this.obstacles.push({
@@ -194,11 +234,11 @@ export class World {
   /** Centro válido para o trecho que começa em x0, partindo do centro anterior. */
   private nextCenter(x0: number, from: number): number {
     const w = WORLD.segmentWidth;
-    const d = difficultyAt(x0);
+    const d = difficultyAt(x0, this.profile);
     // Chão considerado até o meio dos vizinhos: o corredor interpolado nunca encosta no relevo.
     const ground = this.terrain.maxHeight(x0 - w / 2, x0 + w * 1.5);
     const lo = ground + WORLD.groundClear + d.gap / 2;
-    const hi = WORLD.corridorCeiling - d.gap / 2;
+    const hi = this.corridorCeiling - d.gap / 2;
     const target = x0 < WORLD.freeStart ? from : from + randRange(this.rng, -d.maxShift, d.maxShift);
     return Math.min(hi, Math.max(lo, target));
   }
@@ -226,7 +266,7 @@ export class World {
     const w = WORLD.segmentWidth;
     const x1 = x0 + w;
     this.nextSegX = x1;
-    const d = difficultyAt(x0);
+    const d = difficultyAt(x0, this.profile);
     const gap = d.gap;
     const center = this.segments.length === 0 ? this.nextCenter(x0, START_CENTER) : this.pendingCenter;
     this.segments.push({ x0, x1, center, gap });
@@ -241,7 +281,7 @@ export class World {
     // Anel no corredor (às vezes) ou anel alto, que um loop alcança (mais raro).
     const rr = this.rng();
     if (rr < 0.35) this.addRing(x0 + w / 2, center + randRange(this.rng, -0.2, 0.2) * gap, 32, false);
-    else if (rr < 0.5 && center + gap / 2 + 170 < WORLD.corridorCeiling) this.addRing(x0 + w / 2, center + gap / 2 + 110, 30, true);
+    else if (rr < 0.5 && center + gap / 2 + 170 < this.corridorCeiling) this.addRing(x0 + w / 2, center + gap / 2 + 110, 30, true);
 
     const n = Math.floor(d.density + this.rng());
     const m = WORLD.edgeMargin;

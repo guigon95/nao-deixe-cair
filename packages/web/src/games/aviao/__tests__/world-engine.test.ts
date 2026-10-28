@@ -71,6 +71,8 @@ describe('gerador do mundo', () => {
 
 describe('motor da partida', () => {
   const mk = (seed = 7) => new Engine({ storage: new MemoryStorage(), seed, resumeDelay: 0 });
+  /** Física de voo com loops (`?fisica=voo`), deixada de lado mas mantida. */
+  const mkVoo = (seed = 7) => new Engine({ storage: new MemoryStorage(), seed, resumeDelay: 0, physics: 'voo' });
 
   it('estados: menu → jogando → pausa → jogando → fim → reinício', () => {
     const e = mk();
@@ -112,8 +114,8 @@ describe('motor da partida', () => {
     for (let i = 0; i < Math.round(up * 60); i++) e.advance(1 / 60);
   };
 
-  it('toque + toque-e-segure faz um loop e dá pontos', () => {
-    const e = mk();
+  it('voo: toque + toque-e-segure faz um loop e dá pontos', () => {
+    const e = mkVoo();
     const got: string[] = [];
     e.on((ev: GameEvent) => ev.type === 'maneuver' && got.push(ev.m.kind));
     e.start();
@@ -123,8 +125,8 @@ describe('motor da partida', () => {
     expect(e.score.maneuverPoints).toBeGreaterThanOrEqual(100);
   });
 
-  it('segurar muito tempo sobe cada vez mais alto e nunca vira loop', () => {
-    const e = mk();
+  it('voo: segurar muito tempo sobe cada vez mais alto e nunca vira loop', () => {
+    const e = mkVoo();
     const got: string[] = [];
     e.on((ev: GameEvent) => ev.type === 'maneuver' && got.push(ev.m.kind));
     e.start();
@@ -176,7 +178,8 @@ describe('motor da partida', () => {
     e.on((ev) => ev.type === 'maneuver' && got.push(ev.m.kind));
     e.start();
     const r = e.world.rings[0];
-    Object.assign(r, { active: true, x: e.plane.x + 40, y: e.plane.y, r: 34, passed: false, high: false, glow: 0 });
+    // Sem tocar o avião cai: o anel fica um pouco abaixo, no caminho da queda.
+    Object.assign(r, { active: true, x: e.plane.x + 40, y: e.plane.y - 25, r: 34, passed: false, high: false, glow: 0 });
     for (let i = 0; i < 20; i++) e.advance(1 / 60);
     expect(got).toContain('ring');
   });
@@ -203,8 +206,8 @@ describe('motor da partida', () => {
       }
       return saw;
     };
-    expect(loopAndWatch(mk())).toBeGreaterThan(0);
-    const f = mk();
+    expect(loopAndWatch(mkVoo())).toBeGreaterThan(0);
+    const f = mkVoo();
     f.slowmoEnabled = false;
     expect(loopAndWatch(f)).toBe(0);
   });
@@ -214,11 +217,12 @@ describe('motor da partida', () => {
       const e = mk(11);
       e.slowmoEnabled = false;
       e.start();
-      let t = 0;
-      while (t < 4) {
-        e.setHolding(t % 1.2 < 0.5);
+      // Trocas de toque a cada 1/6 s (instante comum a 30, 60, 120 e 144 Hz):
+      // as diferenças medem só a simulação, não o arredondamento da entrada.
+      const per = fps / 6;
+      for (let f = 0; f < fps * 4; f++) {
+        e.setHolding(Math.floor(f / per) % 5 < 2);
         e.advance(1 / fps);
-        t += 1 / fps;
       }
       return e.plane;
     };

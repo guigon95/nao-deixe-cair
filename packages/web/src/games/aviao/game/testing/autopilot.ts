@@ -14,6 +14,23 @@ export class Autopilot {
   presses = 0;
 
   decide(engine: Engine): boolean {
+    return engine.physics === 'bolinha' ? this.decideArcade(engine) : this.decideFlight(engine);
+  }
+
+  /**
+   * Modo bolinha: mira o meio do corredor um pouco à frente e compensa a
+   * velocidade vertical (segura se, mantendo o embalo, ficaria abaixo dele).
+   */
+  private decideArcade(engine: Engine): boolean {
+    const p = engine.plane;
+    const ahead = engine.forwardSpeed * 0.35;
+    const c = engine.world.corridorAt(p.x + ahead);
+    if (!c) return false;
+    const target = (c.bottom + c.top) / 2;
+    return p.y + p.vy * 0.22 < target;
+  }
+
+  private decideFlight(engine: Engine): boolean {
     const p = engine.plane;
     const look = 120 + p.speed * 0.5;
     let bottom = -Infinity;
@@ -36,7 +53,7 @@ export class Autopilot {
 /** Joga `seconds` de partida com o piloto. Retorna o tempo sobrevivido. */
 export function autoplay(engine: Engine, seconds: number, dt = 1 / 120): { survived: number; crashed: boolean } {
   const pilot = new Autopilot();
-  engine.setScheme('a');
+  if (engine.physics === 'voo') engine.setScheme('a');
   if (engine.state !== GameState.PLAYING) engine.start();
   let t = 0;
   while (t < seconds && engine.state === GameState.PLAYING) {

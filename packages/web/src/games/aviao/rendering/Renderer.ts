@@ -1,4 +1,4 @@
-import { ARENA, FLIGHT, PLANE } from '../game/config';
+import { ARCADE, ARENA, FLIGHT, PLANE } from '../game/config';
 import type { Engine } from '../game/Engine';
 import { maxLevelSpeed } from '../game/Plane';
 import { GameState, type Obstacle, type Ring } from '../game/types';
@@ -36,6 +36,12 @@ const HINT = [
   ['Segure: sobe', 132],
   ['Solte: mergulha', 110],
   ['Toque + toque e segure: LOOP!', 88],
+] as const;
+
+/** Dica no modo bolinha. */
+const HINT_BOLINHA = [
+  ['Segure: sobe', 110],
+  ['Solte: cai', 88],
 ] as const;
 
 /** Morros de fundo: parallax, cor, amplitude, base. */
@@ -92,6 +98,14 @@ export class Renderer {
     const a = engine.alpha;
     const x = p.prevX + (p.x - p.prevX) * a;
     const y = p.prevY + (p.y - p.prevY) * a;
+    if (engine.physics === 'bolinha') {
+      // Tela fixa como a da bolinha: só anda para a frente; chão e teto sempre visíveis.
+      const c = this.camera;
+      c.x = x + 20;
+      c.y = ARCADE.groundScreenY - ARENA.height * 0.5;
+      c.zoom = 1;
+      return;
+    }
     const alt = y - engine.world.terrain.height(x);
     this.camera.update(x, y, p.phi, p.speed / VMAX, alt, dt, snap);
   }
@@ -508,13 +522,14 @@ export class Renderer {
       roundRect(ctx, ARENA.width / 2 - 50, 92, 100 * left, 5, 2.5);
     }
     // Dica dos controles nos primeiros segundos (some depois do primeiro loop).
-    if (engine.elapsed < 6 && sc.loops === 0 && engine.scheme.id === 'c') {
+    const hint = engine.physics === 'bolinha' ? HINT_BOLINHA : engine.scheme.id === 'c' && sc.loops === 0 ? HINT : null;
+    if (engine.elapsed < 6 && hint) {
       ctx.globalAlpha = Math.min(1, (6 - engine.elapsed) / 1.2);
       ctx.font = '800 15px system-ui, sans-serif';
       ctx.lineWidth = 4;
       ctx.strokeStyle = 'rgba(20, 25, 60, 0.6)';
       ctx.fillStyle = '#ffffff';
-      for (const [txt, y] of HINT) {
+      for (const [txt, y] of hint) {
         ctx.strokeText(txt, ARENA.width / 2, ARENA.height - y);
         ctx.fillText(txt, ARENA.width / 2, ARENA.height - y);
       }

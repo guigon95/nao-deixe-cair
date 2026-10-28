@@ -102,6 +102,26 @@ export const FLIGHT: FlightParams = {
   thinAirMin: 0.12,
 };
 
+/**
+ * Modo "bolinha" (padrão): a física vertical é EXATAMENTE a do jogo da
+ * bolinha (mesma função, mesmos números) e o avião anda para a frente na
+ * mesma velocidade das barreiras de lá. A tela é fixa, como na bolinha:
+ * o chão embaixo e um teto em cima onde o avião encosta e para.
+ * Modo "voo" (`?fisica=voo`): a física de voo com loops, deixada de lado.
+ */
+export type PhysicsMode = 'bolinha' | 'voo';
+
+export const ARCADE = {
+  /** Teto (altitude, u): o avião encosta e a velocidade para cima zera (como a borda da bolinha). */
+  ceiling: 560,
+  /** Teto dos corredores livres neste modo. */
+  corridorCeiling: 540,
+  /** Câmera fixa: altitude 0 fica nesta altura da arena (u a partir do topo). */
+  groundScreenY: 600,
+  /** Rampa visual da potência do motor (som/efeitos), em 1/s. */
+  throttleRate: 8,
+} as const;
+
 export const PLANE = {
   /** Comprimento visual do avião (u). A hitbox é bem menor que o desenho. */
   length: 38,

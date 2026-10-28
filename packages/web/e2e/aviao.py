@@ -4,9 +4,8 @@ Teste do Acrobata em navegador real (Chromium headless via Playwright).
 Uso:  npm run build && npx vite preview --port 4173   (em outro terminal)
       python3 e2e/aviao.py [http://localhost:4173] [pasta_de_capturas]
 
-Verifica com Pointer Events reais: segurar acelera e sobe cada vez mais alto
-sem virar loop, soltar desacelera, toque + toque-e-segure registra um loop (toques curtos
-em ritmo não), a batida leva ao fim de jogo, o reinício é
+Verifica com Pointer Events reais (modo padrão, física da bolinha): segurar
+sobe e encosta no teto sem bater, soltar cai, a batida leva ao fim de jogo, o reinício é
 imediato, o ranking funciona (Só meu nome), pausa ao ocultar a aba, um único
 laço de animação, sem erros de console e layouts em vários tamanhos.
 """
@@ -32,7 +31,7 @@ def st(page):
     return page.evaluate(
         """() => { const n = window.__NDC__, e = n.engine; return {
             state: e.state, throttle: e.plane.throttle, speed: e.plane.speed, x: e.plane.x, y: e.plane.y,
-            phi: e.plane.phi, loops: e.score.loops, score: e.score.score, best: e.score.best,
+            phi: e.plane.phi, vy: e.plane.vy, loops: e.score.loops, score: e.score.score, best: e.score.best,
             maneuvers: e.score.maneuvers, active: n.loop.activeLoops, runId: e.runId } }"""
     )
 
@@ -71,34 +70,21 @@ with sync_playwright() as p:
     page.wait_for_timeout(250)
     s1 = st(page)
     check("segurar acelera (potência sobe)", s1["throttle"] > 0.8, f"{s0['throttle']:.2f}→{s1['throttle']:.2f}")
-    check("segurar levanta o nariz", s1["phi"] - s0["phi"] > 0.3, f"phi {s0['phi']:.2f}→{s1['phi']:.2f}")
-    page.wait_for_timeout(1750)
+    check("segurar faz subir (como a bolinha)", s1["vy"] > 0 and s1["y"] > s0["y"] - 60, f"vy={s1['vy']:.0f} u/s")
+    check("o nariz acompanha a subida", s1["phi"] > 0.3, f"phi={s1['phi']:.2f}")
+    page.wait_for_timeout(1800)
     s1b = st(page)
-    check("segurar 2 s sobe bem mais alto", s1b["y"] - s0["y"] > 300, f"subiu {s1b['y'] - s0['y']:.0f} u")
-    check("segurar muito não vira loop", s1b["loops"] == 0 and s1b["phi"] < 1.2, f"phi={s1b['phi']:.2f}")
+    check("segurar muito encosta no teto sem bater", s1b["state"] == "PLAYING" and s1b["y"] >= 555, f"y={s1b['y']:.0f}")
     page.screenshot(path=str(OUT / "aviao-02-subindo.png"))
     page.mouse.up()
-    page.wait_for_timeout(350)
+    page.wait_for_timeout(300)
     s2 = st(page)
     check("soltar desacelera (potência cai)", s2["throttle"] < 0.5, f"{s2['throttle']:.2f}")
-    # Dois toques curtos (ritmo frenético) NÃO dão loop.
-    for _ in range(4):
-        page.mouse.down(); page.wait_for_timeout(70); page.mouse.up(); page.wait_for_timeout(110)
-    page.wait_for_timeout(300)
-    check("toques rápidos curtos não dão loop", st(page)["loops"] == 0)
-    page.mouse.down(); page.wait_for_timeout(500); page.mouse.up()
-    page.wait_for_timeout(500)
-    # Toque + toque-e-segure com Pointer Events reais → loop.
-    page.mouse.down(); page.wait_for_timeout(80); page.mouse.up()
-    page.wait_for_timeout(100)
-    page.mouse.down(); page.wait_for_timeout(500); page.mouse.up()
-    page.wait_for_timeout(600)
-    page.screenshot(path=str(OUT / "aviao-02b-loop.png"))
-    page.wait_for_function("() => window.__NDC__.engine.score.loops >= 1", timeout=4000)
-    s2b = st(page)
-    check("toque + toque-e-segure registra um loop", s2b["loops"] >= 1, f"loops={s2b['loops']} pontos={s2b['score']}")
-    page.wait_for_timeout(300)
-    page.screenshot(path=str(OUT / "aviao-03-pos-loop.png"))
+    check("soltar faz cair (como a bolinha)", s2["vy"] < -100, f"vy={s2['vy']:.0f} u/s")
+    page.screenshot(path=str(OUT / "aviao-03-caindo.png"))
+    check("sem loops no modo padrão", s2["loops"] == 0)
+    # Segura um pouco para não cair antes do teste de pausa.
+    page.mouse.down(); page.wait_for_timeout(250); page.mouse.up()
 
     # Pausa ao ocultar a aba.
     page.evaluate("() => { Object.defineProperty(document, 'hidden', {value: true, configurable: true}); document.dispatchEvent(new Event('visibilitychange')) }")

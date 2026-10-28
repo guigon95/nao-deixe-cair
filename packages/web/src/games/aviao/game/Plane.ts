@@ -1,4 +1,5 @@
-import { FLIGHT, type FlightParams } from './config';
+import { ARCADE, FLIGHT, type FlightParams } from './config';
+import { DEFAULT_PHYSICS, verticalAcceleration, type PhysicsParams } from '../../bolinha/game/Physics';
 
 /** Estado do avião (coordenadas de mundo, y para cima). */
 export interface PlaneState {
@@ -14,6 +15,8 @@ export interface PlaneState {
   prevPhi: number;
   /** Rotação atual do nariz (rad/s), para efeitos e detecção. */
   turnRate: number;
+  /** Velocidade vertical (u/s, para cima) — usada no modo "bolinha". */
+  vy: number;
   /** Potência do motor 0..1. */
   throttle: number;
   /** Quanto o jogador está puxando agora 0..1 (após a rampa). */
@@ -44,6 +47,7 @@ export function createPlane(x: number, y: number, speed: number): PlaneState {
     phi: 0,
     prevPhi: 0,
     turnRate: 0,
+    vy: 0,
     throttle: 0.5,
     pull: 0,
     stall: 0,
@@ -168,4 +172,46 @@ export function maxLevelSpeed(p: FlightParams = FLIGHT): number {
 /** Velocidade em que a correção de nível sozinha sustenta o avião. */
 export function trimLevelSpeed(p: FlightParams = FLIGHT): number {
   return Math.sqrt(p.gravity / p.cTrim);
+}
+
+/**
+ * Passo no modo "bolinha": a velocidade vertical segue a MESMA função do
+ * jogo da bolinha (gravidade, propulsão, reforço na inversão e limites de
+ * velocidade), só com o eixo invertido (aqui y cresce para cima). A
+ * velocidade horizontal é dada de fora (curva de velocidade da bolinha).
+ * O ângulo do nariz é só visual: acompanha a direção do movimento.
+ */
+export function stepArcade(
+  s: PlaneState,
+  holding: boolean,
+  forwardSpeed: number,
+  dt: number,
+  p: PhysicsParams = DEFAULT_PHYSICS,
+  ceiling: number = ARCADE.ceiling,
+): void {
+  s.prevX = s.x;
+  s.prevY = s.y;
+  s.prevPhi = s.phi;
+  // vy da bolinha (para baixo) = −vy do avião (para cima).
+  let vyDown = -s.vy;
+  vyDown += verticalAcceleration(vyDown, holding, p) * dt;
+  if (vyDown < -p.maxRiseSpeed) vyDown = -p.maxRiseSpeed;
+  if (vyDown > p.maxFallSpeed) vyDown = p.maxFallSpeed;
+  s.vy = -vyDown;
+  s.y += s.vy * dt;
+  if (s.y > ceiling) {
+    s.y = ceiling;
+    if (s.vy > 0) s.vy = 0; // como a borda da bolinha: anula só o que levaria para fora
+  }
+  s.x += forwardSpeed * dt;
+  s.speed = Math.hypot(forwardSpeed, s.vy);
+  s.phi = Math.atan2(s.vy, forwardSpeed);
+  s.turnRate = dt > 0 ? (s.phi - s.prevPhi) / dt : 0;
+  // Potência só para som e efeitos (rampa curta).
+  const target = holding ? 1 : FLIGHT.idle;
+  s.throttle += Math.max(-ARCADE.throttleRate * dt, Math.min(ARCADE.throttleRate * dt, target - s.throttle));
+  s.pull = holding ? 1 : 0;
+  s.stall = 0;
+  s.air = 1;
+  s.onGround = false;
 }

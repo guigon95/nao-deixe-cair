@@ -9,7 +9,7 @@ import { LoginPanel, RankingPanel, SaveScore } from '../../../shared/ui/RankingU
 type Overlay = 'ranking' | 'login' | null;
 
 export function GameScreen() {
-  const { surfaceRef, canvasRef, ui, settings, updateSettings, start, pause, resume, toMenu, playSound, storage } =
+  const { surfaceRef, canvasRef, ui, settings, updateSettings, start, pause, resume, toMenu, playSound, storage, physics } =
     useAviao();
   const primaryRef = useRef<HTMLButtonElement | null>(null);
 
@@ -108,16 +108,24 @@ export function GameScreen() {
               <span className="title-accent">Acrobata</span>
             </h1>
             <div className="demo demo-plane" aria-hidden="true">
-              <span className="demo-loop" />
-              <span className="demo-jet" />
+              {physics === 'voo' && <span className="demo-loop" />}
+              <span className={physics === 'voo' ? 'demo-jet' : 'demo-jet demo-bob'} />
             </div>
-            <p className="howto">
-              <strong>Segure</strong> para subir — quanto mais tempo, mais alto.
-              <br />
-              <strong>Solte</strong> para mergulhar e ganhar velocidade.
-              <br />
-              <strong>Loop:</strong> toque e, logo em seguida, <strong>toque e segure</strong>.
-            </p>
+            {physics === 'voo' ? (
+              <p className="howto">
+                <strong>Segure</strong> para subir — quanto mais tempo, mais alto.
+                <br />
+                <strong>Solte</strong> para mergulhar e ganhar velocidade.
+                <br />
+                <strong>Loop:</strong> toque e, logo em seguida, <strong>toque e segure</strong>.
+              </p>
+            ) : (
+              <p className="howto">
+                <strong>Segure</strong> para subir. <strong>Solte</strong> para cair.
+                <br />
+                Desvie de balões, pássaros e torres e não encoste no chão.
+              </p>
+            )}
             <button ref={primaryRef} className="btn btn-primary" onClick={start}>
               DECOLAR
             </button>
@@ -191,9 +199,15 @@ export function GameScreen() {
               <span>
                 <strong>{ui.distance}</strong> m
               </span>
-              <span>
-                <strong>{ui.loops}</strong> {ui.loops === 1 ? 'loop' : 'loops'}
-              </span>
+              {physics === 'voo' ? (
+                <span>
+                  <strong>{ui.loops}</strong> {ui.loops === 1 ? 'loop' : 'loops'}
+                </span>
+              ) : (
+                <span>
+                  <strong>{ui.maneuvers}</strong> {ui.maneuvers === 1 ? 'manobra' : 'manobras'}
+                </span>
+              )}
               <span>
                 combo <strong>×{ui.bestMultiplier}</strong>
               </span>

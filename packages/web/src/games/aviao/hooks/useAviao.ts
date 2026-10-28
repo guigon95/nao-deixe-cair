@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { PlaneSfx, vibrate } from '../audio';
 import { schemeFromUrl } from '../game/Controls';
+import type { PhysicsMode } from '../game/config';
 import { Engine } from '../game/Engine';
 import { maxLevelSpeed } from '../game/Plane';
 import { GameState, type ManeuverKind } from '../game/types';
@@ -46,7 +47,13 @@ const VMAX = maxLevelSpeed();
  * Integra a simulação ao React. O React só re-renderiza em mudanças de
  * estado (menu, pausa, fim) — nunca a cada quadro.
  */
+/** `?fisica=voo` liga a física de voo com loops (deixada de lado); o padrão é a da bolinha. */
+export function physicsFromUrl(search: string): PhysicsMode {
+  return new URLSearchParams(search).get('fisica') === 'voo' ? 'voo' : 'bolinha';
+}
+
 export function useAviao() {
+  const physics = useRef<PhysicsMode>(typeof location !== 'undefined' ? physicsFromUrl(location.search) : 'bolinha').current;
   const surfaceRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const storage = useRef(browserStorage()).current;
@@ -82,6 +89,7 @@ export function useAviao() {
       storage,
       seed: seedParam ? Number(seedParam) : undefined,
       scheme: schemeFromUrl(location.search),
+      physics: physicsFromUrl(location.search),
     });
     const fx = new Effects();
     const sfx = new PlaneSfx();
@@ -327,5 +335,5 @@ export function useAviao() {
     [storage],
   );
 
-  return { surfaceRef, canvasRef, ui, settings, updateSettings, start, pause, resume, toMenu, playSound, storage };
+  return { surfaceRef, canvasRef, ui, settings, updateSettings, start, pause, resume, toMenu, playSound, storage, physics };
 }

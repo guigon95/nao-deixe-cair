@@ -1,10 +1,11 @@
-import { FLIGHT, GROUND, MANEUVERS, PLANE, SCORING, SIM, type FlightParams } from './config';
+import { ARCADE, FLIGHT, GROUND, MANEUVERS, PLANE, SCORING, SIM, type FlightParams, type PhysicsMode } from './config';
 import { createScheme, type ControlScheme, type ControlSchemeId } from './Controls';
 import { ManeuverDetector } from './Maneuvers';
-import { createPlane, stepPlane, type PlaneState } from './Plane';
+import { createPlane, stepArcade, stepPlane, type PlaneState } from './Plane';
 import { Score } from './Score';
 import { GameState, type GameEvent, type ManeuverKind, type Obstacle } from './types';
-import { World } from './World';
+import { ARCADE_DIFFICULTY, World } from './World';
+import { difficultyAt as ballDifficulty } from '../../bolinha/game/Difficulty';
 import { createRng, randomSeed } from '../../../shared/random';
 import type { Storage } from '../../../shared/storage/storage';
 
@@ -13,6 +14,8 @@ export interface EngineOptions {
   /** Semente fixa (testes). Sem ela, cada partida usa uma semente aleatória. */
   seed?: number;
   scheme?: ControlSchemeId;
+  /** "bolinha" (padrão): física idêntica à da bolinha. "voo": física de voo com loops. */
+  physics?: PhysicsMode;
   flight?: FlightParams;
   resumeDelay?: number;
 }
@@ -41,6 +44,7 @@ export class Engine {
   readonly score: Score;
   readonly maneuvers = new ManeuverDetector();
   scheme: ControlScheme;
+  readonly physics: PhysicsMode;
   /** Tempo de partida simulado (s). */
   elapsed = 0;
   holding = false;
@@ -63,12 +67,13 @@ export class Engine {
 
   constructor(opts: EngineOptions) {
     this.flight = opts.flight ?? FLIGHT;
+    this.physics = opts.physics ?? 'bolinha';
     this.fixedSeed = opts.seed;
     this.resumeDelay = opts.resumeDelay ?? 1.2;
     this.score = new Score(opts.storage);
     this.scheme = createScheme(opts.scheme ?? 'c');
     const seed = opts.seed ?? randomSeed();
-    this.world = new World(createRng(seed), seed);
+    this.world = new World(createRng(seed), seed, this.physics === 'bolinha' ? ARCADE.corridorCeiling : undefined, this.physics === 'bolinha' ? ARCADE_DIFFICULTY : undefined);
     this.plane = createPlane(0, PLANE.startAltitude, PLANE.startSpeed);
     this.placeAtStart();
   }
@@ -94,7 +99,7 @@ export class Engine {
   private placeAtStart() {
     const p = this.plane;
     const y = this.world.terrain.height(0) + PLANE.startAltitude;
-    Object.assign(p, createPlane(0, y, PLANE.startSpeed));
+    Object.assign(p, createPlane(0, y, this.physics === 'bolinha' ? ballDifficulty(0).speed : PLANE.startSpeed));
     this.world.update(0, 0);
   }
 
@@ -143,6 +148,11 @@ export class Engine {
   toMenu(): void {
     this.setHolding(false);
     this.setState(GameState.READY);
+  }
+
+  /** Velocidade horizontal atual (u/s). */
+  get forwardSpeed(): number {
+    return this.physics === 'bolinha' ? ballDifficulty(this.elapsed).speed : Math.cos(this.plane.phi) * this.plane.speed;
   }
 
   setHolding(h: boolean): void {
@@ -194,7 +204,10 @@ export class Engine {
     this.totalSteps++;
     const p = this.plane;
     const wasStalled = this.maneuvers.stalled;
-    stepPlane(p, this.scheme.command(this.elapsed, p), dt, this.flight);
+    if (this.physics === 'bolinha') {
+      // Mesma física vertical e mesma velocidade das barreiras da bolinha.
+      stepArcade(p, this.holding, ballDifficulty(this.elapsed).speed, dt);
+    } else stepPlane(p, this.scheme.command(this.elapsed, p), dt, this.flight);
     this.elapsed += dt;
     this.world.update(p.x, dt);
 
@@ -202,7 +215,14 @@ export class Engine {
     const terrain = this.world.terrain;
     const ground = terrain.height(p.x);
     const wasOnGround = p.onGround;
-    if (p.y - 5 <= ground) {
+    if (this.physics === 'bolinha') {
+      // Encostou no chão: batida (não deixe cair!).
+      if (p.y - 5 <= ground) {
+        p.y = ground + 5;
+        this.crash('ground');
+        return;
+      }
+    } else if (p.y - 5 <= ground) {
       const slope = terrain.slope(p.x);
       let rel = p.phi - slope;
       rel = Math.atan2(Math.sin(rel), Math.cos(rel));

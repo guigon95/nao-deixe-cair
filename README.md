@@ -5,7 +5,7 @@ Hub de jogos casuais para navegador (prioridade para celular). Cada jogo fica na
 | Jogo | Pasta / rota | Como se joga |
 |---|---|---|
 | **Bolinha** (nome provisório) | `bolinha/` | Segure para subir, solte para cair. Passe pelos vãos das barreiras. |
-| **Acrobata** | `aviao/` | Segure para subir (quanto mais tempo, mais alto), solte para mergulhar, toque + toque e segure dá um loop. Encadeie manobras. |
+| **Acrobata** | `aviao/` | Segure para subir, solte para cair (mesma física da bolinha). Desvie de balões, pássaros e torres e não encoste no chão. |
 
 React 19 + TypeScript estrito + Vite (multi-página) + Canvas 2D no front; **API Fastify + Prisma + Postgres** para contas e ranking de todos os jogadores (mesmo padrão do AquaOps). Sem anúncios, sem analytics. Sons sintetizados com Web Audio. Sem servidor (offline ou hospedagem estática) tudo continua funcionando com ranking e perfil locais.
 
@@ -136,13 +136,24 @@ e2e/                    testes de navegador (hub + um por jogo)
 
 Para adicionar um jogo: uma pasta em `packages/web/src/games/`, um `<jogo>/index.html`, uma entrada em `vite.config.ts` (`build.rollupOptions.input`), uma em `src/shared/games.ts` e, para ranking online, o id em `packages/server/src/lib/games.ts` (com o teto de pontos por segundo).
 
-URLs de diagnóstico (nos dois jogos): `?debug` expõe `window.__NDC__`; `?seed=N` fixa a semente. No Acrobata: `?controle=a` ou `?controle=b` ligam os esquemas antigos e `?debug&piloto` liga o piloto automático.
+URLs de diagnóstico (nos dois jogos): `?debug` expõe `window.__NDC__`; `?seed=N` fixa a semente. No Acrobata: `?fisica=voo` liga a física de voo com loops (deixada de lado; dentro dela `?controle=a|b` ligam os esquemas antigos) e `?debug&piloto` liga o piloto automático.
 
 ---
 
 ## Acrobata (jogo do avião)
 
-### Controle: esquema C — "segurar sobe, toque + toque e segure dá o loop"
+### Física atual: a mesma da bolinha (padrão)
+
+- O movimento vertical usa **a mesma função** do jogo da bolinha (`verticalAcceleration` em `src/games/bolinha/game/Physics.ts`, importada direto): gravidade 1150 u/s², propulsão 2350 u/s², reforço de 1,55× na inversão, subida máxima 430 u/s e queda máxima 480 u/s. Um teste compara passo a passo com a bolinha. Se a física da bolinha for recalibrada, o avião acompanha.
+- O avião anda para a frente na mesma velocidade das barreiras da bolinha (150 → 285 u/s, curva `difficultyAt` da bolinha).
+- **Segurar** sobe, **soltar** cai. O nariz só acompanha a direção do movimento (é visual).
+- Tela fixa como a da bolinha: chão embaixo, teto em cima (o avião encosta e para, sem bater). Encostar no chão é batida.
+- Sem loops neste modo. Continuam valendo anéis, raspões e rasante (passar rente ao chão e subir), com combo.
+- Dificuldade própria deste modo (`ARCADE_DIFFICULTY` em `World.ts`): corredor 300 → 165 u, 1,6 → 5,5 obstáculos por trecho, rampa de 16 000 u. Com um jogador casual simulado, a mediana das partidas ficou entre ~52 s (descuidado) e ~107 s (cuidadoso). Um piloto automático sobrevive 120 s em todas as sementes testadas.
+
+As seções abaixo descrevem a física de voo com loops, deixada de lado por enquanto e disponível em `?fisica=voo`.
+
+### Física de voo (`?fisica=voo`) — controle: esquema C, "segurar sobe, toque + toque e segure dá o loop"
 
 - **Segurar** = motor no máximo e o nariz sobe até ~35–40° e **fica lá**: quanto mais tempo segurar, mais alto o avião vai (~200 u por segundo, 3 s ≈ 540 u). Nunca vira loop sem querer. Se o avião estiver lento, o ângulo diminui sozinho para não estolar.
 - **Soltar** = marcha lenta e o nariz desce na hora até um mergulho firme (~43°), como a bolinha caindo: aponta para baixo em ~0,24 s e desce a ~200 u/s. Segurar de novo inverte para cima em ~0,27 s.
