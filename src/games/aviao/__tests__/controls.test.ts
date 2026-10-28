@@ -11,7 +11,7 @@ describe('esquemas de controle', () => {
     expect(schemeFromUrl('?controle=x')).toBe('c');
   });
 
-  it('C: segurar sobe num ângulo firme; soltar corta o motor', () => {
+  it('C: segurar sobe num ângulo firme; soltar corta o motor e empurra para o mergulho', () => {
     const c = createScheme('c');
     const p = createPlane(0, 0, 250);
     c.press(0);
@@ -21,7 +21,12 @@ describe('esquemas de controle', () => {
     p.phi = SCHEME_C.climbAngle + 0.3; // passou do ângulo: empurra de leve
     expect(c.command(0, p).pull).toBeLessThan(0);
     c.release(1);
-    expect(c.command(1, p)).toEqual({ throttle: 0, pull: 0 });
+    const free = c.command(1, p);
+    expect(free.throttle).toBe(0);
+    expect(free.pull).toBeLessThan(0); // nariz para baixo, como a bolinha caindo
+    p.phi = -SCHEME_C.diveAngle; // já no ângulo de mergulho: não empurra mais
+    p.turnRate = 0;
+    expect(Math.abs(c.command(1.1, p).pull)).toBeLessThan(0.05);
   });
 
   it('C: dois toques rápidos = loop (puxada total até completar a volta)', () => {
@@ -34,8 +39,10 @@ describe('esquemas de controle', () => {
     c.release(0.3);
     p.phi = 3; // no meio do loop, mesmo sem tocar, continua puxando
     expect(c.command(0.5, p).pull).toBe(1);
-    p.phi = Math.PI * 2; // completou
-    expect(c.command(0.6, p)).toEqual({ throttle: 0, pull: 0 });
+    p.phi = Math.PI * 2 - 0.05; // quase: continua puxando até passar da volta
+    expect(c.command(0.6, p).pull).toBe(1);
+    p.phi = Math.PI * 2 + SCHEME_C.loopOvershoot; // completou: volta ao controle normal (solto = mergulho)
+    expect(c.command(0.7, p).throttle).toBe(0);
   });
 
   it('C: toques espaçados ou um toque longo não dão loop', () => {

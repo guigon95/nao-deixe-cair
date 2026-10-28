@@ -142,14 +142,24 @@ export const SCHEME_C = {
   /** Abaixo desta velocidade o ângulo de subida diminui até o nível (u/s). */
   slowSpeed: 175,
   speedBand: 90,
+  /**
+   * Ângulo de mergulho ao soltar (rad): como na bolinha, soltar desce na
+   * hora e firme — não é um planeio. Segurar de novo inverte rápido.
+   */
+  diveAngle: 0.75,
   /** Ganho da puxada por radiano de erro e amortecimento pela rotação atual. */
   gain: 4,
   damping: 0.3,
+  /** No mergulho o nariz desce com ganho próprio (resposta rápida ao soltar). */
+  diveGain: 8,
   /** Toque duplo: o primeiro toque é curto e o segundo vem logo depois (s). */
   tapMax: 0.18,
   doubleTapGap: 0.24,
-  /** Loop assistido: termina ao completar 360° (menos esta folga) ou se estolar. */
-  loopFinish: 0.12,
+  /**
+   * Loop assistido: termina um pouco DEPOIS de 360° (rad) ou se estolar.
+   * Passar da volta garante que o loop conte antes de o mergulho assumir.
+   */
+  loopOvershoot: 0.15,
 } as const;
 
 /** Ângulo da trajetória entre −π e π. */
@@ -162,7 +172,8 @@ function wrapAngle(phi: number): number {
  * - Segurar = motor no máximo e o nariz sobe até um ângulo de subida firme
  *   e fica lá: quanto mais tempo segurar, mais alto o avião vai. Nunca vira
  *   loop sem querer.
- * - Soltar = marcha lenta: o nariz cai e o avião mergulha ganhando velocidade.
+ * - Soltar = marcha lenta e o nariz desce rápido até um mergulho firme
+ *   (~43°), como a bolinha caindo; segurar de novo inverte na hora.
  * - Dois toques rápidos = loop: puxada total até completar a volta. A
  *   resposta é imediata no segundo toque (o primeiro já sobe o nariz).
  *   Segurando depois do segundo toque, o avião sai do loop subindo.
@@ -207,19 +218,24 @@ export class SchemeC implements ControlScheme {
       this.loopStart = plane.phi;
     }
     if (this.loopStart !== null) {
-      const done = plane.phi - this.loopStart >= Math.PI * 2 - SCHEME_C.loopFinish;
+      const done = plane.phi - this.loopStart >= Math.PI * 2 + SCHEME_C.loopOvershoot;
       if (done || plane.stall > 0.7) this.loopStart = null;
       else return { throttle: 1, pull: 1 };
     }
-    if (!this.holding) return { throttle: 0, pull: 0 };
-    // Voando para trás (depois de um estol), não puxa: deixa o avião se recuperar para a frente.
-    if (Math.cos(plane.phi) < 0) return { throttle: 1, pull: 0 };
+    // Voando para trás (depois de um estol), não comanda: deixa o avião se recuperar para a frente.
+    if (Math.cos(plane.phi) < 0) return { throttle: this.holding ? 1 : 0, pull: 0 };
+    if (!this.holding) {
+      // Soltou: empurra o nariz até o ângulo de mergulho e segura lá (nunca mais íngreme).
+      const err = -SCHEME_C.diveAngle - wrapAngle(plane.phi);
+      const pull = SCHEME_C.diveGain * err - SCHEME_C.damping * plane.turnRate;
+      return { throttle: 0, pull: Math.min(1, Math.max(-1, pull)) };
+    }
     // Mantém o ângulo de subida (menor quando está lento, para nunca estolar segurando).
     const slow = Math.min(1, Math.max(0, (plane.speed - SCHEME_C.slowSpeed) / SCHEME_C.speedBand));
     const target = SCHEME_C.climbAngle * slow;
     const err = target - wrapAngle(plane.phi);
     const pull = SCHEME_C.gain * err - SCHEME_C.damping * plane.turnRate;
-    return { throttle: 1, pull: Math.min(1, Math.max(-0.5, pull)) };
+    return { throttle: 1, pull: Math.min(1, Math.max(-1, pull)) };
   }
 
   reset(): void {

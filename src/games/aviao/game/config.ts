@@ -58,6 +58,8 @@ export interface FlightParams {
   diveRecoveryMin: number;
   /** Sustentação extra ao puxar: a = cPull·v² (é ela que faz curvas e loops). */
   cPull: number;
+  /** Força ao empurrar o manche (puxada negativa): a = cPush·v²·puxada. Mais forte que puxar: soltar mergulha na hora. */
+  cPush: number;
   /** Limite de carga: a sustentação total nunca passa de maxG·g. */
   maxG: number;
   /** Velocidade de estol (u/s) e faixa de transição (fração acima dela). */
@@ -88,6 +90,7 @@ export const FLIGHT: FlightParams = {
   invertedTrim: 0.55,
   diveRecoveryMin: 0.8,
   cPull: 0.0115,
+  cPush: 0.024,
   maxG: 6,
   stallSpeed: 105,
   stallBand: 0.3,

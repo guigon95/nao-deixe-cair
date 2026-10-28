@@ -30,7 +30,7 @@ export interface PlaneState {
 export interface FlightCommand {
   /** Potência desejada 0..1. */
   throttle: number;
-  /** Puxada do manche: 0..1 puxa; valores negativos (até −0,5) empurram de leve. */
+  /** Puxada do manche: 0..1 puxa; valores negativos (até −1) empurram o nariz para baixo. */
   pull: number;
 }
 
@@ -79,7 +79,7 @@ export function liftAccel(speed: number, pull: number, air = 1, p: FlightParams 
   const lf = liftFactor(speed, p) * air;
   const v2 = speed * speed;
   const trim = v2 * p.cTrim * lf;
-  const pullLift = v2 * p.cPull * pull * lf;
+  const pullLift = v2 * (pull >= 0 ? p.cPull : p.cPush) * pull * lf;
   const cap = p.maxG * p.gravity;
   const total = Math.min(trim + pullLift, cap);
   // Se o limite cortou, a parte do jogador encolhe primeiro (a correção de nível é preservada).
@@ -136,7 +136,7 @@ export function stepPlane(s: PlaneState, cmd: FlightCommand, dt: number, p: Flig
   if (s.throttle < target) s.throttle = Math.min(target, s.throttle + p.throttleUp * dt);
   else s.throttle = Math.max(target, s.throttle - p.throttleDown * dt);
   // A puxada responde quase na hora (rampa de ~40 ms só para não dar tranco).
-  const pullTarget = clamp(cmd.pull, -0.5, 1);
+  const pullTarget = clamp(cmd.pull, -1, 1);
   s.pull += clamp(pullTarget - s.pull, -dt * 25, dt * 25);
 
   const air = airFactor(s.y, p);

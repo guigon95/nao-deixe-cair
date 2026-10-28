@@ -20,6 +20,7 @@ function simulate(id: ControlSchemeId, events: Event[], seconds: number, speed =
   let maxRotation = 0;
   let stallTime = 0;
   const startPhi = plane.phi;
+  let minPhi = plane.phi;
   const startY = plane.y;
   let maxClimb = 0;
   const alt: number[] = [];
@@ -33,7 +34,9 @@ function simulate(id: ControlSchemeId, events: Event[], seconds: number, speed =
     }
     stepPlane(plane, scheme.command(t, plane), dt);
     if (firstTurnAt < 0 && plane.phi - startPhi > (5 * Math.PI) / 180) firstTurnAt = t;
-    maxRotation = Math.max(maxRotation, plane.phi - startPhi);
+    // Rotação líquida para cima, a partir do menor ângulo até aqui (como o detector de manobras).
+    minPhi = Math.min(minPhi, plane.phi);
+    maxRotation = Math.max(maxRotation, plane.phi - minPhi);
     if (plane.stall > 0.6) stallTime += dt;
     maxClimb = Math.max(maxClimb, plane.y - startY);
     alt.push(plane.y);

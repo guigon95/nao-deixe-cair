@@ -96,8 +96,8 @@ URLs de diagnóstico (nos dois jogos): `?debug` expõe `window.__NDC__`; `?seed=
 ### Controle: esquema C — "segurar sobe, dois toques dão o loop"
 
 - **Segurar** = motor no máximo e o nariz sobe até ~35–40° e **fica lá**: quanto mais tempo segurar, mais alto o avião vai (~200 u por segundo, 3 s ≈ 540 u). Nunca vira loop sem querer. Se o avião estiver lento, o ângulo diminui sozinho para não estolar.
-- **Soltar** = marcha lenta: o nariz cai e o avião mergulha ganhando velocidade.
-- **Dois toques rápidos** (cada um até 0,18 s, com no máximo 0,24 s entre eles) = **loop**: puxada total até completar a volta (~2 s). O loop começa na hora do segundo toque. Segurando depois do segundo toque, o avião sai do loop subindo.
+- **Soltar** = marcha lenta e o nariz desce na hora até um mergulho firme (~43°), como a bolinha caindo: aponta para baixo em ~0,24 s e desce a ~200 u/s. Segurar de novo inverte para cima em ~0,27 s.
+- **Dois toques rápidos** (cada um até 0,18 s, com no máximo 0,24 s entre eles) = **loop**: puxada total até passar da volta completa (~2 s). O loop começa na hora do segundo toque. Segurando depois do segundo toque, o avião sai do loop subindo.
 - **Estol**: devagar e de nariz alto (por exemplo, um loop sem velocidade), a asa para de sustentar; aparece "ESTOL!", o nariz cai e o avião se recupera sozinho se houver altura.
 - Nos primeiros segundos de cada partida, uma dica na tela lembra os três gestos.
 
@@ -109,10 +109,10 @@ Comparação em `src/games/aviao/game/testing/compareControls.ts`, com jogadores
 |---|---|---|---|
 | Toque → nariz gira 5° | 42 ms | 92 ms | **42 ms** |
 | Loops de propósito bem-sucedidos | 100 % (segurando) | 75 % (deslize) | **100 % (dois toques)** |
-| Segurar 3 s: quanto sobe / vira loop? | 179 u / **sim** | 421 u / não | **541 u / não** |
-| Manobras sem querer por minuto de toques frenéticos | 0 | 36,4 tonneaus | 6,4 (≈ 4,8 loops) |
+| Segurar 3 s: quanto sobe / vira loop? | 179 u / **sim** | 421 u / não | **552 u / não** |
+| Manobras sem querer por minuto de toques frenéticos | 0 | 36,4 tonneaus | 20,6 loops |
 
-O ponto fraco do C: quem bate na tela muito rápido, em ritmo, pode disparar um loop sem querer. Com o C isso quase não é necessário (para subir basta segurar), e as janelas do toque duplo foram apertadas para reduzir o problema.
+O ponto fraco do C: quem bate na tela muito rápido, em ritmo (o jeito de jogar a bolinha), pode disparar um loop sem querer. Apertar os tempos do toque duplo não resolve: com toques ≤ 0,14 s e intervalo ≤ 0,18 s os acidentais caem para ~10/min, mas só 54 % dos loops de propósito são reconhecidos.
 
 ### Manobras e pontuação
 
@@ -145,7 +145,7 @@ O ponto fraco do C: quem bate na tela muito rápido, em ritmo, pode disparar um 
 | motor máx. | 560 u/s² | | corredor (início → fim) | 380 → 200 u |
 | arrasto | 0,0028·v² (vel. máx. nivelada ≈ 447 u/s) | | variação máx. do centro | 80 → 190 u/trecho |
 | correção de nível | 0,0068·v² (sustenta sozinha a ≈ 243 u/s) | | obstáculos por trecho | 1,3 → 5,5 |
-| puxada | 0,0115·v², limite 6 g (empurrar até −0,5) | | folga extra no começo | 80 → 0 u |
+| puxada / empurrada | 0,0115·v² / 0,024·v², limite 6 g | | folga extra no começo | 80 → 0 u |
 | estol | < 105 u/s (transição até 136 u/s) | | início livre | 1600 u |
 | potência | sobe 5/s, cai 3,2/s, marcha lenta 12 % | | rampa até o máximo | 36 000 u |
 
