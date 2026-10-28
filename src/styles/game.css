@@ -111,6 +111,11 @@ body,
   text-align: center;
   cursor: default;
   animation: pop 160ms ease-out;
+  /* Painel rola sozinho se não couber (teclado virtual, tela pequena). */
+  max-height: calc(100% - 1.2em);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
 }
 
 .menu {
@@ -318,6 +323,221 @@ button:focus-visible {
   color: var(--dim);
   pointer-events: none;
   white-space: nowrap;
+}
+
+/* ---------- Ranking e perfil ---------- */
+
+.menu-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5em;
+  width: 100%;
+}
+
+.btn-inline {
+  width: auto;
+  flex: 1 1 8em;
+  padding: 0.55em 1em;
+  min-height: 44px;
+}
+
+.btn-tiny {
+  min-height: 36px;
+  font-size: 0.85em;
+  padding: 0 0.6em;
+}
+
+.who {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.2em;
+  color: var(--dim);
+  font-size: 0.9em;
+}
+
+.who strong {
+  color: var(--text);
+}
+
+.save-box {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45em;
+  padding: 0.8em;
+  border-radius: 0.9em;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px dashed var(--panel-border);
+}
+
+.save-box.is-saved {
+  border-style: solid;
+  border-color: rgba(71, 229, 188, 0.5);
+  background: rgba(71, 229, 188, 0.08);
+}
+
+.save-box .btn-link {
+  min-height: 36px;
+}
+
+.save-title {
+  margin: 0;
+  font-weight: 800;
+  font-size: 1em;
+}
+
+.is-saved .save-title {
+  color: var(--ok);
+}
+
+.save-sub {
+  margin: 0;
+  font-size: 0.85em;
+  color: var(--dim);
+}
+
+.form-row {
+  display: flex;
+  gap: 0.5em;
+  width: 100%;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.btn-save {
+  flex: 1 1 8em;
+  padding: 0.55em 1em;
+  min-height: 44px;
+  color: #052b22;
+  background: var(--ok);
+}
+
+.name-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45em;
+  text-align: left;
+}
+
+.name-label {
+  font-weight: 800;
+  font-size: 0.95em;
+}
+
+.name-input {
+  font: inherit;
+  /* 16px+ evita o zoom automático do iOS ao focar o campo. */
+  font-size: max(16px, 1em);
+  width: 100%;
+  padding: 0.6em 0.8em;
+  border-radius: 0.6em;
+  border: 1px solid var(--panel-border);
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--text);
+  user-select: text;
+  -webkit-user-select: text;
+  touch-action: manipulation;
+}
+
+.name-input:focus {
+  outline: 3px solid #8fb0ff;
+  outline-offset: 1px;
+}
+
+.name-input[aria-invalid='true'] {
+  border-color: var(--barrier);
+}
+
+.name-hint {
+  margin: 0;
+  font-size: 0.78em;
+  line-height: 1.35;
+  color: var(--dim);
+}
+
+.name-hint.is-error {
+  color: #ff9db0;
+}
+
+.ranking .panel-title {
+  margin-bottom: -0.2em;
+}
+
+.rank-scope {
+  margin: 0;
+  font-size: 0.8em;
+  color: var(--dim);
+}
+
+.rank-empty {
+  margin: 0.6em 0;
+  color: var(--dim);
+  line-height: 1.5;
+}
+
+.rank-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2em;
+}
+
+.rank-list li {
+  display: grid;
+  grid-template-columns: 2.4em 1fr auto;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.38em 0.7em;
+  border-radius: 0.55em;
+  font-size: 0.95em;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.rank-list li[data-pos='1'] .rank-pos {
+  color: var(--ball);
+}
+
+.rank-list li.is-you {
+  background: rgba(71, 229, 188, 0.14);
+  outline: 1px solid rgba(71, 229, 188, 0.55);
+}
+
+.rank-pos {
+  font-weight: 900;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.rank-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+  font-weight: 600;
+}
+
+.rank-tag {
+  margin-left: 0.35em;
+  font-size: 0.6em;
+  color: var(--ok);
+  vertical-align: middle;
+}
+
+.rank-score {
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -113,7 +113,8 @@ export class InputController {
   private onKeyDown = (ev: Event) => {
     const e = ev as KeyLike;
     if (!e.code || !HOLD_KEYS.has(e.code)) return;
-    if (isInteractive(e.target) && e.code === 'Space') return; // Espaço num botão = clique
+    // Teclas em botões/campos pertencem a eles (Espaço = clique, W/↑ ao digitar o nome).
+    if (isInteractive(e.target)) return;
     e.preventDefault?.(); // evita rolar a página com espaço/seta
     if (!this.enabled) return;
     this.keys.add(e.code);

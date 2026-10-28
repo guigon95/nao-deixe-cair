@@ -18,6 +18,8 @@ export interface UiState {
   best: number;
   isNewRecord: boolean;
   landscape: boolean;
+  /** Identificador da partida que terminou (para enviar ao ranking uma única vez). */
+  runId: number;
 }
 
 /**
@@ -35,7 +37,14 @@ export function useGame() {
 
   const [settings, setSettings] = useState<Settings>(() => loadSettings(storage));
   const settingsRef = useRef(settings);
-  const [ui, setUi] = useState<UiState>({ state: GameState.READY, score: 0, best: 0, isNewRecord: false, landscape: false });
+  const [ui, setUi] = useState<UiState>({
+    state: GameState.READY,
+    score: 0,
+    best: 0,
+    isNewRecord: false,
+    landscape: false,
+    runId: 0,
+  });
 
   useEffect(() => {
     const surface = surfaceRef.current;
@@ -65,9 +74,18 @@ export function useGame() {
     });
     input.setEnabled(false);
 
+    let combo = 0;
+    let lastTick = 0;
     const unsubscribe = engine.on((e) => {
       switch (e.type) {
         case 'state':
+          if (e.state === GameState.PLAYING && e.previous !== GameState.RESUMING && e.previous !== GameState.PAUSED) {
+            combo = 0;
+            sfx.start();
+          }
+          if (e.state === GameState.RESUMING) lastTick = 0;
+          if (e.state === GameState.PLAYING && e.previous === GameState.RESUMING) sfx.tick(true);
+          if (e.state !== GameState.PLAYING) sfx.thrust(false);
           input.setEnabled(e.state === GameState.PLAYING || e.state === GameState.RESUMING);
           if (e.state === GameState.PLAYING && e.previous !== GameState.RESUMING && e.previous !== GameState.PAUSED) {
             fx.clear();
@@ -79,7 +97,7 @@ export function useGame() {
           const b = e.barrier;
           fx.float(b.x + b.width / 2, (b.gapTop + b.gapBottom) / 2, '+5');
           fx.emit(b.x + b.width, (b.gapTop + b.gapBottom) / 2, 6, 70, [COLORS.passed, '#ffffff'], 0.4, 2);
-          sfx.pass();
+          sfx.pass(combo++);
           break;
         }
         case 'newRecord':
@@ -93,7 +111,8 @@ export function useGame() {
           fx.shake = 1;
           fx.flash = 1;
           sfx.crash();
-          setUi((u) => ({ ...u, score: e.score, best: e.best, isNewRecord: e.isNewRecord }));
+          combo = 0;
+          setUi((u) => ({ ...u, score: e.score, best: e.best, isNewRecord: e.isNewRecord, runId: engine.runId }));
           break;
       }
     });
@@ -106,6 +125,13 @@ export function useGame() {
       if (st === GameState.PLAYING) {
         fx.recordTrail(engine.ball.y, fdt);
         if (engine.holding) fx.thrust(engine.ball.x, engine.ball.y, engine.ball.radius, fdt);
+        sfx.thrust(engine.holding, Math.max(0, Math.min(1, -engine.ball.vy / 430)));
+      } else if (st === GameState.RESUMING) {
+        const n = Math.ceil(engine.resumeCountdown / 0.4);
+        if (n !== lastTick && n > 0) {
+          lastTick = n;
+          sfx.tick();
+        }
       }
       const scroll = st === GameState.PLAYING ? difficultyAt(engine.elapsed).speed : 40;
       if (!frozen) fx.update(fdt, scroll);
@@ -152,7 +178,8 @@ export function useGame() {
         if (engine.state === GameState.PLAYING || engine.state === GameState.RESUMING) engine.pause();
         else if (engine.state === GameState.PAUSED) engine.resume();
       } else if (ev.code === 'Enter' && (engine.state === GameState.READY || engine.state === GameState.GAME_OVER)) {
-        if ((ev.target as Element | null)?.closest?.('button')) return; // o botão já trata
+        // Botões e campos de texto (nome no ranking) tratam o próprio Enter.
+        if ((ev.target as Element | null)?.closest?.('button, input, textarea, form')) return;
         sfx.unlock();
         engine.start();
       }
@@ -189,6 +216,10 @@ export function useGame() {
     engineRef.current?.resume();
   }, []);
   const toMenu = useCallback(() => engineRef.current?.toMenu(), []);
+  const playSound = useCallback((name: 'click' | 'success') => {
+    sfxRef.current?.unlock();
+    sfxRef.current?.[name]();
+  }, []);
 
   const updateSettings = useCallback(
     (patch: Partial<Settings>) => {
@@ -199,7 +230,10 @@ export function useGame() {
         if (fxRef.current) fxRef.current.reducedMotion = next.reducedMotion;
         if (sfxRef.current) {
           sfxRef.current.enabled = next.sound;
-          if (next.sound) sfxRef.current.unlock();
+          if (next.sound) {
+            sfxRef.current.unlock();
+            sfxRef.current.click(); // bipe de teste: confirma que o som está saindo
+          }
         }
         return next;
       });
@@ -207,5 +241,5 @@ export function useGame() {
     [storage],
   );
 
-  return { surfaceRef, canvasRef, ui, settings, updateSettings, start, pause, resume, toMenu };
+  return { surfaceRef, canvasRef, ui, settings, updateSettings, start, pause, resume, toMenu, playSound, storage };
 }
