@@ -5,6 +5,7 @@ import { ObstacleManager } from './ObstacleManager';
 import { DEFAULT_PHYSICS, stepBall, type PhysicsParams } from './Physics';
 import { createRng, randomSeed } from '../../../shared/random';
 import { ScoreManager } from './ScoreManager';
+import { CoinField } from './Coins';
 import { GameState, type Ball, type GameEvent, type Storage } from './types';
 
 export interface EngineOptions {
@@ -40,6 +41,7 @@ export class GameEngine {
   readonly ball: Ball;
   readonly obstacles: ObstacleManager;
   readonly score: ScoreManager;
+  readonly coins: CoinField;
   /** Tempo de partida simulado (s). Base da curva de dificuldade. */
   elapsed = 0;
   holding = false;
@@ -69,6 +71,9 @@ export class GameEngine {
     this.resumeDelay = opts.resumeDelay ?? 1.2;
     this.score = new ScoreManager(opts.storage);
     this.obstacles = new ObstacleManager(createRng(opts.seed ?? randomSeed()));
+    // gerador separado: as moedas não alteram a sequência de barreiras de uma semente
+    this.coins = new CoinField(createRng((opts.seed ?? randomSeed()) ^ 0x5eed));
+    this.obstacles.onSpawn = (prev, next, n) => this.coins.onBarrier(prev, next, n);
     const mid = (playfield().top + playfield().bottom) / 2;
     this.ball = { x: BALL_X, y: mid, prevY: mid, vy: 0, radius: PHYSICS.ballRadius };
   }
@@ -105,6 +110,7 @@ export class GameEngine {
     this.livesLeft = this.lives;
     this.score.reset();
     const seed = this.fixedSeed !== undefined ? this.fixedSeed + this.runId - 1 : randomSeed();
+    this.coins.reset(createRng(seed ^ 0x5eed));
     this.obstacles.reset(createRng(seed));
     this.obstacles.fill(difficultyAt(0));
     this.setState(GameState.PLAYING);
@@ -120,6 +126,7 @@ export class GameEngine {
     this.livesLeft--;
     this.holding = false;
     const center = this.obstacles.clearAround(this.ball.x, CONTINUES.clearAhead);
+    this.coins.clearBefore(this.ball.x + this.ball.radius);
     const { minY, maxY } = ballBounds(this.ball.radius);
     this.ball.y = this.ball.prevY = Math.min(maxY, Math.max(minY, center));
     this.ball.vy = 0;
@@ -205,6 +212,7 @@ export class GameEngine {
     if (this.state !== GameState.PLAYING) return;
     this.ball.prevY = this.ball.y;
     this.obstacles.snapshot();
+    this.coins.snapshot();
     this.totalSteps++;
 
     const speed = difficultyAt(this.elapsed).speed;
@@ -215,6 +223,10 @@ export class GameEngine {
     for (let i = 0; i < n; i++) {
       stepBall(this.ball, this.holding, sub, this.physics);
       this.obstacles.update(sub, this.elapsed);
+      this.coins.update(speed * sub, sub);
+      for (const c of this.coins.collect(this.ball.x, this.ball.y, this.ball.radius)) {
+        this.emit({ type: 'coin', x: c.x, y: c.y, collected: this.coins.collected });
+      }
       this.elapsed += sub;
       if (this.score.addTime(sub)) this.emit({ type: 'newRecord', score: this.score.score });
 

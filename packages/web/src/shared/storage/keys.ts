@@ -18,7 +18,7 @@ export const HUB_KEYS = {
   migrated: 'ndc:migrated',
 } as const;
 
-export function gameKey(game: GameId, what: 'best' | 'ranking'): string {
+export function gameKey(game: GameId, what: 'best' | 'ranking' | 'wallet'): string {
   return `ndc:${game}:${what}`;
 }
 

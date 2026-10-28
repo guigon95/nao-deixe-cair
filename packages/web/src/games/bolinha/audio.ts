@@ -81,6 +81,29 @@ export class Sfx extends SynthAudio {
     this.tone(f * 2, f * 2, 0.07, 'triangle', 0.18, 0.02);
   }
 
+  /** Moeda: "plim" curto e brilhante, mais baixo que a passagem. */
+  coin(streak = 0) {
+    const f = 1319 * Math.pow(2, Math.min(streak, 7) / 12);
+    this.tone(f, f, 0.06, 'triangle', 0.32);
+    this.tone(f * 1.335, f * 1.335, 0.14, 'sine', 0.3, 0.05);
+  }
+
+  /**
+   * Macaquinho na selva: "uh-uh-ah!" curto e baixinho (sintetizado, sem
+   * arquivo). Tocado de vez em quando, nunca em sequência.
+   */
+  monkey() {
+    const v = 0.1;
+    const base = 430 + Math.random() * 80;
+    for (let i = 0; i < 3; i++) {
+      const f = base * (1 + i * 0.12);
+      this.tone(f, f * 1.45, 0.09, 'sine', v, i * 0.12, 0.012);
+      this.tone(f * 2, f * 2.6, 0.07, 'triangle', v * 0.25, i * 0.12, 0.012);
+    }
+    this.tone(base * 1.7, base * 1.15, 0.22, 'sine', v * 1.1, 0.4, 0.02);
+    this.tone(base * 3.4, base * 2.2, 0.18, 'triangle', v * 0.22, 0.4, 0.02);
+  }
+
   /**
    * Batida: baque grave (seno caindo), “bonk” abafado e um chiado curto e
    * bem baixo. Nada de serrilha nem ruído alto — impacto sem estourar.

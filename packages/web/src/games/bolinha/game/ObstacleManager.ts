@@ -64,6 +64,9 @@ export class ObstacleManager {
   /** Estatística: quantos deslocamentos foram reduzidos ao limite físico. */
   clamped = 0;
 
+  /** Avisado a cada barreira nova (ex.: para pôr moedas entre barreiras). */
+  onSpawn: ((prev: Barrier | undefined, next: Barrier, spawned: number) => void) | null = null;
+
   constructor(private rng: Rng) {}
 
   reset(rng: Rng): void {
@@ -141,6 +144,7 @@ export class ObstacleManager {
     const spacing = this.barriers.length ? diff.spacing * step.spacingFactor : diff.spacing;
     const spec = this.generate(step, diff, spacing);
 
+    const prev = this.barriers[this.barriers.length - 1];
     const b = this.pool.pop() ?? ({} as Barrier);
     b.id = this.nextId++;
     b.x = Math.max(x, BALL_X + OBSTACLES.minSpawnDistanceFromBall);
@@ -155,6 +159,7 @@ export class ObstacleManager {
     this.lastCenter = spec.center;
     this.lastGap = spec.gap;
     this.spawned++;
+    this.onSpawn?.(prev, b, this.spawned);
   }
 
   /** Gera e valida um vão; tentativas inviáveis são descartadas. */

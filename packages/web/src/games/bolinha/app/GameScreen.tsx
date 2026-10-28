@@ -5,9 +5,10 @@ import { usePlayer, useRanking } from '../../../shared/online/hooks';
 import { HubBack } from '../../../shared/ui/HubBack';
 import { rewardedAds } from '../../../shared/ads/rewarded';
 import { CONTINUES } from '../game/config';
+import { CoinIcon, ShopPanel } from './ShopPanel';
 import { LoginPanel, RankingPanel, SaveScore } from '../../../shared/ui/RankingUi';
 
-type Overlay = 'ranking' | 'login' | null;
+type Overlay = 'ranking' | 'login' | 'shop' | null;
 
 export function GameScreen() {
   const {
@@ -24,6 +25,8 @@ export function GameScreen() {
     endRun,
     playSound,
     storage,
+    shop,
+    buyItem,
   } = useGame();
   const primaryRef = useRef<HTMLButtonElement | null>(null);
 
@@ -126,6 +129,17 @@ export function GameScreen() {
           />
         )}
 
+        {overlay === 'shop' && (
+          <ShopPanel
+            shop={shop}
+            onBuy={buyItem}
+            onClose={() => {
+              playSound('click');
+              setOverlay(null);
+            }}
+          />
+        )}
+
         {overlay === 'login' && (
           <LoginPanel
             initial={profile?.name ?? rank.guestName}
@@ -165,6 +179,15 @@ export function GameScreen() {
             <div className="menu-row">
               <button className="btn btn-secondary btn-inline" onClick={openRanking}>
                 Ranking
+              </button>
+              <button
+                className="btn btn-secondary btn-inline shop-open"
+                onClick={() => {
+                  playSound('click');
+                  setOverlay('shop');
+                }}
+              >
+                Loja <CoinIcon /> {shop.coins}
               </button>
               {profile ? (
                 <p className="who">
@@ -261,6 +284,11 @@ export function GameScreen() {
             <p className="best">
               Recorde: <strong>{ui.best}</strong>
             </p>
+            {ui.runCoins > 0 && (
+              <p className="run-coins">
+                <CoinIcon /> +{ui.runCoins} {ui.runCoins === 1 ? 'moeda' : 'moedas'} · total {shop.coins}
+              </p>
+            )}
             <SaveScore
               key={ui.runId}
               score={ui.score}

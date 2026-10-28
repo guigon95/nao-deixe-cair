@@ -79,16 +79,29 @@ export const CONTINUES = {
   clearAhead: 240,
 } as const;
 
+/** Moedas no percurso (moeda da loja; não muda a pontuação do ranking). */
+export const COINS = {
+  /** Chance de nascer uma moeda entre duas barreiras. */
+  chance: 0.45,
+  /** As primeiras barreiras (aquecimento) não têm moedas. */
+  skipFirst: 2,
+  radius: 7,
+  /** Folga extra para pegar (u): pegar tem que ser fácil quando se passa por perto. */
+  magnet: 4,
+  pool: 12,
+} as const;
+
 /**
  * Cenários por pontuação. Cada um começa a aparecer em `at` pontos e leva
  * `over` pontos para tomar a tela inteira (transição gradual). Para um novo
  * cenário (ex.: neve), acrescente aqui e crie a paleta/decoração em
  * rendering/scenery.ts. Puramente visual: não muda a física nem as barreiras.
  */
-export type SceneId = 'noite' | 'selva';
+export type SceneId = 'noite' | 'selva' | 'neve';
 export const SCENERY: readonly { id: SceneId; at: number; over: number }[] = [
   { id: 'noite', at: 0, over: 0 },
   { id: 'selva', at: 60, over: 40 },
+  { id: 'neve', at: 180, over: 50 },
 ];
 
 export const STORAGE_KEYS = {

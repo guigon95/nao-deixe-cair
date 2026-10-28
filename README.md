@@ -226,11 +226,19 @@ Uma versão anterior do C usava dois toques rápidos para o loop; com o mergulho
 - **Anúncio para continuar (futuro):** o botão chama `rewardedAds.show('continue')` (`packages/web/src/shared/ads/rewarded.ts`). Hoje `NoAds` libera na hora; para ligar anúncios, implemente `RewardedAds` com a rede escolhida e troque `rewardedAds` — o botão passa a dizer "▶ ASSISTIR E CONTINUAR" e só continua se o anúncio for assistido até o fim.
 - Ajustes em `CONTINUES` (`src/games/bolinha/game/config.ts`): `lives` (vidas por partida) e `clearAhead` (espaço livre à frente ao continuar).
 
-### Cenários (noite → selva)
+### Moedas e loja
 
+- **Moedas** aparecem entre algumas barreiras (≈ 45 %), sempre no meio do caminho entre um vão e o próximo — pegar nunca exige manobra impossível. Cada moeda vale 1, toca um "plim" (que sobe de tom em sequência) e é gravada na hora. Moedas **não** contam na pontuação do ranking.
+- **Loja** (botão no menu): 6 bolinhas (Basquete, Sorriso, Futebol, Gelo, Planeta, Lava) e 4 rastros (Bolhas, Arco-íris, Estrelas, Fogo), de 20 a 150 moedas. Só visual: a colisão é a mesma. A prévia usa o mesmo desenho do jogo.
+- Carteira em `ndc:bolinha:wallet` (neste aparelho). Catálogo e preços em `game/cosmetics.ts`; desenhos em `rendering/skins.ts`; regras das moedas em `COINS` (`game/config.ts`).
+
+### Cenários (noite → selva → neve)
+
+- Neve: a partir de **180 pontos** (toma a tela em 230): montanhas nevadas, pinheiros, pinguins, flocos caindo, pingentes de gelo; barreiras viram blocos de gelo.
+- Na selva, de vez em quando (a cada 14–30 s) um macaquinho dá um "uh-uh-ah!" curto e baixinho.
 - O cenário muda com a pontuação, aos poucos: a partir de **60 pontos** a selva começa a aparecer e em **100 pontos** já tomou a tela (céu claro com sol, morros, palmeiras, cipós com macaquinhos balançando, copa de folhas, barreiras viram troncos). Aparece "BEM-VINDO À SELVA!" quando ela começa a chegar.
 - É só visual: a decoração fica atrás das barreiras, com pouco contraste, e não colide com nada. Com **Menos movimento**, cipós e macacos ficam parados.
-- Agenda em `SCENERY` (`game/config.ts`); paletas e desenhos em `rendering/scenery.ts`. Para um cenário novo (ex.: neve): uma entrada em `SCENERY`, uma paleta em `PALETTES`, um nome em `SCENE_NAMES` e uma função de decoração.
+- Agenda em `SCENERY` (`game/config.ts`); paletas e desenhos em `rendering/scenery.ts`. Para um cenário novo: uma entrada em `SCENERY`, uma paleta em `PALETTES`, um nome em `SCENE_NAMES` e uma função de decoração.
 
 Parâmetros em `src/games/bolinha/game/config.ts` e `Difficulty.ts`. Detalhes do jogo, do ranking e do som estão nos comentários do código e nos testes (`src/games/bolinha/__tests__`).
 

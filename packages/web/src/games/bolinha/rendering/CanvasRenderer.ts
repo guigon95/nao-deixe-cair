@@ -4,7 +4,10 @@ import type { GameEngine } from '../game/GameEngine';
 import { GameState } from '../game/types';
 import type { Effects } from './effects';
 import { computeLayout, type Layout } from '../../../shared/layout/layout';
-import { blendPalette, drawCanopy, drawJungle, sceneryAt, weightOf, type Palette } from './scenery';
+import { drawCoin, drawSkin, drawTrailDot } from './skins';
+import { COINS } from '../game/config';
+import type { SkinId, TrailId } from '../game/cosmetics';
+import { blendPalette, daylightOf, drawCanopy, drawJungle, drawSnow, drawSnowBands, sceneryAt, weightOf, type Palette } from './scenery';
 
 export const COLORS = {
   page: '#070b1c',
@@ -40,6 +43,8 @@ export class CanvasRenderer {
   /** Paleta do quadro atual (mistura dos cenários) e chave dos gradientes em cache. */
   private palette: Palette = blendPalette(sceneryAt(0));
   private gradientKey = '';
+  /** Visual escolhido na loja. */
+  look: { skin: SkinId; trail: TrailId } = { skin: 'classica', trail: 'padrao' };
 
   constructor(private canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext('2d', { alpha: false });
@@ -88,17 +93,22 @@ export class CanvasRenderer {
     const scene = sceneryAt(engine.score.score);
     this.usePalette(blendPalette(scene));
     const jungle = weightOf(scene, 'selva');
+    const snow = weightOf(scene, 'neve');
+    const daylight = daylightOf(scene);
     ctx.fillStyle = this.arenaGradient ?? this.palette.skyBottom;
     ctx.fillRect(0, 0, ARENA.width, ARENA.height);
 
     this.drawStars(fx, weightOf(scene, 'noite'));
     drawJungle(ctx, jungle, fx.scroll, fx.clock, !fx.reducedMotion);
+    drawSnow(ctx, snow, fx.scroll, fx.clock, !fx.reducedMotion);
     this.drawBands();
     drawCanopy(ctx, jungle, fx.scroll);
+    drawSnowBands(ctx, snow, fx.scroll);
     this.drawBarriers(engine, jungle);
+    this.drawCoins(engine);
     this.drawTrail(engine, fx);
     this.drawParticles(fx);
-    if (engine.state !== GameState.GAME_OVER || fx.flash > 0.6) this.drawBall(engine, fx, jungle);
+    if (engine.state !== GameState.GAME_OVER || fx.flash > 0.6) this.drawBall(engine, fx, daylight);
     this.drawFloaters(fx);
 
     if (fx.flash > 0) {
@@ -198,22 +208,28 @@ export class CanvasRenderer {
     }
   }
 
+  private drawCoins(engine: GameEngine) {
+    const a = engine.alpha;
+    for (const c of engine.coins.coins) {
+      if (!c.active) continue;
+      const x = c.prevX + (c.x - c.prevX) * a;
+      if (x < -12 || x > ARENA.width + 12) continue;
+      drawCoin(this.ctx, x, c.y, COINS.radius, c.spin);
+    }
+  }
+
   private drawTrail(engine: GameEngine, fx: Effects) {
     if (engine.state === GameState.READY) return;
     const ctx = this.ctx;
     const speed = difficultyAt(engine.elapsed).speed;
     const n = Math.min(fx.trailCount, fx.trailLength);
     const r = engine.ball.radius;
-    ctx.fillStyle = COLORS.ball;
     for (let i = 0; i < n; i++) {
       const idx = (fx.trailHead - 1 - i + fx.trailY.length * 2) % fx.trailY.length;
       const age = fx.trailAge[idx];
       const x = engine.ball.x - age * speed;
       const t = 1 - i / fx.trailY.length;
-      ctx.globalAlpha = 0.28 * t;
-      ctx.beginPath();
-      ctx.arc(x, fx.trailY[idx], r * (0.35 + 0.55 * t), 0, Math.PI * 2);
-      ctx.fill();
+      drawTrailDot(ctx, this.look.trail, x, fx.trailY[idx], r, t, i, fx.clock);
     }
     ctx.globalAlpha = 1;
   }
@@ -235,20 +251,15 @@ export class CanvasRenderer {
     ctx.save();
     ctx.translate(b.x, y);
     ctx.scale(1 - stretch * 0.5, 1 + stretch);
-    ctx.fillStyle = COLORS.ball;
-    ctx.beginPath();
-    ctx.arc(0, 0, r, 0, Math.PI * 2);
-    ctx.fill();
+    drawSkin(ctx, this.look.skin, r, fx.clock);
     if (daylight > 0.01) {
-      // contorno para a bolinha amarela não sumir no céu claro
-      ctx.strokeStyle = `rgba(90, 50, 0, ${0.55 * daylight})`;
+      // contorno para a bolinha não sumir no céu claro
+      ctx.strokeStyle = `rgba(60, 35, 0, ${0.5 * daylight})`;
       ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
       ctx.stroke();
     }
-    ctx.fillStyle = COLORS.ballCore;
-    ctx.beginPath();
-    ctx.arc(-r * 0.3, -r * 0.3, r * 0.38, 0, Math.PI * 2);
-    ctx.fill();
     ctx.restore();
 
     // Anel de feedback ao pressionar.
@@ -283,6 +294,11 @@ export class CanvasRenderer {
       const t = f.life / f.maxLife;
       ctx.globalAlpha = Math.min(1, t * 2);
       ctx.font = `800 ${f.big ? 22 : 15}px ${FONT}`;
+      // contorno escuro: o texto continua legível no céu claro da selva e da neve
+      ctx.lineWidth = f.big ? 4 : 3;
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = 'rgba(8, 14, 36, 0.55)';
+      ctx.strokeText(f.text, f.x, f.y);
       ctx.fillStyle = f.big ? COLORS.record : COLORS.hud;
       ctx.fillText(f.text, f.x, f.y);
     }
@@ -316,6 +332,18 @@ export class CanvasRenderer {
       for (let i = 0; i < engine.lives; i++) {
         drawHeart(ctx, 66 + i * 17, top / 2 + 2, 6.5, i < engine.livesLeft);
       }
+    }
+
+    // Moedas pegas nesta partida, no rodapé à esquerda.
+    {
+      const { bottom: b } = playfield();
+      const cy = b + (ARENA.height - b) / 2;
+      drawCoin(ctx, 24, cy, 6.5, 0);
+      ctx.font = `800 13px ${FONT}`;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = COLORS.hud;
+      ctx.fillText(String(engine.coins.collected), 36, cy + 1);
     }
 
     // Indicador discreto de progresso: barra fina de “intensidade” no rodapé.

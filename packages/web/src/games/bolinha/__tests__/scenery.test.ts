@@ -17,8 +17,16 @@ describe('Cenários por pontuação', () => {
     expect(ts[0]).toBe(0);
     for (let i = 1; i < ts.length; i++) expect(ts[i]).toBeGreaterThan(ts[i - 1]);
     expect(sceneryAt(selva.at + selva.over)).toEqual({ from: 'selva', to: 'selva', t: 0 });
-    expect(weightOf(sceneryAt(5000), 'selva')).toBe(1);
-    expect(weightOf(sceneryAt(5000), 'noite')).toBe(0);
+    expect(weightOf(sceneryAt(selva.at + selva.over + 5), 'selva')).toBe(1);
+    expect(weightOf(sceneryAt(selva.at + selva.over + 5), 'noite')).toBe(0);
+  });
+
+  it('depois da selva vem a neve, também aos poucos', () => {
+    const neve = SCENERY.find((s) => s.id === 'neve')!;
+    expect(neve.at).toBeGreaterThan(selva.at + selva.over);
+    expect(sceneryAt(neve.at + neve.over / 2)).toMatchObject({ from: 'selva', to: 'neve' });
+    expect(weightOf(sceneryAt(5000), 'neve')).toBe(1);
+    expect(blendPalette(sceneryAt(5000))).toEqual(PALETTES.neve);
   });
 
   it('as cores misturam suavemente entre as paletas', () => {

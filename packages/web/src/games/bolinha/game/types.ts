@@ -54,4 +54,5 @@ export type GameEvent =
   | { type: 'pass'; barrier: Barrier; score: number }
   | { type: 'crash'; x: number; y: number; score: number; best: number; isNewRecord: boolean; livesLeft: number }
   | { type: 'continue'; livesLeft: number }
+  | { type: 'coin'; x: number; y: number; collected: number }
   | { type: 'newRecord'; score: number };

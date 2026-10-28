@@ -41,12 +41,25 @@ export const PALETTES: Record<SceneId, Palette> = {
     barrierEdge: '#d9f59a',
     stripe: '#3a1f0b',
   },
+  neve: {
+    skyTop: '#8fb4d8',
+    skyBottom: '#e9f2fa',
+    // faixas escuras (azul-ardósia) para o HUD branco continuar legível
+    band: '#2c4361',
+    bandLine: '#9fc0de',
+    // blocos de gelo: azul com bordas de neve
+    barrier: '#5b9bd1',
+    barrierDark: '#2f6698',
+    barrierEdge: '#ffffff',
+    stripe: '#ffffff',
+  },
 };
 
 /** Texto anunciado quando o cenário começa a chegar. */
 export const SCENE_NAMES: Record<SceneId, string> = {
   noite: 'NOITE',
   selva: 'BEM-VINDO À SELVA!',
+  neve: 'CHEGOU A NEVE!',
 };
 
 export interface SceneMix {
@@ -94,6 +107,11 @@ export function mixHex(a: string, b: string, t: number): string {
   const ch = (shift: number) => Math.round(((pa >> shift) & 255) * (1 - t) + ((pb >> shift) & 255) * t);
   const v = (ch(16) << 16) | (ch(8) << 8) | ch(0);
   return `#${v.toString(16).padStart(6, '0')}`;
+}
+
+/** Peso de cenários com céu claro (contorno da bolinha, etc.). */
+export function daylightOf(mix: SceneMix): number {
+  return weightOf(mix, 'selva') + weightOf(mix, 'neve');
 }
 
 // ---------------------------------------------------------------------------
@@ -320,4 +338,180 @@ function hash(n: number): number {
   let h = (n * 2654435761) >>> 0;
   h ^= h >>> 15;
   return h % 1000;
+}
+
+// ---------------------------------------------------------------------------
+// Decoração da neve
+// ---------------------------------------------------------------------------
+
+const PEAK_TILE = 260;
+const PINE_TILE = 150;
+const FLAKES = 70;
+/** Flocos fixos (posição base + profundidade); o movimento vem de scroll/tempo. */
+const flakes = Array.from({ length: FLAKES }, (_, i) => {
+  const h = (n: number) => ((Math.sin(n * 12.9898 + i * 78.233) * 43758.5453) % 1 + 1) % 1;
+  return { x: h(1) * ARENA.width, y: h(2) * ARENA.height, z: 0.35 + h(3) * 0.65, phase: h(4) * Math.PI * 2 };
+});
+
+/**
+ * Neve: montanhas nevadas, pinheiros, pinguins e flocos caindo. Flocos são
+ * pequenos e translúcidos (não parecem obstáculos); com "menos movimento"
+ * eles ficam parados.
+ */
+export function drawSnow(ctx: CanvasRenderingContext2D, alpha: number, scroll: number, time: number, motion: boolean) {
+  if (alpha <= 0.01) return;
+  const { top, bottom } = playfield();
+  ctx.save();
+  ctx.globalAlpha = alpha;
+
+  // Montanhas ao longe com pico nevado.
+  const off = -((scroll * 0.1) % PEAK_TILE);
+  for (let x = off - PEAK_TILE; x < ARENA.width + PEAK_TILE; x += PEAK_TILE) {
+    const px = x + PEAK_TILE * 0.5;
+    const py = bottom - 230;
+    ctx.fillStyle = 'rgba(120, 150, 185, 0.55)';
+    ctx.beginPath();
+    ctx.moveTo(x - 20, bottom);
+    ctx.lineTo(px, py);
+    ctx.lineTo(x + PEAK_TILE + 20, bottom);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    ctx.beginPath();
+    ctx.moveTo(px - 38, py + 52);
+    ctx.lineTo(px, py);
+    ctx.lineTo(px + 38, py + 52);
+    ctx.lineTo(px + 18, py + 42);
+    ctx.lineTo(px + 4, py + 56);
+    ctx.lineTo(px - 14, py + 42);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Pinheiros nevados (parallax médio) e pinguins no chão.
+  const pOff = -((scroll * 0.3) % PINE_TILE);
+  let k = Math.floor((scroll * 0.3) / PINE_TILE);
+  for (let x = pOff - PINE_TILE; x < ARENA.width + PINE_TILE; x += PINE_TILE, k++) {
+    const h = 90 + (hash(k) % 60);
+    drawPine(ctx, x + 40, bottom, h);
+    if (k % 3 === 0) drawPenguin(ctx, x + 100, bottom - 2, time, motion);
+  }
+
+  // Neve no chão (montinhos).
+  ctx.fillStyle = 'rgba(250, 252, 255, 0.95)';
+  ctx.beginPath();
+  const gOff = -((scroll * 0.5) % 60);
+  ctx.moveTo(0, bottom + 4);
+  for (let x = gOff - 60; x < ARENA.width + 60; x += 60) {
+    ctx.quadraticCurveTo(x + 30, bottom - 12, x + 60, bottom - 2);
+  }
+  ctx.lineTo(ARENA.width, bottom + 4);
+  ctx.closePath();
+  ctx.fill();
+
+  // Flocos caindo, com leve vento para a esquerda (acompanha a corrida).
+  ctx.fillStyle = '#ffffff';
+  const span = bottom - top;
+  for (const f of flakes) {
+    const fall = motion ? time * 28 * f.z : 0;
+    const drift = motion ? Math.sin(time * 1.3 + f.phase) * 6 : 0;
+    let x = (f.x - scroll * 0.35 * f.z + drift) % ARENA.width;
+    if (x < 0) x += ARENA.width;
+    let y = (f.y + fall) % span;
+    if (y < 0) y += span;
+    ctx.globalAlpha = alpha * (0.35 + 0.45 * f.z);
+    ctx.beginPath();
+    ctx.arc(x, top + y, 0.8 + f.z * 1.6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/** Neve acumulada nas faixas de cima e de baixo. */
+export function drawSnowBands(ctx: CanvasRenderingContext2D, alpha: number, scroll: number) {
+  if (alpha <= 0.01) return;
+  const { top } = playfield();
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = '#f4f9ff';
+  const off = -((scroll * 0.5) % 40);
+  ctx.beginPath();
+  ctx.moveTo(0, top - 6);
+  for (let x = off - 40; x < ARENA.width + 40; x += 40) {
+    ctx.quadraticCurveTo(x + 20, top + 6, x + 40, top - 4);
+  }
+  ctx.lineTo(ARENA.width, top - 8);
+  ctx.lineTo(0, top - 8);
+  ctx.closePath();
+  ctx.fill();
+  // pingentes de gelo
+  ctx.fillStyle = 'rgba(220, 238, 255, 0.9)';
+  ctx.beginPath();
+  for (let x = off; x < ARENA.width + 40; x += 40) {
+    ctx.moveTo(x + 8, top);
+    ctx.lineTo(x + 11, top + 12);
+    ctx.lineTo(x + 14, top);
+    ctx.moveTo(x + 26, top);
+    ctx.lineTo(x + 28, top + 8);
+    ctx.lineTo(x + 30, top);
+  }
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawPine(ctx: CanvasRenderingContext2D, x: number, groundY: number, h: number) {
+  ctx.fillStyle = 'rgba(90, 70, 55, 0.5)';
+  ctx.fillRect(x - 4, groundY - 16, 8, 16);
+  for (let i = 0; i < 3; i++) {
+    const w = 34 - i * 8;
+    const y0 = groundY - 14 - i * (h / 3.4);
+    const y1 = y0 - h / 2.2;
+    ctx.fillStyle = 'rgba(46, 96, 88, 0.55)';
+    ctx.beginPath();
+    ctx.moveTo(x - w, y0);
+    ctx.lineTo(x, y1);
+    ctx.lineTo(x + w, y0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+    ctx.beginPath();
+    ctx.moveTo(x - w * 0.45, y1 + (y0 - y1) * 0.45);
+    ctx.lineTo(x, y1);
+    ctx.lineTo(x + w * 0.45, y1 + (y0 - y1) * 0.45);
+    ctx.closePath();
+    ctx.fill();
+  }
+}
+
+/** Pinguim gordinho que balança de um lado para o outro. */
+function drawPenguin(ctx: CanvasRenderingContext2D, x: number, groundY: number, time: number, motion: boolean) {
+  ctx.save();
+  ctx.translate(x, groundY);
+  ctx.rotate(motion ? Math.sin(time * 4 + x) * 0.12 : 0);
+  ctx.scale(1.4, 1.4);
+  ctx.fillStyle = 'rgba(30, 38, 52, 0.9)';
+  ctx.beginPath();
+  ctx.ellipse(0, -11, 7, 11, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(250, 250, 250, 0.95)';
+  ctx.beginPath();
+  ctx.ellipse(0, -9, 4.6, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(30, 38, 52, 0.9)';
+  ctx.beginPath();
+  ctx.arc(0, -20, 5.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(-2.6, -21.5, 1.6, 1.6);
+  ctx.fillRect(1, -21.5, 1.6, 1.6);
+  ctx.fillStyle = '#f2a33a';
+  ctx.beginPath();
+  ctx.moveTo(-1.6, -18.6);
+  ctx.lineTo(1.6, -18.6);
+  ctx.lineTo(0, -16.4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillRect(-4.5, -1, 3.5, 1.5);
+  ctx.fillRect(1, -1, 3.5, 1.5);
+  ctx.restore();
 }
