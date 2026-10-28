@@ -66,7 +66,7 @@ export class Engine {
     this.fixedSeed = opts.seed;
     this.resumeDelay = opts.resumeDelay ?? 1.2;
     this.score = new Score(opts.storage);
-    this.scheme = createScheme(opts.scheme ?? 'a');
+    this.scheme = createScheme(opts.scheme ?? 'c');
     const seed = opts.seed ?? randomSeed();
     this.world = new World(createRng(seed), seed);
     this.plane = createPlane(0, PLANE.startAltitude, PLANE.startSpeed);

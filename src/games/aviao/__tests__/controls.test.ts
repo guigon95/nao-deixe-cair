@@ -1,14 +1,52 @@
 import { describe, expect, it } from 'vitest';
-import { createScheme, SCHEME_B, schemeFromUrl, SchemeB } from '../game/Controls';
+import { createScheme, SCHEME_B, SCHEME_C, schemeFromUrl, SchemeB } from '../game/Controls';
 import { createPlane } from '../game/Plane';
 import { compareControls } from '../game/testing/compareControls';
 
 describe('esquemas de controle', () => {
-  it('?controle=b escolhe o esquema B; qualquer outra coisa, o A', () => {
-    expect(schemeFromUrl('?controle=b')).toBe('b');
+  it('padrão é o esquema C; ?controle=a e ?controle=b ligam os outros', () => {
+    expect(schemeFromUrl('')).toBe('c');
     expect(schemeFromUrl('?controle=a')).toBe('a');
-    expect(schemeFromUrl('')).toBe('a');
-    expect(schemeFromUrl('?controle=x')).toBe('a');
+    expect(schemeFromUrl('?controle=b')).toBe('b');
+    expect(schemeFromUrl('?controle=x')).toBe('c');
+  });
+
+  it('C: segurar sobe num ângulo firme; soltar corta o motor', () => {
+    const c = createScheme('c');
+    const p = createPlane(0, 0, 250);
+    c.press(0);
+    const cmd = c.command(0, p);
+    expect(cmd.throttle).toBe(1);
+    expect(cmd.pull).toBeGreaterThan(0.5); // nivelado: puxa para subir
+    p.phi = SCHEME_C.climbAngle + 0.3; // passou do ângulo: empurra de leve
+    expect(c.command(0, p).pull).toBeLessThan(0);
+    c.release(1);
+    expect(c.command(1, p)).toEqual({ throttle: 0, pull: 0 });
+  });
+
+  it('C: dois toques rápidos = loop (puxada total até completar a volta)', () => {
+    const c = createScheme('c');
+    const p = createPlane(0, 0, 250);
+    c.press(0);
+    c.release(0.1);
+    c.press(0.25);
+    expect(c.command(0.25, p)).toEqual({ throttle: 1, pull: 1 });
+    c.release(0.3);
+    p.phi = 3; // no meio do loop, mesmo sem tocar, continua puxando
+    expect(c.command(0.5, p).pull).toBe(1);
+    p.phi = Math.PI * 2; // completou
+    expect(c.command(0.6, p)).toEqual({ throttle: 0, pull: 0 });
+  });
+
+  it('C: toques espaçados ou um toque longo não dão loop', () => {
+    const c = createScheme('c');
+    c.press(0);
+    c.release(0.1);
+    c.press(0.1 + SCHEME_C.doubleTapGap + 0.1);
+    expect(c.gestures).toBe(0);
+    c.release(1.5);
+    c.press(1.6); // logo depois de um toque LONGO: não é toque duplo
+    expect(c.gestures).toBe(0);
   });
 
   it('A: segurar = potência e puxada total; soltar = nada, na hora', () => {
@@ -36,17 +74,17 @@ describe('esquemas de controle', () => {
     expect(c.gestures).toBe(0);
   });
 
-  it('comparação: o esquema A atende aos critérios e vence o B', () => {
-    const [a, b] = compareControls(30);
-    // resposta imediata (≤ 2 quadros de 60 Hz até o nariz girar 5°)
-    expect(a.responseMs).toBeLessThanOrEqual(50);
-    // loop de propósito nas primeiras tentativas
-    expect(a.loopSuccess).toBeGreaterThanOrEqual(0.95);
-    // nenhuma manobra acidental ao bater na tela para manter o voo
-    expect(a.accidentalPerMinute).toBe(0);
-    expect(a.accidentalLoopsPerMinute).toBe(0);
-    // o B tem gestos que disparam sem querer e loops menos confiáveis
-    expect(b.accidentalPerMinute).toBeGreaterThan(a.accidentalPerMinute);
-    expect(b.loopSuccess).toBeLessThan(a.loopSuccess);
+  it('comparação: o esquema C atende aos critérios', () => {
+    const [a, b, c] = compareControls(30);
+    // resposta imediata (≤ 50 ms até o nariz girar 5°)
+    expect(c.responseMs).toBeLessThanOrEqual(50);
+    // loop de propósito com dois toques
+    expect(c.loopSuccess).toBeGreaterThanOrEqual(0.95);
+    // segurar sobe alto e nunca vira loop (o problema do esquema A)
+    expect(c.hold3Loop).toBe(false);
+    expect(a.hold3Loop).toBe(true);
+    expect(c.hold3Climb).toBeGreaterThan(a.hold3Climb * 2);
+    // toques frenéticos disparam menos manobras sem querer que os gestos do B
+    expect(c.accidentalPerMinute).toBeLessThan(b.accidentalPerMinute);
   });
 });

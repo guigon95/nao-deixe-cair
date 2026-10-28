@@ -20,6 +20,8 @@ function simulate(id: ControlSchemeId, events: Event[], seconds: number, speed =
   let maxRotation = 0;
   let stallTime = 0;
   const startPhi = plane.phi;
+  const startY = plane.y;
+  let maxClimb = 0;
   const alt: number[] = [];
   for (let i = 0; i * dt < seconds; i++) {
     const t = i * dt;
@@ -33,9 +35,10 @@ function simulate(id: ControlSchemeId, events: Event[], seconds: number, speed =
     if (firstTurnAt < 0 && plane.phi - startPhi > (5 * Math.PI) / 180) firstTurnAt = t;
     maxRotation = Math.max(maxRotation, plane.phi - startPhi);
     if (plane.stall > 0.6) stallTime += dt;
+    maxClimb = Math.max(maxClimb, plane.y - startY);
     alt.push(plane.y);
   }
-  return { scheme, plane, firstTurnAt, maxRotation, stallTime, alt };
+  return { scheme, plane, firstTurnAt, maxRotation, stallTime, alt, maxClimb };
 }
 
 /** Jogador "mantendo o voo": toques curtos e irregulares, como quem bate na tela para não cair. */
@@ -60,22 +63,36 @@ export interface ControlReport {
   accidentalPerMinute: number;
   /** Loops completos sem querer nos mesmos 60 s. */
   accidentalLoopsPerMinute: number;
+  /** Segurar 3 s: quanto sobe (u) e se virou loop sem querer. */
+  hold3Climb: number;
+  hold3Loop: boolean;
 }
 
 export function compareControls(trials = 40): ControlReport[] {
   const out: ControlReport[] = [];
-  for (const id of ['a', 'b'] as const) {
+  for (const id of ['a', 'b', 'c'] as const) {
     // 1) Resposta ao toque: aperta e segura a partir do voo nivelado.
     const r = simulate(id, [{ t: 0, kind: 'press' }], 1);
     const responseMs = Math.round(r.firstTurnAt * 1000);
 
     // 2) Loop de propósito. A: segura por 1,3–3,0 s ("segure até dar a volta").
     //    B: segura e desliza para cima com velocidade de 500–2000 u/s de tela.
+    //    C: dois toques (60–160 ms cada, intervalo de 80–220 ms).
     const rng = createRng(1234);
     let ok = 0;
     for (let i = 0; i < trials; i++) {
+      const t1 = 0.06 + rng() * 0.1;
+      const gap = 0.08 + rng() * 0.14;
+      const t2 = 0.06 + rng() * 0.1;
       const ev: Event[] =
-        id === 'a'
+        id === 'c'
+          ? [
+              { t: 0.1, kind: 'press' },
+              { t: 0.1 + t1, kind: 'release' },
+              { t: 0.1 + t1 + gap, kind: 'press' },
+              { t: 0.1 + t1 + gap + t2, kind: 'release' },
+            ]
+          : id === 'a'
           ? [
               { t: 0.1, kind: 'press' },
               { t: 0.1 + 1.3 + rng() * 1.7, kind: 'release' },
@@ -97,8 +114,12 @@ export function compareControls(trials = 40): ControlReport[] {
       gestures += s.scheme.gestures;
       loops += Math.floor(s.maxRotation / (Math.PI * 2));
     }
+    // 4) Segurar 3 s a partir do voo nivelado.
+    const h = simulate(id, [{ t: 0, kind: 'press' }, { t: 3, kind: 'release' }], 3);
     out.push({
       scheme: id,
+      hold3Climb: Math.round(h.maxClimb),
+      hold3Loop: h.maxRotation >= Math.PI * 2,
       responseMs,
       loopSuccess: ok / trials,
       accidentalPerMinute: gestures / runs,

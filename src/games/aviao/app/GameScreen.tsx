@@ -125,11 +125,11 @@ export function GameScreen() {
               <span className="demo-jet" />
             </div>
             <p className="howto">
-              <strong>Segure</strong> para acelerar e puxar o nariz.
+              <strong>Segure</strong> para subir — quanto mais tempo, mais alto.
               <br />
               <strong>Solte</strong> para mergulhar e ganhar velocidade.
               <br />
-              Segure mais tempo e faça um <strong>loop</strong>.
+              <strong>Dois toques</strong> rápidos dão um <strong>loop</strong>.
             </p>
             <button ref={primaryRef} className="btn btn-primary" onClick={start}>
               DECOLAR

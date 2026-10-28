@@ -2,9 +2,12 @@ import type { Engine } from '../Engine';
 import { GameState } from '../types';
 
 /**
- * Piloto automático simples (esquema A: só segura/solta) que segue o meio
+ * Piloto automático simples que segue o meio
  * do corredor livre olhando um pouco à frente. Não lê obstáculos: se ele
  * sobrevive, o corredor garantido pelo gerador é de fato voável.
+ * Ele alterna segurar/soltar muito rápido (controle "liga-desliga"), então
+ * deve voar com o esquema A (`setScheme('a')`): no esquema C essa alternância
+ * viraria toques duplos, isto é, loops.
  */
 export class Autopilot {
   /** Quantas vezes segurou (para ver que não é trivial). */
@@ -33,6 +36,7 @@ export class Autopilot {
 /** Joga `seconds` de partida com o piloto. Retorna o tempo sobrevivido. */
 export function autoplay(engine: Engine, seconds: number, dt = 1 / 120): { survived: number; crashed: boolean } {
   const pilot = new Autopilot();
+  engine.setScheme('a');
   if (engine.state !== GameState.PLAYING) engine.start();
   let t = 0;
   while (t < seconds && engine.state === GameState.PLAYING) {

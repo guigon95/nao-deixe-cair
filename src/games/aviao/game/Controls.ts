@@ -3,9 +3,10 @@ import type { FlightCommand, PlaneState } from './Plane';
 /**
  * Esquemas de controle de um toque. Recebem só "apertou / soltou" (e, no
  * esquema B, deslizes) com o tempo da simulação, e produzem o comando de voo
- * de cada passo. Selecionáveis por `?controle=a|b`.
+ * de cada passo. Padrão: esquema C. `?controle=a` e `?controle=b` ligam os
+ * outros (para comparar).
  */
-export type ControlSchemeId = 'a' | 'b';
+export type ControlSchemeId = 'a' | 'b' | 'c';
 
 export interface ControlScheme {
   readonly id: ControlSchemeId;
@@ -24,7 +25,7 @@ export interface ControlScheme {
 }
 
 /**
- * Esquema A — "acelerar é puxar o nariz".
+ * Esquema A — "acelerar é puxar o nariz" (o primeiro escolhido; hoje em `?controle=a`).
  * Segurar = potência máxima + puxada total; soltar = marcha lenta, sem puxar.
  * A resposta é imediata: não há gesto para reconhecer.
  */
@@ -135,11 +136,109 @@ export class SchemeB implements ControlScheme {
   }
 }
 
+export const SCHEME_C = {
+  /** Ângulo de subida que o "segurar" mantém (rad): sobe firme, nunca vira loop. */
+  climbAngle: 0.62,
+  /** Abaixo desta velocidade o ângulo de subida diminui até o nível (u/s). */
+  slowSpeed: 175,
+  speedBand: 90,
+  /** Ganho da puxada por radiano de erro e amortecimento pela rotação atual. */
+  gain: 4,
+  damping: 0.3,
+  /** Toque duplo: o primeiro toque é curto e o segundo vem logo depois (s). */
+  tapMax: 0.18,
+  doubleTapGap: 0.24,
+  /** Loop assistido: termina ao completar 360° (menos esta folga) ou se estolar. */
+  loopFinish: 0.12,
+} as const;
+
+/** Ângulo da trajetória entre −π e π. */
+function wrapAngle(phi: number): number {
+  return Math.atan2(Math.sin(phi), Math.cos(phi));
+}
+
+/**
+ * Esquema C — "segurar sobe, dois toques dão o loop" (padrão).
+ * - Segurar = motor no máximo e o nariz sobe até um ângulo de subida firme
+ *   e fica lá: quanto mais tempo segurar, mais alto o avião vai. Nunca vira
+ *   loop sem querer.
+ * - Soltar = marcha lenta: o nariz cai e o avião mergulha ganhando velocidade.
+ * - Dois toques rápidos = loop: puxada total até completar a volta. A
+ *   resposta é imediata no segundo toque (o primeiro já sobe o nariz).
+ *   Segurando depois do segundo toque, o avião sai do loop subindo.
+ */
+export class SchemeC implements ControlScheme {
+  readonly id = 'c' as const;
+  roll = 0;
+  gestures = 0;
+  private holding = false;
+  private pressAt = -10;
+  private lastTapEnd = -10;
+  private loopStart: number | null = null;
+  private loopArmed = false;
+
+  press(t: number): void {
+    this.holding = true;
+    // Segundo toque logo depois de um toque curto → loop.
+    if (t - this.lastTapEnd <= SCHEME_C.doubleTapGap && this.loopStart === null) {
+      this.loopArmed = true;
+      this.gestures++;
+      this.lastTapEnd = -10;
+    }
+    this.pressAt = t;
+  }
+
+  release(t: number): void {
+    this.holding = false;
+    if (t - this.pressAt <= SCHEME_C.tapMax) this.lastTapEnd = t;
+    else this.lastTapEnd = -10;
+  }
+
+  swipe(): void {}
+
+  /** Loop assistido em andamento (para a interface). */
+  get looping(): boolean {
+    return this.loopStart !== null || this.loopArmed;
+  }
+
+  command(_t: number, plane: PlaneState): FlightCommand {
+    if (this.loopArmed) {
+      this.loopArmed = false;
+      this.loopStart = plane.phi;
+    }
+    if (this.loopStart !== null) {
+      const done = plane.phi - this.loopStart >= Math.PI * 2 - SCHEME_C.loopFinish;
+      if (done || plane.stall > 0.7) this.loopStart = null;
+      else return { throttle: 1, pull: 1 };
+    }
+    if (!this.holding) return { throttle: 0, pull: 0 };
+    // Voando para trás (depois de um estol), não puxa: deixa o avião se recuperar para a frente.
+    if (Math.cos(plane.phi) < 0) return { throttle: 1, pull: 0 };
+    // Mantém o ângulo de subida (menor quando está lento, para nunca estolar segurando).
+    const slow = Math.min(1, Math.max(0, (plane.speed - SCHEME_C.slowSpeed) / SCHEME_C.speedBand));
+    const target = SCHEME_C.climbAngle * slow;
+    const err = target - wrapAngle(plane.phi);
+    const pull = SCHEME_C.gain * err - SCHEME_C.damping * plane.turnRate;
+    return { throttle: 1, pull: Math.min(1, Math.max(-0.5, pull)) };
+  }
+
+  reset(): void {
+    this.holding = false;
+    this.roll = 0;
+    this.pressAt = -10;
+    this.lastTapEnd = -10;
+    this.loopStart = null;
+    this.loopArmed = false;
+  }
+}
+
 export function createScheme(id: ControlSchemeId): ControlScheme {
-  return id === 'b' ? new SchemeB() : new SchemeA();
+  if (id === 'a') return new SchemeA();
+  if (id === 'b') return new SchemeB();
+  return new SchemeC();
 }
 
 export function schemeFromUrl(search: string): ControlSchemeId {
   const v = new URLSearchParams(search).get('controle');
-  return v === 'b' ? 'b' : 'a';
+  return v === 'a' || v === 'b' ? v : 'c';
 }

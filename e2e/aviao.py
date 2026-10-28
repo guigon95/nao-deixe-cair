@@ -4,8 +4,8 @@ Teste do Acrobata em navegador real (Chromium headless via Playwright).
 Uso:  npm run build && npx vite preview --port 4173   (em outro terminal)
       python3 e2e/aviao.py [http://localhost:4173] [pasta_de_capturas]
 
-Verifica com Pointer Events reais: segurar acelera, soltar desacelera, um
-toque longo registra um loop, a batida leva ao fim de jogo, o reinício é
+Verifica com Pointer Events reais: segurar acelera e sobe cada vez mais alto
+sem virar loop, soltar desacelera, dois toques rápidos registram um loop, a batida leva ao fim de jogo, o reinício é
 imediato, o ranking funciona (Só meu nome), pausa ao ocultar a aba, um único
 laço de animação, sem erros de console e layouts em vários tamanhos.
 """
@@ -70,15 +70,26 @@ with sync_playwright() as p:
     page.wait_for_timeout(250)
     s1 = st(page)
     check("segurar acelera (potência sobe)", s1["throttle"] > 0.8, f"{s0['throttle']:.2f}→{s1['throttle']:.2f}")
-    check("segurar puxa o nariz para cima", s1["phi"] > 0.3, f"phi={s1['phi']:.2f}")
-    page.wait_for_timeout(1700)
-    page.screenshot(path=str(OUT / "aviao-02-loop.png"))
+    check("segurar levanta o nariz", s1["phi"] - s0["phi"] > 0.3, f"phi {s0['phi']:.2f}→{s1['phi']:.2f}")
+    page.wait_for_timeout(1750)
+    s1b = st(page)
+    check("segurar 2 s sobe bem mais alto", s1b["y"] - s0["y"] > 300, f"subiu {s1b['y'] - s0['y']:.0f} u")
+    check("segurar muito não vira loop", s1b["loops"] == 0 and s1b["phi"] < 1.2, f"phi={s1b['phi']:.2f}")
+    page.screenshot(path=str(OUT / "aviao-02-subindo.png"))
     page.mouse.up()
     page.wait_for_timeout(350)
     s2 = st(page)
     check("soltar desacelera (potência cai)", s2["throttle"] < 0.5, f"{s2['throttle']:.2f}")
-    check("toque longo registra um loop", s2["loops"] >= 1, f"loops={s2['loops']} pontos={s2['score']}")
-    page.wait_for_timeout(500)
+    # Dois toques rápidos com Pointer Events reais → loop.
+    page.mouse.down(); page.wait_for_timeout(80); page.mouse.up()
+    page.wait_for_timeout(90)
+    page.mouse.down(); page.wait_for_timeout(80); page.mouse.up()
+    page.wait_for_timeout(900)
+    page.screenshot(path=str(OUT / "aviao-02b-loop.png"))
+    page.wait_for_function("() => window.__NDC__.engine.score.loops >= 1", timeout=4000)
+    s2b = st(page)
+    check("dois toques registram um loop", s2b["loops"] >= 1, f"loops={s2b['loops']} pontos={s2b['score']}")
+    page.wait_for_timeout(300)
     page.screenshot(path=str(OUT / "aviao-03-pos-loop.png"))
 
     # Pausa ao ocultar a aba.

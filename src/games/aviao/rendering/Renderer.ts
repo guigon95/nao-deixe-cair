@@ -31,6 +31,13 @@ export const COLORS = {
 
 const VMAX = maxLevelSpeed();
 
+/** Dica dos controles (texto, distância do fundo da arena). */
+const HINT = [
+  ['Segure: sobe', 132],
+  ['Solte: mergulha', 110],
+  ['2 toques: LOOP!', 88],
+] as const;
+
 /** Morros de fundo: parallax, cor, amplitude, base. */
 const HILLS = [
   [0.2, COLORS.hillFar, 34, 70],
@@ -499,6 +506,19 @@ export class Renderer {
       roundRect(ctx, ARENA.width / 2 - 50, 92, 100, 5, 2.5);
       ctx.fillStyle = left < 0.3 ? COLORS.danger : COLORS.combo;
       roundRect(ctx, ARENA.width / 2 - 50, 92, 100 * left, 5, 2.5);
+    }
+    // Dica dos controles nos primeiros segundos (some depois do primeiro loop).
+    if (engine.elapsed < 6 && sc.loops === 0 && engine.scheme.id === 'c') {
+      ctx.globalAlpha = Math.min(1, (6 - engine.elapsed) / 1.2);
+      ctx.font = '800 15px system-ui, sans-serif';
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = 'rgba(20, 25, 60, 0.6)';
+      ctx.fillStyle = '#ffffff';
+      for (const [txt, y] of HINT) {
+        ctx.strokeText(txt, ARENA.width / 2, ARENA.height - y);
+        ctx.fillText(txt, ARENA.width / 2, ARENA.height - y);
+      }
+      ctx.globalAlpha = 1;
     }
     // Aviso de estol: legível, piscando.
     if (engine.plane.stall > 0.4 && !engine.plane.onGround && Math.sin(time * 12) > -0.3) {

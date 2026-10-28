@@ -190,6 +190,7 @@ export function useAviao() {
     let demoT = 0;
     // Depuração: `?debug&piloto` liga o piloto automático (capturas e testes de navegador).
     const pilot = debug && params.has('piloto') ? new Autopilot() : null;
+    if (pilot) engine.setScheme('a');
     const loop = new GameLoop((dt) => {
       if (pilot && engine.state === GameState.PLAYING) engine.setHolding(pilot.decide(engine));
       engine.advance(dt);

@@ -30,7 +30,7 @@ export interface PlaneState {
 export interface FlightCommand {
   /** Potência desejada 0..1. */
   throttle: number;
-  /** Puxada do manche 0..1. */
+  /** Puxada do manche: 0..1 puxa; valores negativos (até −0,5) empurram de leve. */
   pull: number;
 }
 
@@ -83,7 +83,8 @@ export function liftAccel(speed: number, pull: number, air = 1, p: FlightParams 
   const cap = p.maxG * p.gravity;
   const total = Math.min(trim + pullLift, cap);
   // Se o limite cortou, a parte do jogador encolhe primeiro (a correção de nível é preservada).
-  return { trim: Math.min(trim, cap), pull: Math.max(0, total - Math.min(trim, cap)) };
+  // Empurrar (puxada negativa) só tira sustentação.
+  return { trim: Math.min(trim, cap), pull: total - Math.min(trim, cap) };
 }
 
 /**
@@ -135,7 +136,7 @@ export function stepPlane(s: PlaneState, cmd: FlightCommand, dt: number, p: Flig
   if (s.throttle < target) s.throttle = Math.min(target, s.throttle + p.throttleUp * dt);
   else s.throttle = Math.max(target, s.throttle - p.throttleDown * dt);
   // A puxada responde quase na hora (rampa de ~40 ms só para não dar tranco).
-  const pullTarget = clamp(cmd.pull, 0, 1);
+  const pullTarget = clamp(cmd.pull, -0.5, 1);
   s.pull += clamp(pullTarget - s.pull, -dt * 25, dt * 25);
 
   const air = airFactor(s.y, p);
@@ -152,7 +153,7 @@ export function stepPlane(s: PlaneState, cmd: FlightCommand, dt: number, p: Flig
   s.turnRate = omega;
   s.phi += omega * dt;
 
-  const accel = s.throttle * p.thrust * air - p.drag * v * v - p.pullDrag * v * s.pull * liftFactor(v, p) - p.gravity * sin;
+  const accel = s.throttle * p.thrust * air - p.drag * v * v - p.pullDrag * v * Math.abs(s.pull) * liftFactor(v, p) - p.gravity * sin;
   s.speed = Math.max(p.minSpeed, s.speed + accel * dt);
 
   s.x += Math.cos(s.phi) * s.speed * dt;

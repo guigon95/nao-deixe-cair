@@ -5,7 +5,7 @@ Hub de jogos casuais para navegador (prioridade para celular). Cada jogo fica na
 | Jogo | Pasta / rota | Como se joga |
 |---|---|---|
 | **Bolinha** (nome provisório) | `bolinha/` | Segure para subir, solte para cair. Passe pelos vãos das barreiras. |
-| **Acrobata** | `aviao/` | Segure para acelerar e puxar o nariz, solte para mergulhar. Faça loops e encadeie manobras. |
+| **Acrobata** | `aviao/` | Segure para subir (quanto mais tempo, mais alto), solte para mergulhar, dois toques rápidos dão um loop. Encadeie manobras. |
 
 React 19 + TypeScript estrito + Vite (multi-página) + Canvas 2D. Sem backend, sem contas reais, sem anúncios, sem analytics. Sons sintetizados com Web Audio (sem arquivos de terceiros). Funciona offline depois de carregado.
 
@@ -87,29 +87,32 @@ e2e/                    testes de navegador (hub + um por jogo)
 
 Para adicionar um jogo: uma pasta em `src/games/`, um `<jogo>/index.html`, uma entrada em `vite.config.ts` (`build.rollupOptions.input`) e uma em `src/shared/games.ts`.
 
-URLs de diagnóstico (nos dois jogos): `?debug` expõe `window.__NDC__`; `?seed=N` fixa a semente. No Acrobata: `?controle=b` liga o esquema de controle B e `?debug&piloto` liga o piloto automático.
+URLs de diagnóstico (nos dois jogos): `?debug` expõe `window.__NDC__`; `?seed=N` fixa a semente. No Acrobata: `?controle=a` ou `?controle=b` ligam os esquemas antigos e `?debug&piloto` liga o piloto automático.
 
 ---
 
 ## Acrobata (jogo do avião)
 
-### Controle escolhido: esquema A — "acelerar é puxar o nariz"
+### Controle: esquema C — "segurar sobe, dois toques dão o loop"
 
-- **Segurar** = motor no máximo **e** puxar o manche. Com velocidade, o avião sobe em curva; segurando ~1,6 s ou mais, o nariz continua girando e **o loop se fecha sozinho** (em ~1,7 s).
-- **Soltar** = marcha lenta. A correção de nivelamento deixa o nariz cair e o avião mergulha ganhando velocidade — energia para a próxima manobra.
-- **Toques curtos** mantêm o voo nivelado (0,1 s levanta o nariz ~15°).
-- **Estol**: devagar e de nariz alto, a asa para de sustentar; aparece "ESTOL!", o nariz cai e o avião se recupera sozinho se houver altura.
+- **Segurar** = motor no máximo e o nariz sobe até ~35–40° e **fica lá**: quanto mais tempo segurar, mais alto o avião vai (~200 u por segundo, 3 s ≈ 540 u). Nunca vira loop sem querer. Se o avião estiver lento, o ângulo diminui sozinho para não estolar.
+- **Soltar** = marcha lenta: o nariz cai e o avião mergulha ganhando velocidade.
+- **Dois toques rápidos** (cada um até 0,18 s, com no máximo 0,24 s entre eles) = **loop**: puxada total até completar a volta (~2 s). O loop começa na hora do segundo toque. Segurando depois do segundo toque, o avião sai do loop subindo.
+- **Estol**: devagar e de nariz alto (por exemplo, um loop sem velocidade), a asa para de sustentar; aparece "ESTOL!", o nariz cai e o avião se recupera sozinho se houver altura.
+- Nos primeiros segundos de cada partida, uma dica na tela lembra os três gestos.
 
-Comparação com o esquema B ("toque = impulso, gestos = manobras": segurar sobe de leve, toque duplo = tonneau, deslizar para cima = loop assistido), medida em `src/games/aviao/game/testing/compareControls.ts` com jogadores **simulados** (perfis de toque supostos, não medições com pessoas):
+Histórico: o primeiro esquema escolhido (A, "segurar = acelerar e puxar o nariz") fazia qualquer toque longo virar loop e não deixava subir alto. Ele continua em `?controle=a`, e o B (gestos: toque duplo = tonneau, deslizar = loop) em `?controle=b`, para comparar.
 
-| Critério | Esquema A | Esquema B |
-|---|---|---|
-| Toque → nariz gira 5° | **42 ms** | 92 ms |
-| Loops de propósito bem-sucedidos (40 tentativas) | **100 %** | 72,5 % (deslize lento não é reconhecido) |
-| Manobras acidentais por minuto de toques para manter o voo | **0** | 36,4 tonneaus |
-| Precisa reconhecer gesto antes de responder | não | sim |
+Comparação em `src/games/aviao/game/testing/compareControls.ts`, com jogadores **simulados** (perfis de toque supostos, não medições com pessoas):
 
-O critério "entender em menos de 10 segundos" não foi medido com pessoas; o A tem uma regra só (segure = suba/gire), mostrada no menu.
+| Critério | A (puxar) | B (gestos) | **C (atual)** |
+|---|---|---|---|
+| Toque → nariz gira 5° | 42 ms | 92 ms | **42 ms** |
+| Loops de propósito bem-sucedidos | 100 % (segurando) | 75 % (deslize) | **100 % (dois toques)** |
+| Segurar 3 s: quanto sobe / vira loop? | 179 u / **sim** | 421 u / não | **541 u / não** |
+| Manobras sem querer por minuto de toques frenéticos | 0 | 36,4 tonneaus | 6,4 (≈ 4,8 loops) |
+
+O ponto fraco do C: quem bate na tela muito rápido, em ritmo, pode disparar um loop sem querer. Com o C isso quase não é necessário (para subir basta segurar), e as janelas do toque duplo foram apertadas para reduzir o problema.
 
 ### Manobras e pontuação
 
@@ -142,7 +145,7 @@ O critério "entender em menos de 10 segundos" não foi medido com pessoas; o A 
 | motor máx. | 560 u/s² | | corredor (início → fim) | 380 → 200 u |
 | arrasto | 0,0028·v² (vel. máx. nivelada ≈ 447 u/s) | | variação máx. do centro | 80 → 190 u/trecho |
 | correção de nível | 0,0068·v² (sustenta sozinha a ≈ 243 u/s) | | obstáculos por trecho | 1,3 → 5,5 |
-| puxada | 0,0115·v², limite 6 g | | folga extra no começo | 80 → 0 u |
+| puxada | 0,0115·v², limite 6 g (empurrar até −0,5) | | folga extra no começo | 80 → 0 u |
 | estol | < 105 u/s (transição até 136 u/s) | | início livre | 1600 u |
 | potência | sobe 5/s, cai 3,2/s, marcha lenta 12 % | | rampa até o máximo | 36 000 u |
 

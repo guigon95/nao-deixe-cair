@@ -104,17 +104,43 @@ describe('motor da partida', () => {
     expect(e.plane.throttle).toBeLessThan(0.3);
   });
 
-  it('segurar ~1,8 s registra um loop e dá pontos', () => {
+  /** Toque curto (s) via motor, em quadros de 60 Hz. */
+  const tap = (e: Engine, down: number, up: number) => {
+    e.setHolding(true);
+    for (let i = 0; i < Math.round(down * 60); i++) e.advance(1 / 60);
+    e.setHolding(false);
+    for (let i = 0; i < Math.round(up * 60); i++) e.advance(1 / 60);
+  };
+
+  it('dois toques rápidos fazem um loop e dão pontos', () => {
     const e = mk();
     const got: string[] = [];
     e.on((ev: GameEvent) => ev.type === 'maneuver' && got.push(ev.m.kind));
     e.start();
-    e.setHolding(true);
-    for (let i = 0; i < 110; i++) e.advance(1 / 60);
-    e.setHolding(false);
-    for (let i = 0; i < 30; i++) e.advance(1 / 60);
+    tap(e, 0.1, 0.12);
+    tap(e, 0.1, 2.5);
     expect(got).toContain('loop');
     expect(e.score.maneuverPoints).toBeGreaterThanOrEqual(100);
+  });
+
+  it('segurar muito tempo sobe cada vez mais alto e nunca vira loop', () => {
+    const e = mk();
+    const got: string[] = [];
+    e.on((ev: GameEvent) => ev.type === 'maneuver' && got.push(ev.m.kind));
+    e.start();
+    const y0 = e.plane.y;
+    const heights: number[] = [];
+    e.setHolding(true);
+    for (let s = 0; s < 3; s++) {
+      for (let i = 0; i < 60; i++) e.advance(1 / 60);
+      heights.push(e.plane.y - y0);
+    }
+    expect(heights[0]).toBeGreaterThan(100);
+    expect(heights[1]).toBeGreaterThan(heights[0] + 100);
+    expect(heights[2]).toBeGreaterThan(heights[1] + 100);
+    expect(e.plane.phi).toBeLessThan(Math.PI / 2);
+    expect(got).not.toContain('loop');
+    expect(e.plane.stall).toBe(0);
   });
 
   it('bater num obstáculo encerra a partida', () => {
@@ -164,25 +190,23 @@ describe('motor da partida', () => {
   });
 
   it('câmera lenta curta numa manobra grande, desligada com menos movimento', () => {
-    const e = mk();
-    e.start();
-    e.setHolding(true);
-    let saw = 0;
-    for (let i = 0; i < 120; i++) {
-      e.advance(1 / 60);
-      saw = Math.max(saw, e.slowmo);
-    }
-    expect(saw).toBeGreaterThan(0);
+    const loopAndWatch = (e: Engine) => {
+      e.start();
+      tap(e, 0.1, 0.12);
+      e.setHolding(true);
+      let saw = 0;
+      for (let i = 0; i < 6; i++) e.advance(1 / 60);
+      e.setHolding(false);
+      for (let i = 0; i < 180; i++) {
+        e.advance(1 / 60);
+        saw = Math.max(saw, e.slowmo);
+      }
+      return saw;
+    };
+    expect(loopAndWatch(mk())).toBeGreaterThan(0);
     const f = mk();
     f.slowmoEnabled = false;
-    f.start();
-    f.setHolding(true);
-    let saw2 = 0;
-    for (let i = 0; i < 120; i++) {
-      f.advance(1 / 60);
-      saw2 = Math.max(saw2, f.slowmo);
-    }
-    expect(saw2).toBe(0);
+    expect(loopAndWatch(f)).toBe(0);
   });
 
   it('mesmo resultado com quadros de 30, 60, 120 e 144 Hz', () => {
