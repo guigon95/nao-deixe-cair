@@ -100,8 +100,8 @@ export const FLIGHT: FlightParams = {
 };
 
 export const PLANE = {
-  /** Comprimento visual do avião (u). */
-  length: 30,
+  /** Comprimento visual do avião (u). A hitbox é bem menor que o desenho. */
+  length: 38,
   /** Hitbox: dois círculos (centro e nariz), tolerantes. */
   hitRadius: 6.5,
   noseOffset: 9,
@@ -120,6 +120,8 @@ export const GROUND = {
   skidAngle: 0.52,
   /** Perda de velocidade por segundo enquanto rola/raspa no chão (fração). */
   skidFriction: 0.9,
+  /** Abaixo desta fração da velocidade de estol, encostado no chão = batida (não dá para "pousar"). */
+  minSkidSpeed: 1.1,
   /** Tempo de tolerância (s): uma batida de bico logo depois de encostar ainda conta como rasante. */
   coyoteTime: 0.12,
 } as const;

@@ -1,0 +1,77 @@
+/* Ajustes visuais do Acrobata sobre o tema compartilhado (painéis, botões). */
+.aviao {
+  --bg: #1b3f8f;
+  background: #2a6fdb;
+}
+
+.aviao .title-accent {
+  color: #ff7a45;
+  text-shadow: 0 0.06em 0 #c2502a, 0 0 0.6em rgba(255, 122, 69, 0.35);
+}
+
+.aviao .btn-primary {
+  background: linear-gradient(180deg, #ffb38a, #ff7a45);
+  box-shadow: 0 0.3em 0 #c2502a, 0 0.6em 1.4em rgba(255, 122, 69, 0.3);
+}
+
+.aviao .menu {
+  background: rgba(13, 24, 60, 0.7);
+}
+
+/* Demonstração no menu: avião dando um loop com rastro de fumaça. */
+.demo-plane {
+  position: relative;
+  width: 6em;
+  height: 4.2em;
+}
+
+.demo-loop {
+  position: absolute;
+  inset: 0.3em 1.2em;
+  border: 0.22em dotted rgba(255, 255, 255, 0.7);
+  border-radius: 50%;
+}
+
+.demo-jet {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1.4em;
+  height: 0.45em;
+  margin: -0.22em 0 0 -0.7em;
+  border-radius: 0.25em;
+  background: #ff7a45;
+  box-shadow: inset 0.35em 0 0 #c2502a, 0 0 0 0.12em rgba(255, 210, 63, 0.9);
+  transform-origin: 50% 50%;
+  animation: demo-loop 2.2s linear infinite;
+}
+
+@keyframes demo-loop {
+  from {
+    transform: rotate(0deg) translateY(1.7em) rotate(0deg);
+  }
+  to {
+    transform: rotate(-360deg) translateY(1.7em) rotate(0deg);
+  }
+}
+
+.run-stats {
+  margin: 0;
+  display: flex;
+  gap: 0.9em;
+  justify-content: center;
+  flex-wrap: wrap;
+  font-size: 0.9em;
+  color: var(--dim);
+}
+
+.run-stats strong {
+  color: var(--text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demo-jet {
+    animation: none;
+    transform: translateY(1.7em);
+  }
+}
