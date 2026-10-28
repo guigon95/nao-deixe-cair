@@ -24,7 +24,7 @@ export const GAMES: readonly GameInfo[] = [
   },
   {
     id: 'aviao',
-    name: 'Looping',
+    name: 'Acrobata',
     tagline: 'Segure para acelerar, solte para mergulhar. Faça loops.',
     href: 'aviao/',
     accent: '#ff7a45',
