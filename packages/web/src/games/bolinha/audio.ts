@@ -1,4 +1,5 @@
 import { SynthAudio } from '../../shared/audio/SynthAudio';
+import type { TrailId } from './game/cosmetics';
 
 /** Sons próprios do jogo da bolinha; a base (desbloqueio, iOS, botões) é compartilhada. */
 export class Sfx extends SynthAudio {
@@ -6,6 +7,10 @@ export class Sfx extends SynthAudio {
   private lastPress = -1;
   private thrustGain: GainNode | null = null;
   private thrustFilter: BiquadFilterNode | null = null;
+  /** Som do toque/propulsor combina com o rastro escolhido na loja. */
+  style: TrailId = 'padrao';
+  /** Próximo instante de um detalhe enquanto segura (bolha, faísca, brilho). */
+  private nextDetail = 0;
 
   protected override stopContinuous(): void {
     this.thrust(false);
@@ -47,8 +52,16 @@ export class Sfx extends SynthAudio {
         this.thrustSrc.start();
       }
       const t = ctx.currentTime;
-      this.thrustFilter!.frequency.setTargetAtTime(650 + rising * 700, t, 0.08);
-      this.thrustGain!.gain.setTargetAtTime(0.09 + rising * 0.05, t, 0.05);
+      // Cor do sopro por rastro: bolhas = água abafada, fogo = ronco grave,
+      // arco-íris/estrelas = brilho agudo e mais baixo.
+      const tone = THRUST_TONE[this.style];
+      this.thrustFilter!.frequency.setTargetAtTime(tone.freq + rising * tone.rise, t, 0.08);
+      this.thrustGain!.gain.setTargetAtTime((0.09 + rising * 0.05) * tone.gain, t, 0.05);
+      // Detalhes esparsos enquanto segura (nunca mais que ~6 por segundo).
+      if (this.style !== 'padrao' && t >= this.nextDetail) {
+        this.nextDetail = t + 0.14 + Math.random() * 0.22;
+        this.holdDetail(rising);
+      }
     } catch {
       /* ignora */
     }
@@ -63,15 +76,88 @@ export class Sfx extends SynthAudio {
     const now = this.ctx!.currentTime;
     if (now - this.lastPress < 0.07) return;
     this.lastPress = now;
-    const f = 520 + Math.random() * 40; // leve variação: não soa repetitivo
-    this.tone(f, f * 1.9, 0.07, 'sine', 0.32, 0, 0.003);
-    this.noise(0.04, 0.06, 4000, 2500, 'highpass');
+    this.nextDetail = now + 0.12;
+    const j = Math.random(); // leve variação: não soa repetitivo
+    switch (this.style) {
+      case 'bolhas': {
+        // "blup-blup": duas bolhas subindo de tom, com estalinho no fim
+        const f = 300 + j * 80;
+        this.tone(f, f * 2.6, 0.07, 'sine', 0.3, 0, 0.004);
+        this.tone(f * 1.35, f * 3.2, 0.06, 'sine', 0.22, 0.065, 0.004);
+        this.noise(0.02, 0.03, 3000, 2000, 'bandpass', 0.12);
+        break;
+      }
+      case 'arco-iris': {
+        // acorde brilhante de pentatônica (sempre afinado)
+        const root = PENTA[Math.floor(j * PENTA.length)];
+        this.tone(root, root, 0.12, 'triangle', 0.2);
+        this.tone(root * 1.25, root * 1.25, 0.12, 'triangle', 0.15, 0.035);
+        this.tone(root * 1.5, root * 1.5, 0.16, 'sine', 0.14, 0.07);
+        break;
+      }
+      case 'estrelas': {
+        // "tin-tin" agudo de sininho
+        const f = 1568 + j * 200;
+        this.tone(f, f, 0.09, 'triangle', 0.18, 0, 0.002);
+        this.tone(f * 1.5, f * 1.5, 0.14, 'sine', 0.12, 0.06, 0.002);
+        break;
+      }
+      case 'fogo': {
+        // "fuuush" de labareda: sopro subindo + tum grave
+        this.noise(0.16, 0.16, 350, 1600, 'bandpass');
+        this.tone(140 + j * 20, 80, 0.12, 'sine', 0.28, 0, 0.004);
+        break;
+      }
+      default: {
+        const f = 520 + j * 40;
+        this.tone(f, f * 1.9, 0.07, 'sine', 0.32, 0, 0.003);
+        this.noise(0.04, 0.06, 4000, 2500, 'highpass');
+      }
+    }
   }
 
-  /** Soltar: “puff” bem discreto, descendo. */
+  /** Soltar: discreto, descendo, no estilo do rastro. */
   release(): void {
     if (!this.ready) return;
-    this.tone(480, 300, 0.06, 'sine', 0.1, 0, 0.004);
+    switch (this.style) {
+      case 'bolhas':
+        this.tone(900, 1400, 0.03, 'sine', 0.1, 0, 0.002); // "plic" da bolha estourando
+        break;
+      case 'arco-iris':
+      case 'estrelas':
+        this.tone(1046, 784, 0.08, 'sine', 0.07, 0, 0.004);
+        break;
+      case 'fogo':
+        this.noise(0.08, 0.06, 900, 300, 'lowpass');
+        break;
+      default:
+        this.tone(480, 300, 0.06, 'sine', 0.1, 0, 0.004);
+    }
+  }
+
+  /** Detalhe enquanto segura: bolhinha, faísca de fogo ou brilho. */
+  private holdDetail(rising: number) {
+    const j = Math.random();
+    switch (this.style) {
+      case 'bolhas': {
+        const f = 380 + j * 260 + rising * 120;
+        this.tone(f, f * 2.2, 0.05, 'sine', 0.12, 0, 0.003);
+        break;
+      }
+      case 'fogo':
+        this.noise(0.025, 0.07, 2500 + j * 2000, 1500, 'highpass'); // estalo de brasa
+        break;
+      case 'arco-iris': {
+        const f = PENTA[Math.floor(j * PENTA.length)] * 2;
+        this.tone(f, f, 0.08, 'sine', 0.06, 0, 0.004);
+        break;
+      }
+      case 'estrelas': {
+        const f = 2093 + j * 600;
+        this.tone(f, f, 0.05, 'triangle', 0.07, 0, 0.002);
+        break;
+      }
+    }
   }
 
   pass(combo = 0) {
@@ -119,3 +205,15 @@ export class Sfx extends SynthAudio {
   }
 
 }
+
+/** Notas da pentatônica de Dó (C5 D5 E5 G5 A5): qualquer combinação soa bem. */
+const PENTA = [523.25, 587.33, 659.25, 783.99, 880];
+
+/** Filtro/volume do sopro contínuo por rastro. */
+const THRUST_TONE: Record<TrailId, { freq: number; rise: number; gain: number }> = {
+  padrao: { freq: 650, rise: 700, gain: 1 },
+  bolhas: { freq: 320, rise: 260, gain: 0.8 },
+  'arco-iris': { freq: 1800, rise: 900, gain: 0.55 },
+  estrelas: { freq: 2400, rise: 900, gain: 0.45 },
+  fogo: { freq: 380, rise: 420, gain: 1.2 },
+};

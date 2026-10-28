@@ -82,12 +82,21 @@ export const CONTINUES = {
 /** Moedas no percurso (moeda da loja; não muda a pontuação do ranking). */
 export const COINS = {
   /** Chance de nascer uma moeda entre duas barreiras. */
-  chance: 0.45,
+  chance: 0.35,
   /** As primeiras barreiras (aquecimento) não têm moedas. */
-  skipFirst: 2,
+  skipFirst: 3,
   radius: 7,
-  /** Folga extra para pegar (u): pegar tem que ser fácil quando se passa por perto. */
-  magnet: 4,
+  /** Folga extra para pegar (u). Pequena: tem que passar por cima da moeda. */
+  magnet: 1,
+  /**
+   * Desvio da moeda para fora da linha reta entre os vãos (u): é preciso
+   * sair do caminho mais seguro para pegar. Limitado ao que a física permite
+   * no tempo disponível (sempre dá para pegar e ainda chegar ao próximo vão).
+   */
+  offsetMin: 26,
+  offsetMax: 60,
+  /** Fração do deslocamento fisicamente possível que o desvio pode usar. */
+  offsetSafety: 0.45,
   pool: 12,
 } as const;
 

@@ -1,4 +1,5 @@
-import { COINS } from './config';
+import { ballBounds, COINS, OBSTACLES } from './config';
+import { reachableDistance } from './Physics';
 import type { Rng } from '../../../shared/random';
 import type { Barrier } from './types';
 
@@ -12,10 +13,10 @@ export interface Coin {
 }
 
 /**
- * Moedas no percurso. Nascem entre duas barreiras, na metade do caminho
- * entre os dois vãos — o mesmo trajeto que a bolinha já precisa fazer —,
- * então pegar moeda nunca exige uma manobra impossível. Não afetam a
- * pontuação do ranking: são a moeda da loja.
+ * Moedas no percurso. Nascem entre duas barreiras, deslocadas para cima ou
+ * para baixo da linha entre os dois vãos: pegar exige sair do caminho mais
+ * seguro, mas o desvio é limitado pela física (dá para pegar e ainda chegar
+ * ao próximo vão). Não afetam a pontuação do ranking: são a moeda da loja.
  */
 export class CoinField {
   readonly coins: Coin[] = [];
@@ -33,16 +34,24 @@ export class CoinField {
   }
 
   /** Chamado quando nasce uma barreira: às vezes põe uma moeda entre ela e a anterior. */
-  onBarrier(prev: Barrier | undefined, next: Barrier, spawnedCount: number): void {
+  onBarrier(prev: Barrier | undefined, next: Barrier, spawnedCount: number, speed = 160): void {
     if (!prev || spawnedCount <= COINS.skipFirst) return;
     if (this.rng() >= COINS.chance) return;
     const c = this.coins.find((c) => !c.active);
     if (!c) return;
     const gapPrev = (prev.gapTop + prev.gapBottom) / 2;
     const gapNext = (next.gapTop + next.gapBottom) / 2;
+    const x = (prev.x + prev.width + next.x) / 2;
+    const mid = (gapPrev + gapNext) / 2;
+    // Tempo da saída do vão anterior até a moeda (e da moeda ao próximo vão).
+    const half = Math.max(0, (next.x - prev.x - prev.width) / 2 / speed - OBSTACLES.reactionTime * 0.5);
+    const dir = this.rng() < 0.5 ? -1 : 1; // -1 = acima (segurar), 1 = abaixo (soltar)
+    const room = reachableDistance(half, dir < 0 ? 'up' : 'down') * COINS.offsetSafety;
+    const want = COINS.offsetMin + this.rng() * (COINS.offsetMax - COINS.offsetMin);
+    const { minY, maxY } = ballBounds(COINS.radius);
     c.active = true;
-    c.x = c.prevX = (prev.x + prev.width + next.x) / 2;
-    c.y = gapPrev + (gapNext - gapPrev) * 0.5;
+    c.x = c.prevX = x;
+    c.y = Math.min(maxY, Math.max(minY, mid + dir * Math.min(want, room)));
     c.spin = this.rng() * Math.PI * 2;
   }
 

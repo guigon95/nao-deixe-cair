@@ -73,7 +73,7 @@ export class GameEngine {
     this.obstacles = new ObstacleManager(createRng(opts.seed ?? randomSeed()));
     // gerador separado: as moedas não alteram a sequência de barreiras de uma semente
     this.coins = new CoinField(createRng((opts.seed ?? randomSeed()) ^ 0x5eed));
-    this.obstacles.onSpawn = (prev, next, n) => this.coins.onBarrier(prev, next, n);
+    this.obstacles.onSpawn = (prev, next, n, speed) => this.coins.onBarrier(prev, next, n, speed);
     const mid = (playfield().top + playfield().bottom) / 2;
     this.ball = { x: BALL_X, y: mid, prevY: mid, vy: 0, radius: PHYSICS.ballRadius };
   }

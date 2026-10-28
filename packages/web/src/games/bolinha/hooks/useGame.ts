@@ -12,6 +12,7 @@ import { CanvasRenderer, COLORS } from '../rendering/CanvasRenderer';
 import { Effects } from '../rendering/effects';
 import { SCENE_NAMES, sceneryAt, weightOf } from '../rendering/scenery';
 import { Wallet, type WalletState } from '../game/Wallet';
+import { TRAILS } from '../game/cosmetics';
 import { effectiveDpr } from '../../../shared/layout/layout';
 
 export interface UiState {
@@ -77,6 +78,7 @@ export function useGame() {
     {
       const w = wallet.current!.get();
       renderer.look = { skin: w.skin, trail: w.trail };
+      sfx.style = w.trail;
     }
     engineRef.current = engine;
     fxRef.current = fx;
@@ -296,8 +298,11 @@ export function useGame() {
       const st = w.get();
       if (rendererRef.current) rendererRef.current.look = { skin: st.skin, trail: st.trail };
       if (sfxRef.current) {
+        sfxRef.current.style = st.trail;
         sfxRef.current.unlock();
-        sfxRef.current.success();
+        // prévia: ao escolher um rastro, toca o som do toque dele
+        if (TRAILS.some((t) => t.id === id)) sfxRef.current.press();
+        else sfxRef.current.success();
       }
     }
     setShop(w.get());

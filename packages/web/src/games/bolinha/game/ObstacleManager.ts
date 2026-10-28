@@ -65,7 +65,7 @@ export class ObstacleManager {
   clamped = 0;
 
   /** Avisado a cada barreira nova (ex.: para pôr moedas entre barreiras). */
-  onSpawn: ((prev: Barrier | undefined, next: Barrier, spawned: number) => void) | null = null;
+  onSpawn: ((prev: Barrier | undefined, next: Barrier, spawned: number, speed: number) => void) | null = null;
 
   constructor(private rng: Rng) {}
 
@@ -159,7 +159,7 @@ export class ObstacleManager {
     this.lastCenter = spec.center;
     this.lastGap = spec.gap;
     this.spawned++;
-    this.onSpawn?.(prev, b, this.spawned);
+    this.onSpawn?.(prev, b, this.spawned, diff.speed);
   }
 
   /** Gera e valida um vão; tentativas inviáveis são descartadas. */
