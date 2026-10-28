@@ -1,0 +1,331 @@
+:root {
+  --bg: #070b1c;
+  --panel: rgba(13, 20, 50, 0.86);
+  --panel-border: rgba(150, 170, 255, 0.22);
+  --text: #f4f6ff;
+  --dim: rgba(220, 228, 255, 0.72);
+  --ball: #ffd23f;
+  --barrier: #ff5577;
+  --ok: #47e5bc;
+  --font: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+.app {
+  position: fixed;
+  inset: 0;
+  /* Áreas seguras (notch, barra de gestos). */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  display: flex;
+}
+
+/* Superfície de jogo: aqui (e só aqui) os gestos nativos são desativados. */
+.surface {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  cursor: pointer;
+  --u: 1px;
+  --arena-left: 0px;
+  --arena-top: 0px;
+  --arena-w: 360px;
+  --arena-h: 640px;
+}
+
+.game-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+
+/* Camada de interface alinhada exatamente à arena do canvas. */
+.arena-ui {
+  position: absolute;
+  left: var(--arena-left);
+  top: var(--arena-top);
+  width: var(--arena-w);
+  height: var(--arena-h);
+  pointer-events: none;
+  font-size: calc(var(--u) * 16);
+}
+
+.arena-ui > * {
+  pointer-events: auto;
+}
+
+.icon-btn {
+  position: absolute;
+  top: calc(var(--u) * 6);
+  left: calc(var(--u) * 8);
+  width: max(44px, calc(var(--u) * 40));
+  height: max(44px, calc(var(--u) * 40));
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  background: rgba(13, 20, 50, 0.55);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.panel {
+  position: absolute;
+  left: 7%;
+  right: 7%;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 1.4em 1.2em 1.2em;
+  border-radius: 1.2em;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  box-shadow: 0 1.2em 3em rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.7em;
+  text-align: center;
+  cursor: default;
+  animation: pop 160ms ease-out;
+}
+
+.menu {
+  background: rgba(13, 20, 50, 0.72);
+}
+
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) scale(0.96);
+  }
+}
+
+.title {
+  margin: 0;
+  line-height: 0.95;
+  font-size: 2.6em;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  display: flex;
+  flex-direction: column;
+}
+
+.title-accent {
+  color: var(--ball);
+  text-shadow: 0 0 0.4em rgba(255, 210, 63, 0.45);
+}
+
+.panel-title {
+  margin: 0;
+  font-size: 1.7em;
+  font-weight: 900;
+}
+
+.howto {
+  margin: 0;
+  font-size: 1em;
+  line-height: 1.45;
+  color: var(--dim);
+}
+
+.howto strong {
+  color: var(--text);
+}
+
+/* Mini-animação da tela inicial mostrando o movimento (sobe/desce). */
+.demo {
+  width: 3.2em;
+  height: 3.4em;
+  position: relative;
+  border-left: 2px dashed rgba(150, 170, 255, 0.25);
+  border-right: 2px dashed rgba(150, 170, 255, 0.25);
+}
+
+.demo-ball {
+  position: absolute;
+  left: 50%;
+  width: 1.2em;
+  height: 1.2em;
+  margin-left: -0.6em;
+  border-radius: 50%;
+  background: var(--ball);
+  box-shadow: 0 0 0.8em rgba(255, 210, 63, 0.6);
+  animation: bob 1.6s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
+}
+
+@keyframes bob {
+  from {
+    top: 0;
+  }
+  to {
+    top: calc(100% - 1.2em);
+  }
+}
+
+.btn {
+  font: inherit;
+  font-weight: 800;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  min-height: 48px;
+  touch-action: manipulation;
+}
+
+.btn-primary {
+  width: 100%;
+  padding: 0.85em 1em;
+  font-size: 1.35em;
+  letter-spacing: 0.06em;
+  color: #1a1300;
+  background: linear-gradient(180deg, #ffe17a, var(--ball));
+  box-shadow: 0 0.3em 0 #c79a00, 0 0.6em 1.4em rgba(255, 210, 63, 0.3);
+}
+
+.btn-primary:active {
+  transform: translateY(0.15em);
+  box-shadow: 0 0.15em 0 #c79a00;
+}
+
+.btn-secondary {
+  width: 100%;
+  padding: 0.7em 1em;
+  font-size: 1em;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--panel-border);
+}
+
+.btn-link {
+  background: none;
+  color: var(--dim);
+  font-weight: 600;
+  font-size: 0.95em;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  min-height: 44px;
+  padding: 0 1em;
+}
+
+.best {
+  margin: 0;
+  color: var(--dim);
+  font-size: 1em;
+}
+
+.best strong {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.final-score {
+  margin: 0.2em 0 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.final-score .label {
+  font-size: 0.8em;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.final-score .value {
+  font-size: 3.4em;
+  font-weight: 900;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.gameover .badge {
+  margin: 0;
+  padding: 0.3em 0.9em;
+  border-radius: 999px;
+  font-size: 0.85em;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  color: #052b22;
+  background: var(--ok);
+}
+
+.toggles {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4em;
+  margin-top: 0.3em;
+}
+
+.chip {
+  font: inherit;
+  font-size: 0.78em;
+  font-weight: 600;
+  color: var(--dim);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  padding: 0.5em 0.9em;
+  min-height: 36px;
+  cursor: pointer;
+}
+
+.chip[aria-pressed='true'] {
+  color: var(--text);
+  border-color: rgba(255, 210, 63, 0.5);
+}
+
+button:focus-visible {
+  outline: 3px solid #8fb0ff;
+  outline-offset: 3px;
+}
+
+.rotate-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  font-size: 13px;
+  color: var(--dim);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel,
+  .demo-ball {
+    animation: none;
+  }
+  .demo-ball {
+    top: calc(50% - 0.6em);
+  }
+}
