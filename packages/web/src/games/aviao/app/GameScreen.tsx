@@ -4,7 +4,7 @@ import { GameState } from '../game/types';
 import { useAviao } from '../hooks/useAviao';
 import { usePlayer, useRanking } from '../../../shared/online/hooks';
 import { HubBack } from '../../../shared/ui/HubBack';
-import { LoginPanel, RankingPanel, SaveScore } from '../../../shared/ui/RankingUi';
+import { LoginPanel, RankingPanel, SaveScore, WeeklyCallout } from '../../../shared/ui/RankingUi';
 
 type Overlay = 'ranking' | 'login' | null;
 
@@ -80,6 +80,7 @@ export function GameScreen() {
             highlightId={savedThisRun?.entry.id}
             scope={rank.scope}
             me={rank.me}
+            weekly={rank.weekly}
             youId={profile?.provider === 'online' ? profile.id : undefined}
             onClose={() => {
               playSound('click');
@@ -134,6 +135,7 @@ export function GameScreen() {
                 Recorde: <strong>{ui.best}</strong>
               </p>
             )}
+            {rank.scope === 'online' && <WeeklyCallout weekly={rank.weekly} onOpen={openRanking} />}
             <div className="menu-row">
               <button className="btn btn-secondary btn-inline" onClick={openRanking}>
                 Ranking

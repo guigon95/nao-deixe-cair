@@ -16,17 +16,31 @@ interface PlayerDto {
 }
 const toProfile = (p: PlayerDto): AccountProfile => ({ id: p.id, name: p.name, provider: 'online', createdAt: p.createdAt });
 
+export type RankingPeriod = 'week' | 'all';
+
+export interface WeekInfo {
+  start: string;
+  /** Quando a semana termina (ISO). */
+  end: string;
+  lastChampion: { name: string; score: number } | null;
+}
+
 export interface OnlineRankingPage {
+  period?: RankingPeriod;
   entries: RankingEntry[];
   size: number;
   /** Melhor pontuação e posição de quem está logado (pode estar fora do top 10). */
   me: { best: number; position: number } | null;
+  /** Só no ranking semanal. */
+  week?: WeekInfo;
 }
 
 export interface OnlineResult extends RankingResult {
   personalBest: boolean;
   /** Pontos desta partida (a `entry` é a melhor do jogador). */
   score: number;
+  /** Posição e melhor da semana. */
+  week?: { position: number; best: number; personalBest: boolean; end: string };
 }
 
 /** Tudo o que o front fala com o servidor. Recebe `fetch` para os testes. */
@@ -69,8 +83,8 @@ export class OnlineApi {
     await this.call('/api/auth/logout', { body: {} });
   }
 
-  async ranking(game: GameId): Promise<OnlineRankingPage> {
-    return this.call<OnlineRankingPage>(`/api/games/${game}/ranking`);
+  async ranking(game: GameId, period: RankingPeriod = 'all'): Promise<OnlineRankingPage> {
+    return this.call<OnlineRankingPage>(`/api/games/${game}/ranking?period=${period}`);
   }
 
   async startRun(game: GameId): Promise<string> {

@@ -55,5 +55,7 @@ model Score {
   createdAt  DateTime @default(now())
 
   @@index([game, score(sort: Desc)])
+  /// ranking semanal: filtra por jogo e data
+  @@index([game, createdAt])
   @@index([playerId, game, score(sort: Desc)])
 }

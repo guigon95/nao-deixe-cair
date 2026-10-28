@@ -96,10 +96,12 @@ export function useRanking(opts: { game: GameId; storage: Storage; localKey?: st
   const [eligibility, setEligibility] = useState({ runId: 0, qualifies: false, threshold: 1 });
   const [save, setSave] = useState<SaveState>({ runId: 0, status: 'idle', outcome: null });
 
+  const [weekly, setWeekly] = useState({ entries: controller.weekEntries, me: controller.weekMe, week: controller.week });
   const sync = useCallback(() => {
     setEntries(controller.entries);
     setMe(controller.me);
     setScope(controller.scope);
+    setWeekly({ entries: controller.weekEntries, me: controller.weekMe, week: controller.week });
   }, [controller]);
 
   const refresh = useCallback(async () => {
@@ -166,6 +168,8 @@ export function useRanking(opts: { game: GameId; storage: Storage; localKey?: st
     scope,
     entries,
     me,
+    /** Ranking da semana (online): top 10, sua posição e quando termina. */
+    weekly,
     refresh,
     eligibility: thisRun(eligibility) ?? { runId: run.runId, qualifies: false, threshold: 1 },
     save: thisRun(save) ?? { runId: run.runId, status: 'idle' as const, outcome: null },

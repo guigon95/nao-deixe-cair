@@ -70,6 +70,13 @@ API em `packages/server` (Fastify 5 + Prisma 6 + Postgres), no mesmo formato do 
 | `POST /api/games/:jogo/runs` | token assinado do início da partida |
 | `POST /api/games/:jogo/scores` | envia a pontuação com o token |
 
+Ranking semanal (é o que aparece primeiro):
+
+- A semana vai de **segunda 00:00 a domingo 23:59, horário de Brasília**, e zera toda segunda. `GET /api/games/:jogo/ranking?period=week` devolve o top 10 da semana, sua posição, quando termina e o **campeão da semana passada**; `period=all` é o geral.
+- Cada envio responde a posição na semana e no geral ("🏆 1º lugar da semana!" / "3º na semana · 12º no geral").
+- Convidados entram se ficarem no **top 10 da semana** (bem mais alcançável que o geral).
+- No menu, um aviso chama para a disputa: "Você é o 2º da semana — o 1º tem 27", "Ainda tem vaga no top 10 da semana" ou "Top 10 a partir de N pontos", sempre com quanto falta para a semana acabar.
+
 Regras:
 
 - **Apelido único** sem diferenciar maiúscula nem acento ("Zé" = "ze"); 2–16 caracteres, as mesmas regras do front. Senha com 6+ caracteres.
@@ -228,8 +235,10 @@ Uma versão anterior do C usava dois toques rápidos para o loop; com o mergulho
 
 ### Moedas e loja
 
-- **Moedas** aparecem entre algumas barreiras (≈ 45 %), sempre no meio do caminho entre um vão e o próximo — pegar nunca exige manobra impossível. Cada moeda vale 1, toca um "plim" (que sobe de tom em sequência) e é gravada na hora. Moedas **não** contam na pontuação do ranking.
+- **Moedas** aparecem entre algumas barreiras (≈ 35 %), no trecho entre um vão e o próximo. Cada moeda vale 1, toca um "plim" (que sobe de tom em sequência) e é gravada na hora. Moedas **não** contam na pontuação do ranking.
 - **Loja** (botão no menu): 6 bolinhas (Basquete, Sorriso, Futebol, Gelo, Planeta, Lava) e 4 rastros (Bolhas, Arco-íris, Estrelas, Fogo), de 20 a 150 moedas. Só visual: a colisão é a mesma. A prévia usa o mesmo desenho do jogo.
+- Cada **rastro tem seu som** de toque e de propulsor: bolhas ("blup-blup" e bolhinhas enquanto segura), arco-íris (acorde de pentatônica), estrelas (sininho), fogo (labareda e estalos). Escolher o rastro na loja toca a prévia.
+- Moedas ficam **um pouco fora da linha** entre os vãos (acima ou abaixo): é preciso arriscar para pegar, mas o desvio é limitado ao que a física permite naquele trecho.
 - Carteira em `ndc:bolinha:wallet` (neste aparelho). Catálogo e preços em `game/cosmetics.ts`; desenhos em `rendering/skins.ts`; regras das moedas em `COINS` (`game/config.ts`).
 
 ### Cenários (noite → selva → neve)

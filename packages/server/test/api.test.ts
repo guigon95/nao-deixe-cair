@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { Client, makeApp, prisma, resetDb, SECRET } from './helpers';
 import { issueRunToken } from '../src/lib/runToken';
 import { nameKey } from '../src/lib/names';
+import { previousWeek, weekWindow } from '../src/lib/week';
 
 let app: FastifyInstance;
 beforeAll(async () => {
@@ -245,5 +246,69 @@ describe('limite de tentativas', () => {
     const { loadConfig } = await import('../src/config');
     expect(() => loadConfig({ NODE_ENV: 'production', DATABASE_URL: 'postgresql://x' })).toThrow(/APP_SECRET/);
     expect(() => loadConfig({ NODE_ENV: 'production' })).toThrow(/DATABASE_URL/);
+  });
+});
+
+describe('ranking semanal', () => {
+  /** Grava uma partida direto no banco, numa data qualquer (semana passada etc.). */
+  async function scoreAt(name: string, score: number, when: Date, playerId?: string) {
+    await prisma.score.create({ data: { game: 'bolinha', score, name, playerId: playerId ?? null, runId: `r-${Math.random()}`, durationMs: 60_000, createdAt: when } });
+  }
+
+  it('a semana vai de segunda 00:00 a domingo, no horário de Brasília', () => {
+    // quarta, 28/10/2026 20:00 em Brasília = 23:00 UTC
+    const w = weekWindow(new Date('2026-10-28T23:00:00Z'));
+    expect(w.start.toISOString()).toBe('2026-10-26T03:00:00.000Z'); // seg 26/10 00:00 BRT
+    expect(w.end.toISOString()).toBe('2026-11-02T03:00:00.000Z');
+    // domingo 23:30 BRT ainda é a mesma semana; segunda 00:00 já é a próxima
+    expect(weekWindow(new Date('2026-11-02T02:30:00Z')).start.toISOString()).toBe('2026-10-26T03:00:00.000Z');
+    expect(weekWindow(new Date('2026-11-02T03:00:00Z')).start.toISOString()).toBe('2026-11-02T03:00:00.000Z');
+    expect(previousWeek(w).start.toISOString()).toBe('2026-10-19T03:00:00.000Z');
+  });
+
+  it('a semanal só conta partidas desta semana e mostra o campeão da semana passada', async () => {
+    const w = weekWindow();
+    const lastWeek = new Date(w.start.getTime() - 2 * 86_400_000);
+    await scoreAt('Lenda', 500, lastWeek);
+    await scoreAt('Antigo', 300, lastWeek);
+    await scoreAt('Novato', 40, new Date());
+    const c = new Client(app);
+    const all = await c.get('/api/games/bolinha/ranking?period=all');
+    expect(all.data.entries.map((e: { name: string }) => e.name)).toEqual(['Lenda', 'Antigo', 'Novato']);
+    const week = await c.get('/api/games/bolinha/ranking?period=week');
+    expect(week.data.period).toBe('week');
+    expect(week.data.entries.map((e: { name: string }) => e.name)).toEqual(['Novato']);
+    expect(week.data.week).toMatchObject({ start: w.start.toISOString(), end: w.end.toISOString(), lastChampion: { name: 'Lenda', score: 500 } });
+    expect((await c.get('/api/games/bolinha/ranking?period=mes')).statusCode).toBe(422);
+  });
+
+  it('o envio informa a posição na semana e no geral', async () => {
+    const lastWeek = new Date(weekWindow().start.getTime() - 86_400_000);
+    await scoreAt('Lenda', 500, lastWeek);
+    const gui = await register('Gui');
+    const r = await gui.post('/api/games/bolinha/scores', { token: oldToken('bolinha', 60), score: 50 });
+    expect(r.data.position).toBe(2); // geral: atrás da Lenda
+    expect(r.data.week).toMatchObject({ position: 1, best: 50, personalBest: true }); // semana: 1º
+    const worse = await gui.post('/api/games/bolinha/scores', { token: oldToken('bolinha', 60), score: 20 });
+    expect(worse.data.week).toMatchObject({ position: 1, best: 50, personalBest: false });
+    expect((await gui.get('/api/games/bolinha/ranking?period=week')).data.me).toEqual({ best: 50, position: 1 });
+  });
+
+  it('o melhor da conta na semana conta só partidas desta semana', async () => {
+    const gui = await register('Gui');
+    const me = await prisma.player.findFirstOrThrow();
+    await scoreAt('Gui', 900, new Date(weekWindow().start.getTime() - 3600_000), me.id);
+    const r = await gui.post('/api/games/bolinha/scores', { token: oldToken('bolinha', 60), score: 30 });
+    expect(r.data.personalBest).toBe(false); // no geral, 900 continua o melhor
+    expect(r.data.week).toMatchObject({ best: 30, personalBest: true, position: 1 });
+  });
+
+  it('convidado entra se for top 10 da semana, mesmo sem ser top 10 geral', async () => {
+    const lastWeek = new Date(weekWindow().start.getTime() - 86_400_000);
+    for (let i = 0; i < 10; i++) await scoreAt(`Velho${i}`, 1000 + i, lastWeek);
+    const r = await new Client(app).post('/api/games/bolinha/scores', { token: oldToken('bolinha', 30), score: 15, name: 'Bia' });
+    expect(r.statusCode, r.body).toBe(201);
+    expect(r.data.week.position).toBe(1);
+    expect(r.data.position).toBe(11);
   });
 });

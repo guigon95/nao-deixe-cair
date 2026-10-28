@@ -53,11 +53,32 @@ export function RankingList({
   );
 }
 
+/** "2d 5h", "5h 20min", "12min" até o fim da semana. */
+export function timeLeft(endIso: string, now = Date.now()): string {
+  const ms = Math.max(0, new Date(endIso).getTime() - now);
+  const min = Math.floor(ms / 60_000);
+  const d = Math.floor(min / 1440);
+  const h = Math.floor((min % 1440) / 60);
+  const m = min % 60;
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${m}min`;
+  return `${Math.max(1, m)}min`;
+}
+
+export interface WeeklyData {
+  entries: RankingEntry[];
+  me: { best: number; position: number } | null;
+  week: { end: string; lastChampion: { name: string; score: number } | null } | null;
+}
+
+type RankTab = 'week' | 'all';
+
 export function RankingPanel({
   entries,
   highlightId,
   scope = 'local',
   me,
+  weekly,
   youId,
   onClose,
 }: {
@@ -66,29 +87,84 @@ export function RankingPanel({
   scope?: Scope;
   /** Melhor do jogador logado (online), para mostrar a posição mesmo fora do top 10. */
   me?: { best: number; position: number } | null;
+  /** Ranking da semana (online). Com ele, o painel abre na aba "Semana". */
+  weekly?: WeeklyData;
   youId?: string;
   onClose: () => void;
 }) {
   const closeRef = useRef<HTMLButtonElement | null>(null);
   useEffect(() => closeRef.current?.focus({ preventScroll: true }), []);
+  const hasWeek = scope === 'online' && !!weekly;
+  const [tab, setTab] = useState<RankTab>(hasWeek ? 'week' : 'all');
+  const showWeek = hasWeek && tab === 'week';
+  const list = showWeek ? weekly!.entries : entries;
+  const mine = showWeek ? weekly!.me : me;
   return (
     <section className="panel ranking" data-ui role="dialog" aria-modal="true" aria-labelledby="rank-title">
       <h2 id="rank-title" className="panel-title">
         Ranking
       </h2>
-      <p className="rank-scope" data-scope={scope}>
-        {scope === 'online' ? 'Melhores de todos os jogadores' : 'Melhores pontuações neste aparelho'}
+      {hasWeek && (
+        <div className="shop-tabs rank-tabs" role="tablist">
+          <button role="tab" aria-selected={tab === 'week'} className="chip" onClick={() => setTab('week')}>
+            Semana
+          </button>
+          <button role="tab" aria-selected={tab === 'all'} className="chip" onClick={() => setTab('all')}>
+            Geral
+          </button>
+        </div>
+      )}
+      <p className="rank-scope" data-scope={scope} data-tab={showWeek ? 'week' : 'all'}>
+        {showWeek
+          ? weekly!.week
+            ? `Termina em ${timeLeft(weekly!.week.end)} · zera toda segunda`
+            : 'Melhores desta semana'
+          : scope === 'online'
+            ? 'Melhores de todos os tempos'
+            : 'Melhores pontuações neste aparelho'}
       </p>
-      <RankingList entries={entries} highlightId={highlightId} youId={youId} />
-      {scope === 'online' && me && me.position > entries.length && (
+      {showWeek && weekly!.week?.lastChampion && (
+        <p className="rank-champion">
+          🏆 Campeão da semana passada: <strong>{weekly!.week.lastChampion.name}</strong> ({weekly!.week.lastChampion.score})
+        </p>
+      )}
+      {showWeek && list.length === 0 ? (
+        <p className="rank-empty">
+          Ninguém jogou esta semana ainda.
+          <br />
+          Jogue agora e comece em 1º!
+        </p>
+      ) : (
+        <RankingList entries={list} highlightId={highlightId} youId={youId} />
+      )}
+      {scope === 'online' && mine && mine.position > list.length && (
         <p className="rank-me">
-          Você: <strong>{ordinal(me.position)}</strong> lugar com <strong>{me.best}</strong>
+          Você: <strong>{ordinal(mine.position)}</strong> lugar com <strong>{mine.best}</strong>
         </p>
       )}
       <button ref={closeRef} className="btn btn-secondary" onClick={onClose}>
         Voltar
       </button>
     </section>
+  );
+}
+
+/**
+ * Chamada no menu para disputar a semana: sua posição, ou quanto falta
+ * para o top 10, e quando a semana termina.
+ */
+export function WeeklyCallout({ weekly, onOpen }: { weekly: WeeklyData; onOpen: () => void }) {
+  const { entries, me, week } = weekly;
+  const left = week ? ` · termina em ${timeLeft(week.end)}` : '';
+  let text: string;
+  if (me && me.position === 1) text = `Você é o 1º da semana! Defenda o topo${left}`;
+  else if (me && me.position <= 10) text = `Você é o ${ordinal(me.position)} da semana — o 1º tem ${entries[0]?.score ?? '?'}${left}`;
+  else if (entries.length < 10) text = `Ainda tem vaga no top 10 da semana${left}`;
+  else text = `Top 10 da semana a partir de ${entries[entries.length - 1].score + 1} pontos${left}`;
+  return (
+    <button className="weekly-callout" onClick={onOpen}>
+      <span aria-hidden="true">🏆</span> {text}
+    </button>
   );
 }
 
@@ -291,11 +367,23 @@ export function SaveScore({
 
   if (save.status === 'saved' && result) {
     const kept = result.personalBest === false;
+    const week = result.week;
     return (
-      <div className="save-box is-saved" role="status">
-        <p className="save-title">{ordinal(result.position)} lugar no ranking</p>
+      <div className={`save-box is-saved${week?.position === 1 ? ' is-champion' : ''}`} role="status">
+        <p className="save-title">
+          {week
+            ? week.position === 1
+              ? '🏆 1º lugar da semana!'
+              : `${ordinal(week.position)} lugar na semana`
+            : `${ordinal(result.position)} lugar no ranking`}
+        </p>
         <p className="save-sub">
-          {kept ? `Seu melhor continua ${result.entry.score} pontos` : `Salvo como ${result.entry.name}`}
+          {week && `${ordinal(result.position)} no geral · `}
+          {week && !week.personalBest
+            ? `seu melhor da semana continua ${week.best}`
+            : kept
+              ? `Seu melhor continua ${result.entry.score} pontos`
+              : `Salvo como ${result.entry.name}`}
           {save.outcome?.message ? ` · ${save.outcome.message}` : ''}
         </p>
         <button className="btn btn-link" onClick={onShowRanking}>
@@ -329,7 +417,11 @@ export function SaveScore({
   if (!qualifies || score <= 0) {
     return (
       <div className="save-box">
-        {score > 0 && threshold > 1 && <p className="save-sub">Faltaram {threshold - score} pontos para entrar no ranking.</p>}
+        {score > 0 && threshold > 1 && (
+          <p className="save-sub">
+            Faltaram {threshold - score} pontos para entrar no {online ? 'top 10 da semana' : 'ranking'}.
+          </p>
+        )}
         <button className="btn btn-link" onClick={onShowRanking}>
           Ver ranking
         </button>

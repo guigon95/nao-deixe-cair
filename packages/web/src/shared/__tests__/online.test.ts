@@ -6,6 +6,7 @@ import { api, ApiError } from '../online/api';
 import { OnlineApi } from '../online/services';
 import { PlayerService } from '../online/player';
 import { RankingController } from '../online/RankingController';
+import { timeLeft } from '../ui/RankingUi';
 
 type Handler = (url: string, init: RequestInit) => { status: number; body?: unknown; raw?: string } | 'network';
 
@@ -172,5 +173,34 @@ describe('RankingController', () => {
     c.setOnline(true);
     await c.refresh();
     expect(c.scope).toBe('local');
+  });
+});
+
+describe('Ranking semanal no cliente', () => {
+  it('online, o top 10 a bater é o da semana', async () => {
+    const all = Array.from({ length: 10 }, (_, i) => entry(`G${i}`, 1000 - i));
+    const week = Array.from({ length: 10 }, (_, i) => entry(`S${i}`, 50 - i));
+    const f = fakeFetch((url) => ({
+      status: 200,
+      body: url.includes('period=week')
+        ? { entries: week, size: 10, me: null, week: { start: 'a', end: '2026-11-02T03:00:00Z', lastChampion: { name: 'Lenda', score: 900 } } }
+        : { entries: all, size: 10, me: null },
+    }));
+    const c = new RankingController('bolinha', new OnlineApi(f.fn), new LocalRanking(new MemoryStorage()));
+    c.setOnline(true);
+    await c.refresh();
+    expect(c.threshold()).toBe(42);
+    expect(c.qualifies(45)).toBe(true);
+    expect(c.week?.lastChampion?.name).toBe('Lenda');
+    expect(c.entries[0].name).toBe('G0');
+    expect(c.weekEntries[0].name).toBe('S0');
+  });
+
+  it('formata quanto falta para a semana acabar', () => {
+    const now = Date.parse('2026-10-28T23:00:00Z');
+    expect(timeLeft('2026-11-02T03:00:00Z', now)).toBe('4d 4h');
+    expect(timeLeft('2026-10-29T01:30:00Z', now)).toBe('2h 30min');
+    expect(timeLeft('2026-10-28T23:05:00Z', now)).toBe('5min');
+    expect(timeLeft('2026-10-28T22:00:00Z', now)).toBe('1min');
   });
 });

@@ -1,12 +1,12 @@
 import { LocalRanking, RANKING_SIZE, type RankingEntry, type RankingResult } from '../ranking/Ranking';
 import type { GameId } from '../storage/keys';
 import { ApiError } from './api';
-import type { OnlineApi, OnlineResult } from './services';
+import type { OnlineApi, OnlineResult, WeekInfo } from './services';
 
 export type RankingScope = 'online' | 'local';
 
 export interface SubmitOutcome {
-  result: (RankingResult & Partial<Pick<OnlineResult, 'personalBest' | 'score'>>) | null;
+  result: (RankingResult & Partial<Pick<OnlineResult, 'personalBest' | 'score' | 'week'>>) | null;
   /** Mensagem para o jogador quando não deu para salvar (ou salvou só aqui). */
   message?: string;
   /** true = servidor fora do ar; salvou (se deu) só neste aparelho. */
@@ -28,6 +28,10 @@ export class RankingController {
   scope: RankingScope = 'local';
   entries: RankingEntry[];
   me: { best: number; position: number } | null = null;
+  /** Ranking da semana (só online). */
+  weekEntries: RankingEntry[] = [];
+  weekMe: { best: number; position: number } | null = null;
+  week: WeekInfo | null = null;
 
   private next: { token: Promise<string | null>; at: number } | null = null;
   private byRun = new Map<number, Promise<string | null>>();
@@ -47,6 +51,9 @@ export class RankingController {
     if (!online) {
       this.entries = this.local.list();
       this.me = null;
+      this.weekEntries = [];
+      this.weekMe = null;
+      this.week = null;
       this.next = null;
     } else this.prefetch();
   }
@@ -58,18 +65,26 @@ export class RankingController {
       return;
     }
     try {
-      const page = await this.api.ranking(this.game);
+      const [page, week] = await Promise.all([this.api.ranking(this.game, 'all'), this.api.ranking(this.game, 'week')]);
       this.entries = page.entries;
       this.me = page.me;
+      this.weekEntries = week.entries;
+      this.weekMe = week.me;
+      this.week = week.week ?? null;
     } catch (e) {
       if (e instanceof ApiError && e.unavailable) this.setOnline(false);
       else throw e;
     }
   }
 
+  /**
+   * Pontos para entrar no top 10. Online vale o da SEMANA (é o que dá para
+   * disputar; o servidor aceita convidados por ele); offline, o deste aparelho.
+   */
   threshold(): number {
-    if (this.entries.length < RANKING_SIZE) return 1;
-    return this.entries[this.entries.length - 1].score + 1;
+    const list = this.scope === 'online' ? this.weekEntries : this.entries;
+    if (list.length < RANKING_SIZE) return 1;
+    return list[list.length - 1].score + 1;
   }
 
   qualifies(score: number): boolean {

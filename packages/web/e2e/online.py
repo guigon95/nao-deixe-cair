@@ -63,7 +63,7 @@ with sync_playwright() as p:
     a.tap("text=JOGAR DE NOVO"); a.wait_for_timeout(1500); die(a, 0); a.wait_for_timeout(200)
     a.wait_for_selector(".save-box.is-saved, .save-box .is-error", timeout=5000)
     txt = a.locator(".save-box").inner_text()
-    check("partida pior mantém o melhor", "melhor continua" in txt or int(a.locator(".final-score .value").inner_text()) > scoreA, txt.replace("\n", " | "))
+    check("partida pior mantém o melhor", "continua" in txt or int(a.locator(".final-score .value").inner_text()) > scoreA, txt.replace("\n", " | "))
 
     # --- Aparelho B: convidado ---
     ctxB, b, errB = device(br)
@@ -86,9 +86,18 @@ with sync_playwright() as p:
     # A recarrega o ranking e vê B
     a.tap("text=Ver ranking"); a.wait_for_timeout(800)
     rows = a.locator(".rank-list li").all_inner_texts()
+    check("ranking abre na aba Semana, com quanto falta para acabar",
+          a.locator(".rank-scope[data-tab='week']").count() == 1 and "Termina em" in a.locator(".rank-scope").inner_text())
     check("ranking global tem os dois, um por jogador", len(rows) == 2 and any(NAME_B in r for r in rows), " / ".join(r.replace("\n", " ") for r in rows))
     check("a linha da conta logada fica destacada", a.locator(".rank-list li.is-you").count() == 1)
     a.screenshot(path=str(OUT / "o4-ranking-global.png"))
+
+    a.tap("text=Geral"); a.wait_for_timeout(150)
+    check("aba Geral mostra o ranking de todos os tempos", a.locator(".rank-scope[data-tab='all']").count() == 1 and a.locator(".rank-list li").count() == 2)
+    a.tap("text=Voltar"); a.tap("text=Menu inicial"); a.wait_for_timeout(300)
+    check("menu chama para a disputa da semana", a.locator(".weekly-callout").count() == 1 and "semana" in a.locator(".weekly-callout").inner_text(),
+          a.locator(".weekly-callout").inner_text() if a.locator(".weekly-callout").count() else "")
+    a.screenshot(path=str(OUT / "o6-menu-weekly.png"))
 
     # B entra na conta de A (outro aparelho)
     b.tap("text=Menu inicial"); b.wait_for_timeout(200)
