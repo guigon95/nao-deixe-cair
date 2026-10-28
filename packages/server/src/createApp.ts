@@ -1,3 +1,5 @@
+// Monta a API (rotas, segurança). Não se chama app.ts de propósito: a Vercel
+// procura app.ts antes de index.ts, e a entrada da função tem que ser src/index.ts.
 import Fastify, { type FastifyInstance } from 'fastify';
 import cookie from '@fastify/cookie';
 import helmet from '@fastify/helmet';

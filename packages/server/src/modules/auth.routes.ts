@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
-import type { AppContext } from '../app';
+import type { AppContext } from '../createApp';
 import { createSession, destroySession, DUMMY_HASH, hashPassword, requireAuth, verifyPassword } from '../auth/auth';
 import { HttpError, parse } from '../lib/http';
 import { isValidName, NAME_MAX, NAME_MIN, nameKey, sanitizeName } from '../lib/names';

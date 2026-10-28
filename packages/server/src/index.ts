@@ -1,5 +1,5 @@
 import Fastify from 'fastify';
-import { buildApp } from './app';
+import { buildApp } from './createApp';
 import { loadConfig, type AppConfig } from './config';
 import { basePrisma } from './db/prisma';
 

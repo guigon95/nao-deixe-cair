@@ -1,13 +1,13 @@
 import type { FastifyInstance } from 'fastify';
 import { Prisma, type PrismaClient } from '@prisma/client';
 import { z } from 'zod';
-import type { AppContext } from '../app';
+import type { AppContext } from '../createApp';
 import { GAME_IDS, MAX_SCORE, RANKING_SIZE, SCORE_LIMITS, type GameId } from '../lib/games';
 import { HttpError, parse } from '../lib/http';
 import { isValidName, NAME_MAX, NAME_MIN, nameKey, sanitizeName } from '../lib/names';
 import { issueRunToken, verifyRunToken } from '../lib/runToken';
 
-const gameSchema = z.enum(GAME_IDS, { errorMap: () => ({ message: 'Jogo desconhecido' }) });
+const gameSchema = z.enum(GAME_IDS, { message: 'Jogo desconhecido' });
 
 const submitSchema = z.object({
   token: z.string().min(10).max(500),

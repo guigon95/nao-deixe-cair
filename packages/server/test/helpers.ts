@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import type { FastifyInstance, LightMyRequestResponse } from 'fastify';
-import { buildApp } from '../src/app';
+import { buildApp } from '../src/createApp';
 import { loadConfig } from '../src/config';
 
 export const TEST_DB = process.env.TEST_DATABASE_URL ?? 'postgresql://postgres:postgres@localhost:5432/ndc_test?schema=public';

@@ -195,7 +195,7 @@ describe('limite de tentativas', () => {
   it('login tem limite próprio fora do modo de teste', async () => {
     vi.stubEnv('NODE_ENV', 'production');
     const { loadConfig } = await import('../src/config');
-    const { buildApp } = await import('../src/app');
+    const { buildApp } = await import('../src/createApp');
     const config = loadConfig({ NODE_ENV: 'production', DATABASE_URL: 'postgresql://x', APP_SECRET: SECRET });
     const { app: prod } = await buildApp({ prisma, config, logger: false });
     let last = 0;
