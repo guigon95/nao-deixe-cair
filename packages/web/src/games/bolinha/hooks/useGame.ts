@@ -289,25 +289,55 @@ export function useGame() {
     sfxRef.current?.[name]();
   }, []);
 
+  /** Aplica o visual e o som da carteira atual e atualiza a tela da loja. */
+  const syncLook = useCallback((feedbackItem?: string) => {
+    const st = wallet.current!.get();
+    if (rendererRef.current) rendererRef.current.look = { skin: st.skin, trail: st.trail };
+    const sfx = sfxRef.current;
+    if (sfx) {
+      sfx.style = st.trail;
+      if (feedbackItem) {
+        sfx.unlock();
+        // prévia: ao escolher um rastro, toca o som do toque dele
+        if (TRAILS.some((t) => t.id === feedbackItem)) sfx.press();
+        else sfx.success();
+      }
+    }
+    setShop(st);
+  }, []);
+
+  /** Troca de carteira: a do aparelho (sem conta) ou a cópia local da conta. */
+  const setWalletKey = useCallback(
+    (key: string) => {
+      wallet.current!.switchTo(key);
+      syncLook();
+    },
+    [syncLook],
+  );
+
+  /** Carteira que veio do servidor (conta). */
+  const applyWallet = useCallback(
+    (w: { coins: number; owned: string[]; skin: string; trail: string }, feedbackItem?: string) => {
+      wallet.current!.replace(w);
+      syncLook(feedbackItem);
+    },
+    [syncLook],
+  );
+
+  /** Recorde da conta (servidor) também vale aqui: só sobe. */
+  const raiseBest = useCallback((n: number) => {
+    const e = engineRef.current;
+    if (e?.score.raiseBest(n)) setUi((u) => ({ ...u, best: e.score.best }));
+  }, []);
+
   /** Loja: compra (se tiver moedas) e já usa o item. */
   const buyItem = useCallback((id: string) => {
     const w = wallet.current!;
     const ok = w.owns(id) || w.buy(id);
-    if (ok) {
-      w.equip(id);
-      const st = w.get();
-      if (rendererRef.current) rendererRef.current.look = { skin: st.skin, trail: st.trail };
-      if (sfxRef.current) {
-        sfxRef.current.style = st.trail;
-        sfxRef.current.unlock();
-        // prévia: ao escolher um rastro, toca o som do toque dele
-        if (TRAILS.some((t) => t.id === id)) sfxRef.current.press();
-        else sfxRef.current.success();
-      }
-    }
-    setShop(w.get());
+    if (ok) w.equip(id);
+    syncLook(ok ? id : undefined);
     return ok;
-  }, []);
+  }, [syncLook]);
 
   const updateSettings = useCallback(
     (patch: Partial<Settings>) => {
@@ -345,5 +375,8 @@ export function useGame() {
     storage,
     shop,
     buyItem,
+    setWalletKey,
+    applyWallet,
+    raiseBest,
   };
 }

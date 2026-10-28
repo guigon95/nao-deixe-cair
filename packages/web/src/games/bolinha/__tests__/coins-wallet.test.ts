@@ -134,3 +134,28 @@ describe('Carteira e loja', () => {
     expect(w.trail).toBe('padrao');
   });
 });
+
+describe('Carteira da conta (cópia local da nuvem)', () => {
+  it('troca entre a carteira do aparelho e a da conta sem misturar', async () => {
+    const { accountWalletKey } = await import('../game/Wallet');
+    const storage = new MemoryStorage();
+    const w = new Wallet(storage);
+    w.add(10);
+    w.switchTo(accountWalletKey('p1'));
+    expect(w.coins).toBe(0);
+    w.replace({ coins: 77, owned: ['classica', 'padrao', 'lava'], skin: 'lava', trail: 'padrao' });
+    expect(w.get()).toMatchObject({ coins: 77, skin: 'lava' });
+    w.switchTo(WALLET_KEY);
+    expect(w.coins).toBe(10);
+    w.switchTo(accountWalletKey('p1'));
+    expect(w.get()).toMatchObject({ coins: 77, skin: 'lava' }); // abre na hora com a cópia
+  });
+
+  it('estado do servidor é validado (ids desconhecidos e item não comprado em uso)', () => {
+    const w = new Wallet(new MemoryStorage());
+    w.replace({ coins: 5, owned: ['classica', 'padrao', 'hack'], skin: 'lava', trail: 'fogo' });
+    expect(w.get()).toMatchObject({ coins: 5, skin: 'classica', trail: 'padrao' });
+    w.reset();
+    expect(w.coins).toBe(0);
+  });
+});

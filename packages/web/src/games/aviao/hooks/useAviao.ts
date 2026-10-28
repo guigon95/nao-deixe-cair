@@ -309,6 +309,11 @@ export function useAviao() {
     engineRef.current?.resume();
   }, []);
   const toMenu = useCallback(() => engineRef.current?.toMenu(), []);
+  /** Recorde da conta (servidor) também vale neste aparelho: só sobe. */
+  const raiseBest = useCallback((n: number) => {
+    const e = engineRef.current;
+    if (e?.score.raiseBest(n)) setUi((u) => ({ ...u, best: e.score.best }));
+  }, []);
   const playSound = useCallback((name: 'click' | 'success') => {
     sfxRef.current?.unlock();
     sfxRef.current?.[name]();
@@ -335,5 +340,5 @@ export function useAviao() {
     [storage],
   );
 
-  return { surfaceRef, canvasRef, ui, settings, updateSettings, start, pause, resume, toMenu, playSound, storage, physics };
+  return { surfaceRef, canvasRef, ui, settings, updateSettings, start, pause, resume, toMenu, playSound, storage, physics, raiseBest };
 }

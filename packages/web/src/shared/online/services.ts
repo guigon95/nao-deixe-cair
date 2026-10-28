@@ -41,6 +41,17 @@ export interface OnlineResult extends RankingResult {
   score: number;
   /** Posição e melhor da semana. */
   week?: { position: number; best: number; personalBest: boolean; end: string };
+  /** Carteira da conta depois de creditar as moedas da partida. */
+  wallet?: CloudWallet;
+}
+
+/** Carteira da conta no servidor (moedas e itens da loja). */
+export interface CloudWallet {
+  coins: number;
+  owned: string[];
+  skin: string;
+  trail: string;
+  imported: boolean;
 }
 
 /** Tudo o que o front fala com o servidor. Recebe `fetch` para os testes. */
@@ -91,7 +102,22 @@ export class OnlineApi {
     return (await this.call<{ token: string }>(`/api/games/${game}/runs`, { body: {} })).token;
   }
 
-  async submit(game: GameId, token: string, score: number, name?: string): Promise<OnlineResult> {
-    return this.call<OnlineResult>(`/api/games/${game}/scores`, { body: { token, score: Math.floor(score), ...(name ? { name } : {}) } });
+  async submit(game: GameId, token: string, score: number, name?: string, coins?: number): Promise<OnlineResult> {
+    return this.call<OnlineResult>(`/api/games/${game}/scores`, {
+      body: { token, score: Math.floor(score), ...(name ? { name } : {}), ...(coins ? { coins: Math.floor(coins) } : {}) },
+    });
+  }
+
+  async wallet(game: GameId): Promise<CloudWallet> {
+    return (await this.call<{ wallet: CloudWallet }>(`/api/games/${game}/wallet`)).wallet;
+  }
+
+  /** Leva para a conta (uma vez só) as moedas e itens que estavam só neste aparelho. */
+  async importWallet(game: GameId, local: { coins: number; owned: string[]; skin: string; trail: string }): Promise<{ wallet: CloudWallet; imported: boolean }> {
+    return this.call(`/api/games/${game}/wallet/import`, { body: local });
+  }
+
+  async buy(game: GameId, item: string): Promise<CloudWallet> {
+    return (await this.call<{ wallet: CloudWallet }>(`/api/games/${game}/shop/buy`, { body: { item } })).wallet;
   }
 }

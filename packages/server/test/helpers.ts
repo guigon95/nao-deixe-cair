@@ -8,7 +8,7 @@ export const prisma = new PrismaClient({ datasources: { db: { url: TEST_DB } } }
 export const SECRET = 'test-secret-0123456789abcdef';
 
 export async function resetDb() {
-  await prisma.$executeRawUnsafe('TRUNCATE "Score", "Session", "Player" CASCADE');
+  await prisma.$executeRawUnsafe('TRUNCATE "Wallet", "Score", "Session", "Player" CASCADE');
 }
 
 export async function makeApp() {

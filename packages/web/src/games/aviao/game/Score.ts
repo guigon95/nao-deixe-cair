@@ -121,6 +121,19 @@ export class Score {
     return { score, best: this.best, isNewRecord };
   }
 
+  /** Recorde vindo da conta (servidor): só sobe e fica salvo aqui também. */
+  raiseBest(n: number): boolean {
+    if (!(Number.isFinite(n) && n > this.best)) return false;
+    this.best = Math.floor(n);
+    if (this.frozen || this.distance === 0) this.bestAtStart = this.best;
+    try {
+      this.storage.setItem(STORAGE.best, String(this.best));
+    } catch {
+      /* vale só nesta sessão */
+    }
+    return true;
+  }
+
   get isFrozen() {
     return this.frozen;
   }

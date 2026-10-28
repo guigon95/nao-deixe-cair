@@ -239,7 +239,11 @@ Uma versão anterior do C usava dois toques rápidos para o loop; com o mergulho
 - **Loja** (botão no menu): 6 bolinhas (Basquete, Sorriso, Futebol, Gelo, Planeta, Lava) e 4 rastros (Bolhas, Arco-íris, Estrelas, Fogo), de 20 a 150 moedas. Só visual: a colisão é a mesma. A prévia usa o mesmo desenho do jogo.
 - Cada **rastro tem seu som** de toque e de propulsor: bolhas ("blup-blup" e bolhinhas enquanto segura), arco-íris (acorde de pentatônica), estrelas (sininho), fogo (labareda e estalos). Escolher o rastro na loja toca a prévia.
 - Moedas ficam **um pouco fora da linha** entre os vãos (acima ou abaixo): é preciso arriscar para pegar, mas o desvio é limitado ao que a física permite naquele trecho.
-- Carteira em `ndc:bolinha:wallet` (neste aparelho). Catálogo e preços em `game/cosmetics.ts`; desenhos em `rendering/skins.ts`; regras das moedas em `COINS` (`game/config.ts`).
+- **Com conta, moedas e itens ficam na nuvem** (qualquer aparelho): `GET /api/games/:jogo/wallet`, `POST .../shop/buy` e `.../shop/equip`. O saldo nunca é definido pelo cliente: as moedas da partida são creditadas no servidor junto com o envio da pontuação (com teto pelo tempo de partida) e a compra confere saldo e preço no servidor, de forma atômica (sem descontar duas vezes).
+- Na primeira vez que uma conta entra, as moedas e itens que estavam só neste aparelho vão para ela (`.../wallet/import`, uma vez por conta, até 2000 moedas) e saem do aparelho, para não duplicar em outra conta.
+- Sem conta, a carteira fica em `ndc:bolinha:wallet` (neste aparelho); com conta, o aparelho guarda uma cópia (`ndc:bolinha:wallet:<conta>`) para abrir na hora.
+- O **recorde** do menu e do HUD também segue a conta: ao entrar, vale o melhor entre o do aparelho e o da conta no ranking.
+- Catálogo e preços: `game/cosmetics.ts` (front) e `packages/server/src/lib/shop.ts` (servidor); um teste garante que são iguais. Desenhos em `rendering/skins.ts`; regras das moedas em `COINS` (`game/config.ts`).
 
 ### Cenários (noite → selva → neve)
 

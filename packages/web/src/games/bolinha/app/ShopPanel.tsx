@@ -42,7 +42,20 @@ function Preview({ kind, id }: { kind: Tab; id: string }) {
   return <canvas ref={ref} className="shop-preview" width={64} height={64} aria-hidden="true" />;
 }
 
-export function ShopPanel({ shop, onBuy, onClose }: { shop: WalletState; onBuy: (id: string) => boolean; onClose: () => void }) {
+export function ShopPanel({
+  shop,
+  onBuy,
+  onClose,
+  cloud = false,
+  message = null,
+}: {
+  shop: WalletState;
+  onBuy: (id: string) => void;
+  onClose: () => void;
+  /** Carteira da conta (na nuvem) ou só deste aparelho. */
+  cloud?: boolean;
+  message?: string | null;
+}) {
   const [tab, setTab] = useState<Tab>('bolinhas');
   const closeRef = useRef<HTMLButtonElement | null>(null);
   useEffect(() => closeRef.current?.focus({ preventScroll: true }), []);
@@ -94,7 +107,15 @@ export function ShopPanel({ shop, onBuy, onClose }: { shop: WalletState; onBuy: 
           );
         })}
       </ul>
-      <p className="shop-hint">Pegue moedas no caminho para comprar. Só muda o visual — a bolinha continua do mesmo tamanho.</p>
+      {message && (
+        <p className="shop-msg" role="status">
+          {message}
+        </p>
+      )}
+      <p className="shop-hint">
+        Pegue moedas no caminho para comprar. Só muda o visual.{' '}
+        {cloud ? 'Moedas e itens salvos na sua conta.' : 'Entre com uma conta para guardar moedas e itens na nuvem.'}
+      </p>
       <button ref={closeRef} className="btn btn-secondary" onClick={onClose}>
         Voltar
       </button>

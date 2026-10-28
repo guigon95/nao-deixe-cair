@@ -782,3 +782,9 @@ button:focus-visible {
 .is-champion .save-title {
   color: #ffd23f;
 }
+
+.shop-msg {
+  margin: 0;
+  font-size: 0.8em;
+  color: #ffd66b;
+}

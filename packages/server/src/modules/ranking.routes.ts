@@ -7,6 +7,8 @@ import { HttpError, parse } from '../lib/http';
 import { isValidName, NAME_MAX, NAME_MIN, nameKey, sanitizeName } from '../lib/names';
 import { issueRunToken, verifyRunToken } from '../lib/runToken';
 import { previousWeek, weekWindow, type WeekWindow } from '../lib/week';
+import { maxCoinsFor } from '../lib/shop';
+import { creditCoins, toWalletDto } from './wallet.routes';
 
 const gameSchema = z.enum(GAME_IDS, { message: 'Jogo desconhecido' });
 const periodSchema = z.enum(['week', 'all'], { message: 'Período inválido' }).default('all');
@@ -16,6 +18,8 @@ const submitSchema = z.object({
   score: z.number().int('Pontuação inválida').positive('Pontuação inválida').max(MAX_SCORE, 'Pontuação inválida'),
   /** Só para quem joga sem conta. Com sessão, o nome é o da conta. */
   name: z.string().optional(),
+  /** Moedas pegas na partida (com conta, vão para a carteira na nuvem). */
+  coins: z.number().int().min(0).max(1000).optional(),
 });
 
 interface Row {
@@ -96,8 +100,8 @@ export async function rankingRoutes(app: FastifyInstance, ctx: AppContext) {
       const [champ] = await topScores(prisma, game, previousWeek(w), 1);
       week = { start: w.start.toISOString(), end: w.end.toISOString(), lastChampion: champ ? { name: champ.name, score: champ.score } : null };
     }
-    // Cache curto no navegador; sem cache compartilhado (a resposta depende da sessão).
-    reply.header('cache-control', 'private, max-age=5');
+    // Sem cache: a resposta depende da sessão (logo depois de entrar, "você" tem que aparecer).
+    reply.header('cache-control', 'no-store');
     return { game, period, size: RANKING_SIZE, entries: rows.map(toEntry), me, ...(week ? { week } : {}) };
   });
 
@@ -155,6 +159,13 @@ export async function rankingRoutes(app: FastifyInstance, ctx: AppContext) {
     const personalBest = !previousBest || created.score > previousBest.score;
     const best = personalBest ? created : previousBest!;
     const position = await positionOf(prisma, game, best);
+    // Moedas da partida vão para a carteira da conta (com teto pelo tempo de partida).
+    let wallet;
+    if (auth && body.coins) {
+      const coins = Math.min(body.coins, maxCoinsFor(durationMs));
+      if (coins < body.coins) req.log.warn({ game, coins: body.coins, durationMs }, 'moedas acima do teto; creditado o teto');
+      wallet = toWalletDto(await creditCoins(prisma, auth.playerId, game, coins));
+    }
     const weekBestIsNew = !previousWeekBest || created.score > previousWeekBest.score;
     const weekBest = weekBestIsNew ? created : previousWeekBest!;
     return reply.status(201).send({
@@ -168,6 +179,7 @@ export async function rankingRoutes(app: FastifyInstance, ctx: AppContext) {
         personalBest: weekBestIsNew,
         end: w.end.toISOString(),
       },
+      ...(wallet ? { wallet } : {}),
     });
   });
 }

@@ -71,6 +71,8 @@ export interface RunInfo {
   /** runId da partida em andamento (muda quando uma partida começa). */
   liveRunId: number;
   score: number;
+  /** Moedas pegas na partida (vão para a carteira da conta junto com a pontuação). */
+  coins?: number;
 }
 
 export interface SaveState {
@@ -128,16 +130,17 @@ export function useRanking(opts: { game: GameId; storage: Storage; localKey?: st
     if (run.liveRunId > 0) controller.runStarted(run.liveRunId);
   }, [run.liveRunId, controller]);
 
+  const runCoins = run.coins ?? 0;
   const doSubmit = useCallback(
     async (runId: number, score: number, name: string, profile: Profile | null) => {
       setSave({ runId, status: 'saving', outcome: null });
-      const outcome = await controller.submit(runId, score, { name, profile });
+      const outcome = await controller.submit(runId, score, { name, profile, coins: runCoins });
       setSave({ runId, status: outcome.result ? 'saved' : 'error', outcome });
       sync();
       if (outcome.result) onSaved?.();
       return outcome;
     },
-    [controller, sync, onSaved],
+    [controller, sync, onSaved, runCoins],
   );
 
   // Fim de partida: elegibilidade e envio automático (uma vez por partida).

@@ -63,6 +63,18 @@ export class ScoreManager {
     return { score, best: this.best, isNewRecord: isNewRecord && this.bestAtStart > 0 };
   }
 
+  /**
+   * Recorde vindo de fora (melhor da conta no servidor): só sobe, nunca desce,
+   * e fica salvo neste aparelho também.
+   */
+  raiseBest(n: number): boolean {
+    if (!(Number.isFinite(n) && n > this.best)) return false;
+    this.best = Math.floor(n);
+    if (this.bestAtStart < this.best && (this.frozen || this.time === 0)) this.bestAtStart = this.best;
+    this.saveBest(this.best);
+    return true;
+  }
+
   /** Continuar depois de bater: a pontuação volta a contar de onde parou. */
   unfreeze(): void {
     this.frozen = false;

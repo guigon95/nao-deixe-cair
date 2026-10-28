@@ -3,6 +3,8 @@ import type { Storage } from '../../../shared/storage/storage';
 import { SKINS, TRAILS, type SkinId, type TrailId } from './cosmetics';
 
 export const WALLET_KEY = gameKey('bolinha', 'wallet');
+/** Cópia local da carteira de uma conta (abre na hora; a verdade está no servidor). */
+export const accountWalletKey = (playerId: string) => `${WALLET_KEY}:${playerId}`;
 
 export interface WalletState {
   coins: number;
@@ -16,14 +18,41 @@ const FREE: string[] = [...SKINS, ...TRAILS].filter((i) => i.price === 0).map((i
 const DEFAULT: WalletState = { coins: 0, owned: FREE, skin: 'classica', trail: 'padrao' };
 
 /**
- * Carteira de moedas e itens da loja, salva neste aparelho.
+ * Carteira de moedas e itens da loja.
+ * - Sem conta: salva neste aparelho (WALLET_KEY).
+ * - Com conta: cópia local da carteira da nuvem (accountWalletKey), trocada
+ *   pela versão do servidor sempre que ela chega.
  * Cada moeda é gravada na hora em que é pega (não se perde se a aba fechar).
  */
 export class Wallet {
   private state: WalletState;
+  private key = WALLET_KEY;
 
   constructor(private storage: Storage) {
     this.state = this.load();
+  }
+
+  /** Passa a usar outra carteira (do aparelho ou da conta). */
+  switchTo(key: string): void {
+    if (key === this.key) return;
+    this.key = key;
+    this.state = this.load();
+  }
+
+  get currentKey() {
+    return this.key;
+  }
+
+  /** Substitui pelo estado que veio do servidor (validando ids). */
+  replace(next: { coins: number; owned: string[]; skin: string; trail: string }): void {
+    this.state = this.sanitize(next);
+    this.save();
+  }
+
+  /** Zera esta carteira (ex.: moedas do aparelho levadas para a conta). */
+  reset(): void {
+    this.state = { ...DEFAULT, owned: [...FREE] };
+    this.save();
   }
 
   get(): WalletState {
@@ -66,14 +95,21 @@ export class Wallet {
 
   private load(): WalletState {
     try {
-      const raw = this.storage.getItem(WALLET_KEY);
+      const raw = this.storage.getItem(this.key);
       if (!raw) return { ...DEFAULT, owned: [...FREE] };
-      const p = JSON.parse(raw) as Partial<WalletState>;
+      return this.sanitize(JSON.parse(raw) as Partial<WalletState>);
+    } catch {
+      return { ...DEFAULT, owned: [...FREE] };
+    }
+  }
+
+  private sanitize(p: { coins?: unknown; owned?: unknown; skin?: unknown; trail?: unknown }): WalletState {
+    try {
       const owned = Array.isArray(p.owned) ? p.owned.filter((x): x is string => typeof x === 'string') : [];
       for (const f of FREE) if (!owned.includes(f)) owned.push(f);
       const coins = typeof p.coins === 'number' && Number.isFinite(p.coins) && p.coins >= 0 ? Math.floor(p.coins) : 0;
-      const skin = SKINS.some((s) => s.id === p.skin) && owned.includes(p.skin!) ? (p.skin as SkinId) : 'classica';
-      const trail = TRAILS.some((t) => t.id === p.trail) && owned.includes(p.trail!) ? (p.trail as TrailId) : 'padrao';
+      const skin = SKINS.some((s) => s.id === p.skin) && owned.includes(p.skin as string) ? (p.skin as SkinId) : 'classica';
+      const trail = TRAILS.some((t) => t.id === p.trail) && owned.includes(p.trail as string) ? (p.trail as TrailId) : 'padrao';
       return { coins, owned, skin, trail };
     } catch {
       return { ...DEFAULT, owned: [...FREE] };
@@ -82,7 +118,7 @@ export class Wallet {
 
   private save(): void {
     try {
-      this.storage.setItem(WALLET_KEY, JSON.stringify(this.state));
+      this.storage.setItem(this.key, JSON.stringify(this.state));
     } catch {
       /* fica só na memória desta sessão */
     }

@@ -10,6 +10,7 @@ import { loadAuth } from './auth/auth';
 import { errorHandler, HttpError } from './lib/http';
 import { authRoutes } from './modules/auth.routes';
 import { rankingRoutes } from './modules/ranking.routes';
+import { walletRoutes } from './modules/wallet.routes';
 
 export interface AppContext {
   prisma: PrismaClient;
@@ -58,6 +59,7 @@ export async function buildApp(opts: { prisma: PrismaClient; config: AppConfig; 
 
   await authRoutes(app, ctx);
   await rankingRoutes(app, ctx);
+  await walletRoutes(app, ctx);
 
   app.setNotFoundHandler((_req, reply) => reply.status(404).send({ error: 'Não encontrado' }));
   return { app, ctx };

@@ -9,7 +9,7 @@ import { LoginPanel, RankingPanel, SaveScore, WeeklyCallout } from '../../../sha
 type Overlay = 'ranking' | 'login' | null;
 
 export function GameScreen() {
-  const { surfaceRef, canvasRef, ui, settings, updateSettings, start, pause, resume, toMenu, playSound, storage, physics } =
+  const { surfaceRef, canvasRef, ui, settings, updateSettings, start, pause, resume, toMenu, playSound, storage, physics, raiseBest } =
     useAviao();
   const primaryRef = useRef<HTMLButtonElement | null>(null);
 
@@ -25,6 +25,11 @@ export function GameScreen() {
     onSaved: () => playSound('success'),
   });
   const [overlay, setOverlay] = useState<Overlay>(null);
+  // Recorde da conta (servidor) vale em qualquer aparelho.
+  const accountBest = player.mode === 'online' && profile?.provider === 'online' ? (rank.me?.best ?? 0) : 0;
+  useEffect(() => {
+    if (accountBest > 0) raiseBest(accountBest);
+  }, [accountBest, raiseBest]);
 
   useEffect(() => {
     if (ui.state !== GameState.READY && ui.state !== GameState.GAME_OVER) setOverlay(null);

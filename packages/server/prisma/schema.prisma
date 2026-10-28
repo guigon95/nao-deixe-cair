@@ -25,6 +25,7 @@ model Player {
   createdAt    DateTime  @default(now())
   sessions     Session[]
   scores       Score[]
+  wallets      Wallet[]
 }
 
 model Session {
@@ -58,4 +59,21 @@ model Score {
   /// ranking semanal: filtra por jogo e data
   @@index([game, createdAt])
   @@index([playerId, game, score(sort: Desc)])
+}
+
+/// Moedas e itens da loja de uma conta, por jogo. As compras e os créditos de
+/// moedas acontecem no servidor (o cliente não define o saldo).
+model Wallet {
+  playerId  String
+  player    Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  game      String
+  coins     Int      @default(0)
+  owned     String[]
+  skin      String
+  trail     String
+  /// Já trouxe as moedas/itens que estavam só no aparelho (acontece uma vez).
+  imported  Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+
+  @@id([playerId, game])
 }

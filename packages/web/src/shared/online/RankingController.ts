@@ -6,7 +6,7 @@ import type { OnlineApi, OnlineResult, WeekInfo } from './services';
 export type RankingScope = 'online' | 'local';
 
 export interface SubmitOutcome {
-  result: (RankingResult & Partial<Pick<OnlineResult, 'personalBest' | 'score' | 'week'>>) | null;
+  result: (RankingResult & Partial<Pick<OnlineResult, 'personalBest' | 'score' | 'week' | 'wallet'>>) | null;
   /** Mensagem para o jogador quando não deu para salvar (ou salvou só aqui). */
   message?: string;
   /** true = servidor fora do ar; salvou (se deu) só neste aparelho. */
@@ -113,13 +113,18 @@ export class RankingController {
     this.prefetch();
   }
 
-  async submit(runId: number, score: number, opts: { name: string; profile: { id: string; provider: 'local' | 'online' } | null }): Promise<SubmitOutcome> {
+  async submit(
+    runId: number,
+    score: number,
+    opts: { name: string; profile: { id: string; provider: 'local' | 'online' } | null; coins?: number },
+  ): Promise<SubmitOutcome> {
     if (this.scope !== 'online' || opts.profile?.provider === 'local') return this.submitLocal(score, opts);
     try {
       let token = (await this.byRun.get(runId)) ?? null;
       if (!token) token = await this.api.startRun(this.game);
       const isGuest = !opts.profile;
-      const res = await this.api.submit(this.game, token, score, isGuest ? opts.name : undefined);
+      // com conta, as moedas da partida vão junto para a carteira na nuvem
+      const res = await this.api.submit(this.game, token, score, isGuest ? opts.name : undefined, isGuest ? undefined : opts.coins);
       this.byRun.delete(runId);
       await this.refresh().catch(() => undefined);
       return { result: res };

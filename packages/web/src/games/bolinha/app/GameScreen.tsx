@@ -6,6 +6,7 @@ import { HubBack } from '../../../shared/ui/HubBack';
 import { rewardedAds } from '../../../shared/ads/rewarded';
 import { CONTINUES } from '../game/config';
 import { CoinIcon, ShopPanel } from './ShopPanel';
+import { useCloudWallet } from './useCloudWallet';
 import { LoginPanel, RankingPanel, SaveScore, WeeklyCallout } from '../../../shared/ui/RankingUi';
 
 type Overlay = 'ranking' | 'login' | 'shop' | null;
@@ -27,6 +28,9 @@ export function GameScreen() {
     storage,
     shop,
     buyItem,
+    setWalletKey,
+    applyWallet,
+    raiseBest,
   } = useGame();
   const primaryRef = useRef<HTMLButtonElement | null>(null);
 
@@ -37,10 +41,31 @@ export function GameScreen() {
     game: 'bolinha',
     storage,
     player,
-    run: { state: ui.state, runId: ui.runId, liveRunId: ui.liveRunId, score: ui.score },
+    run: { state: ui.state, runId: ui.runId, liveRunId: ui.liveRunId, score: ui.score, coins: ui.runCoins },
     onSaved: () => playSound('success'),
   });
   const [overlay, setOverlay] = useState<Overlay>(null);
+
+  // Conta online: moedas e itens da loja ficam na nuvem (qualquer aparelho).
+  const account = online && profile?.provider === 'online' ? profile : null;
+  const cloud = useCloudWallet({
+    api: player.service.api,
+    storage,
+    account,
+    setWalletKey,
+    applyWallet,
+    localBuy: buyItem,
+  });
+  // A carteira atualizada (moedas da partida creditadas) volta junto com o envio.
+  const savedWallet = rank.save.outcome?.result?.wallet;
+  useEffect(() => {
+    if (savedWallet) applyWallet(savedWallet);
+  }, [savedWallet, applyWallet]);
+  // Recorde da conta (servidor) vale em qualquer aparelho.
+  const accountBest = account ? (rank.me?.best ?? 0) : 0;
+  useEffect(() => {
+    if (accountBest > 0) raiseBest(accountBest);
+  }, [accountBest, raiseBest]);
 
   useEffect(() => {
     if (ui.state !== GameState.READY && ui.state !== GameState.GAME_OVER) setOverlay(null);
@@ -133,9 +158,12 @@ export function GameScreen() {
         {overlay === 'shop' && (
           <ShopPanel
             shop={shop}
-            onBuy={buyItem}
+            onBuy={(id) => void cloud.buy(id)}
+            cloud={!!account}
+            message={cloud.message}
             onClose={() => {
               playSound('click');
+              cloud.clearMessage();
               setOverlay(null);
             }}
           />
