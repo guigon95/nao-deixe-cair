@@ -6,6 +6,7 @@ Hub de jogos casuais para navegador (prioridade para celular). Cada jogo fica na
 |---|---|---|
 | **Bolinha** (nome provisório) | `bolinha/` | Segure para subir, solte para cair. Passe pelos vãos das barreiras. |
 | **Acrobata** | `aviao/` | Segure para subir, solte para cair (mesma física da bolinha). Desvie de balões, pássaros e torres e não encoste no chão. |
+| **Disparada** (nome provisório) | `corrida/` | Corrida infinita lateral: toque pula, segure para pular alto e planar. Fuja do enxame de marimbondos coletando jabuticabas. |
 
 React 19 + TypeScript estrito + Vite (multi-página) + Canvas 2D no front; **API Fastify + Prisma + Postgres** para contas e ranking de todos os jogadores (mesmo padrão do AquaOps). Sem anúncios, sem analytics. Sons sintetizados com Web Audio. Sem servidor (offline ou hospedagem estática) tudo continua funcionando com ranking e perfil locais.
 
@@ -50,6 +51,7 @@ python e2e/hub.py http://localhost:4173 e2e/screens             # hub, migraçã
 python e2e/bolinha_smoke.py http://localhost:4173 e2e/screens   # bolinha: controles, pausa, layouts
 python e2e/bolinha_ranking.py http://localhost:4173 e2e/screens # bolinha: ranking local, perfil, sons
 python e2e/aviao.py http://localhost:4173 e2e/screens           # acrobata: controle, loop, fim, ranking, layouts
+python e2e/corrida.py http://localhost:4173 e2e/screens         # disparada: toque/segurar/teclado/deslize, dash, fim, ranking, hub, piloto, layouts
 
 # modo online (API rodando em :4000 com um banco de teste vazio)
 API_PROXY_TARGET=http://localhost:4000 npx vite preview --port 4174
@@ -125,6 +127,7 @@ packages/web/
 index.html              hub (escolha de jogos)
 bolinha/index.html      entrada do jogo da bolinha
 aviao/index.html        entrada do Acrobata
+corrida/index.html      entrada da Disparada
 src/
   hub/                  tela do hub: cartões com ilustração em SVG, recorde e perfil
   shared/               o que os jogos compartilham
@@ -138,12 +141,13 @@ src/
   games/
     bolinha/            motor, física, obstáculos, render e telas da bolinha
     aviao/              motor, física de voo, mundo, manobras, render, som e telas do Acrobata
+    corrida/            Disparada: física do pulo, padrões, gerador, planejador, render, som e telas
 e2e/                    testes de navegador (hub + um por jogo)
 ```
 
 Para adicionar um jogo: uma pasta em `packages/web/src/games/`, um `<jogo>/index.html`, uma entrada em `vite.config.ts` (`build.rollupOptions.input`), uma em `src/shared/games.ts` e, para ranking online, o id em `packages/server/src/lib/games.ts` (com o teto de pontos por segundo).
 
-URLs de diagnóstico (nos dois jogos): `?debug` expõe `window.__NDC__`; `?seed=N` fixa a semente. No Acrobata: `?fisica=voo` liga a física de voo com loops (deixada de lado; dentro dela `?controle=a|b` ligam os esquemas antigos) e `?debug&piloto` liga o piloto automático.
+URLs de diagnóstico (nos três jogos): `?debug` expõe `window.__NDC__`; `?seed=N` fixa a semente. No Acrobata: `?fisica=voo` liga a física de voo com loops (deixada de lado; dentro dela `?controle=a|b` ligam os esquemas antigos) e `?debug&piloto` liga o piloto automático.
 
 ---
 
@@ -223,6 +227,60 @@ Uma versão anterior do C usava dois toques rápidos para o loop; com o mergulho
 - Fumaça de acrobacia que fica no céu e desenha o loop, escapamento, faíscas, linhas de velocidade, câmera que se afasta com velocidade e altura sem girar, hélice e "squash" no toque, tremida no estol, câmera lenta de 0,16 s nas manobras grandes (desligada com **Menos movimento**), vibração no Android.
 - Pools de tamanho fixo para fumaça, partículas, textos, obstáculos e anéis.
 
+## Disparada (corrida infinita)
+
+Inspirada no gênero de *Banana Kong* (corrida automática, pulo, planar, dash com medidor, perseguidor atrás), com identidade própria: um **quati** foge de um **enxame de marimbondos** pela mata, coletando **jabuticabas**. Tudo desenhado em Canvas 2D e sons sintetizados — nenhum recurso de terceiros.
+
+### Controles
+
+| Ação | Toque | Teclado |
+|---|---|---|
+| Pular (na hora, sem esperar gesto) | tocar em qualquer lugar | Espaço / ↑ / W |
+| Pulo alto e planar na descida (rabo vira hélice, até 0,9 s) | segurar | segurar |
+| Descer rápido / atravessar o galho | deslizar ↓ | ↓ / S |
+| **Disparada** (dash: 0,85 s, ×1,65 de velocidade, quebra pedras, espinhos e caixotes, afasta o enxame) | deslizar → ou botão **DISPARAR** | → / D / Shift |
+| Pausar | botão ⏸ | Esc / P |
+
+Toque curto = pulo baixo (~85 u, passa pedras pequenas); segurar = pulo cheio (~160 u, ~0,66 s no ar). Há pulo mínimo (o corte só vale após 0,08 s), 0,09 s de tolerância depois da beirada e 0,12 s de "toque guardado" antes de pousar.
+
+### Regras
+
+- Pedra de lado, espinhos ou cair no rio = fim. Em cima de pedra dá para pousar (quinas de até 7 u sobem sozinhas).
+- **Caixote**: atravessar atrasa (velocidade cai a 30 % e volta em 1,3 s) e o enxame se aproxima; pisar em cima quica (+10).
+- **Flor-mola**: encostar lança bem alto. **Galhos** (presos por cipós) são caminhos altos com frutas; dá para descer deles com ↓.
+- **Enxame**: começa perto e vai ficando para trás (até 280 u) enquanto você corre; caixotes o aproximam, o dash afasta; se alcançar, acabou. Perto, a tela ganha borda vermelha e zumbido.
+- **Pontos** = metros + 5 por jabuticaba + 10 por quebra/pisão. 12 jabuticabas enchem o medidor do dash.
+- O cenário muda a cada 800 m (Mata → Entardecer → Noite na mata → Amanhecer); os obstáculos mantêm as cores em todos.
+
+### Orientação
+
+Paisagem (arena lógica 640×360): a corrida lateral precisa de visão à frente (~1–1,6 s). Em pé o jogo funciona numa faixa, com o aviso "Deite o celular"; nada força a orientação. Telas mais largas mostram mais caminho; mais altas, mais céu e terra.
+
+### Percurso justo
+
+- Obstáculos vêm de **padrões escritos em segundos** (`game/patterns.ts`): o `Builder` converte em distância pela velocidade prevista para quando o quati chegar. "Um rio de 0,44 s" pede o mesmo pulo a 290 ou 480 u/s.
+- Um **planejador** (`game/testing/planner.ts`) usa a mesma física e procura uma sequência de toques que atravessa: os testes provam que **os 20 padrões** são atravessáveis em três velocidades e três sementes sem bater em caixote, e que ele recusa trechos impossíveis.
+- Um piloto automático (o planejador replanejando a cada pouso) sobrevive **150 s em 16 sementes** do percurso gerado de verdade.
+- Jogadores **simulados** (pulam no meio da janela, com erro de tempo aleatório e toque ±25 %): mediana de **73 s** com ±25 ms e **27 s** com ±70 ms. É simulação, não medição com pessoas.
+
+### Dificuldade (`game/Difficulty.ts`)
+
+| Tempo | Nível | Novidades |
+|---|---|---|
+| 0–10 s | 0 | pedras, pedrona, caixote, riacho; 2,2 s iniciais livres |
+| 10–25 s | 1 | rio médio, espinhos, duas pedras, galho, caixotes, flor-mola |
+| 25–45 s | 2 | pedra + rio, pedras juntas, rio largo, ponte de galho, pedrona + caixote |
+| 45–75 s | 3 | escada de galhos, espinhos longos (pedem planar), ritmo de três pulos |
+| 75 s+ | 4 | galhos sobre rio comprido, corredor de obstáculos |
+
+Velocidade 290 → 480 u/s (aproximação exponencial, τ = 70 s); folga entre padrões de 0,85–1,45 s, caindo até 0,25–0,6 s aos 90 s. Parâmetros em `game/config.ts`.
+
+### Arquitetura
+
+`game/` não conhece DOM nem React: `Physics.ts` (passo puro a 120 Hz, sem alocação), `Level.ts` (listas que se limpam atrás da tela), `Track.ts` (gerador), `Engine.ts` (estados, enxame, dash, pontos, eventos), `Gestures.ts` (deslizes). `rendering/` desenha (paletas, quati, efeitos em pools fixos); `hooks/useCorrida.ts` liga tudo ao `GameLoop`, `InputController`, `SynthAudio`, ranking e configurações do hub. Recorde e ranking em `ndc:corrida:best` / `ndc:corrida:ranking`; ranking online pelo mesmo backend (id `corrida`, teto de 200 pontos/s).
+
+`?debug&piloto` liga o piloto automático no navegador.
+
 ## Bolinha
 
 ### Continuar de onde parou (3 vidas)
@@ -261,4 +319,6 @@ Parâmetros em `src/games/bolinha/game/config.ts` e `Difficulty.ts`. Detalhes do
 - A duração das partidas foi estimada com um "jogador casual" simulado (reação de 0,15–0,25 s e erros aleatórios): mediana entre ~27 s (descuidado) e ~85 s (cuidadoso). Jogadores reais podem diferir.
 - iOS não tem `navigator.vibrate`: lá a vibração simplesmente não acontece.
 - O recorde pessoal mostrado no menu ainda é o deste aparelho; o melhor da conta aparece no ranking online.
+- Disparada: toda a calibragem (pulo, planar, folgas, enxame) foi feita com simulação e Chromium (desktop e emulação de celular), **não em aparelho físico**. Em pé, a faixa do jogo fica pequena (o aviso pede para deitar). Fora da 1ª versão: animais montáveis, cipós de balançar, loja e missões.
+- Dois testes do servidor (`empate: quem fez primeiro fica na frente` e `o melhor da conta na semana…`) já falhavam antes da Disparada no Postgres local deste ambiente; não foram alterados.
 - O anti-trapaça é básico (token + teto por tempo): quem editar o jogo no navegador ainda consegue enviar pontuações plausíveis.

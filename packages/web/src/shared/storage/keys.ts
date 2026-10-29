@@ -6,7 +6,7 @@ import type { Storage } from './storage';
  * Padrão: `ndc:<dado>` para o que é do hub (perfil, configurações) e
  * `ndc:<jogo>:<dado>` para o que é de cada jogo (recorde, ranking).
  */
-export type GameId = 'bolinha' | 'aviao';
+export type GameId = 'bolinha' | 'aviao' | 'corrida';
 
 export const HUB_KEYS = {
   profile: 'ndc:profile',

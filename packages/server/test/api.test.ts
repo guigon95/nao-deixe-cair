@@ -16,7 +16,7 @@ afterAll(async () => {
 beforeEach(resetDb);
 
 /** Token de uma partida que "começou" há `secondsAgo` segundos. */
-const oldToken = (game: 'bolinha' | 'aviao', secondsAgo: number) => issueRunToken(SECRET, game, Date.now() - secondsAgo * 1000).token;
+const oldToken = (game: 'bolinha' | 'aviao' | 'corrida', secondsAgo: number) => issueRunToken(SECRET, game, Date.now() - secondsAgo * 1000).token;
 
 async function register(name: string, password = 'senha123') {
   const c = new Client(app);
@@ -188,6 +188,15 @@ describe('ranking', () => {
     expect(a.statusCode, a.body).toBe(201);
     expect((await c.post('/api/games/bolinha/scores', { token: oldToken('bolinha', 30), score: 0 })).statusCode).toBe(422);
     expect((await c.post('/api/games/bolinha/scores', { token: oldToken('bolinha', 30), score: 1.5 })).statusCode).toBe(422);
+  });
+
+  it('Disparada (corrida): ranking próprio e teto pela duração da partida', async () => {
+    const c = await register('Corredor');
+    const ok = await c.post('/api/games/corrida/scores', { token: oldToken('corrida', 60), score: 3200 });
+    expect(ok.statusCode, ok.body).toBe(201);
+    expect((await c.post('/api/games/corrida/scores', { token: oldToken('corrida', 60), score: 50_000 })).statusCode).toBe(422);
+    expect((await c.get('/api/games/corrida/ranking')).data.entries.map((e: { score: number }) => e.score)).toEqual([3200]);
+    expect((await c.get('/api/games/aviao/ranking')).data.entries).toEqual([]);
   });
 
   it('convidado: precisa de nome válido, não pode usar apelido de conta e só entra se for top 10', async () => {

@@ -1,0 +1,260 @@
+"""
+Teste da Disparada em navegador real (Chromium headless via Playwright).
+
+Uso:  npm run build && npx vite preview --port 4173   (em outro terminal)
+      python3 e2e/corrida.py [http://localhost:4173] [pasta_de_capturas]
+
+Verifica com Pointer Events reais: toque pula na hora, segurar planeja,
+teclado (Espaço, ↓, →), deslize para a direita e botão de dash, pausa ao
+ocultar a aba, um único laço, fim de partida com a causa, ranking (Só meu
+nome) separado dos outros jogos, reinício imediato, volta ao hub, piloto
+automático correndo 20 s sem bater e layouts em vários tamanhos.
+"""
+import sys
+from pathlib import Path
+
+from playwright.sync_api import sync_playwright
+
+BASE = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:4173"
+OUT = Path(sys.argv[2] if len(sys.argv) > 2 else "e2e/screens")
+OUT.mkdir(parents=True, exist_ok=True)
+URL = BASE + "/corrida/?debug&seed=7"
+
+results = []
+
+
+def check(name, cond, detail=""):
+    results.append((name, bool(cond), detail))
+    print(("PASS " if cond else "FAIL ") + name + (f"  [{detail}]" if detail else ""))
+
+
+def st(page):
+    return page.evaluate(
+        """() => { const n = window.__NDC__, e = n.engine, r = e.runner; return {
+            state: e.state, x: r.x, y: r.y, vy: r.vy, grounded: r.grounded, gliding: r.gliding, dash: r.dash,
+            fast: r.fastFall, score: e.score.score, best: e.score.best, meter: e.meter, swarm: e.swarm,
+            elapsed: e.elapsed, active: n.loop.activeLoops, runId: e.runId, cause: e.deathCause } }"""
+    )
+
+
+def wait_grounded(page):
+    page.wait_for_function("() => window.__NDC__.engine.runner.grounded", timeout=3000)
+
+
+with sync_playwright() as p:
+    browser = p.chromium.launch()
+    ctx = browser.new_context(viewport={"width": 844, "height": 390}, device_scale_factor=3, has_touch=True, is_mobile=True)
+    page = ctx.new_page()
+    errors = []
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    page.on("console", lambda m: errors.append(m.text) if m.type == "error" and "/api/" not in (m.location or {}).get("url", "") else None)  # sem servidor, o /api falha de propósito
+
+    # Hub: o jogo aparece no catálogo junto dos outros dois.
+    page.goto(BASE + "/")
+    page.evaluate("() => localStorage.clear()")
+    page.reload()
+    page.wait_for_selector(".hub-card")
+    names = page.locator(".hub-name").all_inner_texts()
+    check("hub lista os três jogos", len(names) == 3 and "Disparada" in names, ", ".join(names))
+    page.screenshot(path=str(OUT / "corrida-00-hub.png"))
+    page.locator('.hub-card[data-game="corrida"] a').click()
+    page.wait_for_selector("text=CORRER")
+    check("cartão do hub abre a Disparada", "/corrida/" in page.url)
+
+    page.goto(URL)
+    page.wait_for_selector("text=CORRER")
+    check("menu da Disparada aparece", page.locator("h1").inner_text().strip() == "Disparada")
+    canvas_w = page.evaluate("() => document.querySelector('canvas').width")
+    check("canvas usa devicePixelRatio (limitado)", canvas_w >= 844 * 2.4, f"{canvas_w}px")
+    page.screenshot(path=str(OUT / "corrida-01-menu.png"))
+
+    page.click("text=CORRER")
+    page.wait_for_timeout(250)
+    s0 = st(page)
+    check("CORRER inicia a partida", s0["state"] == "PLAYING")
+    check("um único laço de animação", s0["active"] == 1)
+    # Trecho livre de ~16 s para testar os controles sem bater (depois o percurso volta ao normal).
+    page.evaluate(
+        """() => { const t = window.__NDC__.engine.track, l = t.level;
+           l.rocks.length = l.thorns.length = l.crates.length = l.springs.length = l.platforms.length = 0;
+           l.ground.length = 0; l.addGround(-800, t.genX + 5000); t.genX += 5000 }"""
+    )
+    page.wait_for_timeout(300)
+    check("o quati corre sozinho", st(page)["x"] > s0["x"] + 60)
+
+    b = page.locator(".surface").bounding_box()
+    cx, cy = b["x"] + b["width"] * 0.5, b["y"] + b["height"] * 0.6
+
+    # Toque curto pula na hora.
+    page.mouse.move(cx, cy)
+    page.mouse.down()
+    page.wait_for_timeout(40)
+    s1 = st(page)
+    page.mouse.up()
+    check("toque pula na hora (≤ 40 ms)", not s1["grounded"] and s1["vy"] > 0, f"vy={s1['vy']:.0f}")
+    wait_grounded(page)
+
+    # Segurar: pula alto e plana na descida.
+    page.mouse.down()
+    page.wait_for_timeout(520)
+    s2 = st(page)
+    page.screenshot(path=str(OUT / "corrida-02-planando.png"))
+    page.mouse.up()
+    check("segurar plana na descida", s2["gliding"] and s2["vy"] > -200, f"vy={s2['vy']:.0f} y={s2['y']:.0f}")
+    wait_grounded(page)
+
+    # Teclado: Espaço pula; ↓ no ar desce rápido.
+    page.keyboard.down("Space")
+    page.wait_for_timeout(120)
+    page.keyboard.up("Space")
+    page.keyboard.press("ArrowDown")
+    page.wait_for_timeout(30)
+    s3 = st(page)
+    check("Espaço pula e ↓ desce rápido", s3["fast"] or s3["grounded"], f"vy={s3['vy']:.0f}")
+    wait_grounded(page)
+
+    # Dash: com o medidor cheio, aparece o botão; deslizar → também dispara.
+    page.evaluate("() => { window.__NDC__.engine.meter = 12 }")
+    page.mouse.down()
+    page.wait_for_timeout(30)
+    page.mouse.up()  # um toque para o React ver o medidor (evento de fruta não houve)
+    page.evaluate("() => window.__NDC__.engine.dash()")
+    page.wait_for_timeout(60)
+    check("dash pelo motor com medidor cheio", st(page)["dash"] > 0)
+    page.wait_for_timeout(1000)
+    wait_grounded(page)
+    # Força uma fruta para encher (o botão aparece pelo evento do jogo).
+    page.evaluate(
+        """() => { const e = window.__NDC__.engine, r = e.runner; e.meter = 11;
+           e.track.level.fruits.unshift({ x: r.x + 30, y: 17, taken: false, risky: false }) }"""
+    )
+    page.wait_for_selector(".dash-btn", timeout=2000)
+    page.screenshot(path=str(OUT / "corrida-03-dash-pronto.png"))
+    btn = page.locator(".dash-btn").bounding_box()
+    check("botão DISPARAR ≥ 64 px no canto de baixo", btn["height"] >= 60 and btn["x"] > b["width"] * 0.6)
+    page.tap(".dash-btn", force=True)
+    page.wait_for_timeout(50)
+    s4 = st(page)
+    check("botão DISPARAR faz o dash e não pula", s4["dash"] > 0 and s4["vy"] == 0)
+    page.screenshot(path=str(OUT / "corrida-04-dash.png"))
+    page.wait_for_timeout(1100)
+    wait_grounded(page)
+    page.evaluate("() => { window.__NDC__.engine.meter = 12 }")
+    page.mouse.move(cx - 120, cy)
+    page.mouse.down()
+    page.mouse.move(cx - 60, cy, steps=2)
+    page.mouse.move(cx + 20, cy, steps=2)
+    page.mouse.up()
+    page.wait_for_timeout(30)
+    check("deslizar → dispara o dash", st(page)["dash"] > 0)
+    page.wait_for_timeout(1100)
+
+    # Pausa ao ocultar a aba.
+    page.evaluate("() => { Object.defineProperty(document, 'hidden', {value: true, configurable: true}); document.dispatchEvent(new Event('visibilitychange')) }")
+    check("aba oculta pausa", st(page)["state"] == "PAUSED")
+    x = st(page)["x"]
+    page.wait_for_timeout(400)
+    check("nada avança pausado", st(page)["x"] == x)
+    page.evaluate("() => { Object.defineProperty(document, 'hidden', {value: false, configurable: true}); document.dispatchEvent(new Event('visibilitychange')) }")
+    page.screenshot(path=str(OUT / "corrida-05-pausa.png"))
+    page.click("text=CONTINUAR")
+    page.wait_for_function("() => window.__NDC__.engine.state === 'PLAYING'", timeout=4000)
+    check("retomada volta a jogar sem saltar posição", abs(st(page)["x"] - x) < 60)
+
+    # Sem tocar, o quati bate e a partida acaba.
+    page.wait_for_function("() => window.__NDC__.engine.state === 'GAME_OVER'", timeout=45000)
+    page.wait_for_timeout(500)
+    s5 = st(page)
+    check("batida leva ao fim de jogo", s5["state"] == "GAME_OVER", f"causa={s5['cause']} pontos={s5['score']}")
+    check("fim mostra causa, pontos e CORRER DE NOVO", page.locator(".cause").count() == 1 and str(s5["score"]) in page.locator(".final-score").inner_text() and page.locator("text=CORRER DE NOVO").count() == 1)
+    page.screenshot(path=str(OUT / "corrida-06-fim.png"))
+
+    if page.locator("text=Só meu nome").count():
+        page.click("text=Só meu nome")
+        page.fill("#player-name", "Teste Quati")
+        page.press("#player-name", "Enter")
+        page.wait_for_selector("text=lugar no ranking")
+        check("ranking salva com Só meu nome", page.locator(".save-box.is-saved").count() == 1)
+    else:
+        check("ranking salva com Só meu nome", False, "pontuação não qualificou")
+    rank = page.evaluate("() => JSON.parse(localStorage.getItem('ndc:corrida:ranking') || '[]').length")
+    others = page.evaluate("() => [localStorage.getItem('ndc:bolinha:ranking'), localStorage.getItem('ndc:aviao:ranking')]")
+    check("ranking da Disparada separado dos outros jogos", rank == 1 and others == [None, None])
+    check("recorde salvo", page.evaluate("() => localStorage.getItem('ndc:corrida:best')") == str(s5["score"]))
+
+    run_before = s5["runId"]
+    page.click("text=CORRER DE NOVO")
+    page.wait_for_timeout(100)
+    s6 = st(page)
+    check("reinício imediato", s6["state"] == "PLAYING" and s6["runId"] == run_before + 1 and s6["score"] < 10)
+    check("reinício não duplica laços", s6["active"] == 1)
+    page.keyboard.press("Escape")
+    check("Esc pausa", st(page)["state"] == "PAUSED")
+    page.click("text=Menu inicial")
+    page.wait_for_selector("text=CORRER")
+    check("recorde aparece no menu", str(s5["score"]) in page.locator(".best").inner_text())
+
+    # Volta ao hub: o recorde aparece no cartão.
+    page.click(".hub-back")
+    page.wait_for_selector(".hub-card")
+    card = page.locator('.hub-card[data-game="corrida"]').inner_text()
+    check("volta ao hub e o cartão mostra o recorde", str(s5["score"]) in card)
+    check("sem erros de console", not errors, "; ".join(errors[:3]))
+    ctx.close()
+
+    # Piloto automático: 20 s de jogo real sem bater.
+    c = browser.new_context(viewport={"width": 1280, "height": 720})
+    pg = c.new_page()
+    errs = []
+    pg.on("pageerror", lambda e: errs.append(str(e)))
+    pg.goto(BASE + "/corrida/?debug&piloto&seed=11")
+    pg.wait_for_selector("text=CORRER")
+    pg.click("text=CORRER")
+    pg.wait_for_timeout(20000)
+    sp = st(pg)
+    check("piloto automático corre 20 s sem bater", sp["state"] == "PLAYING" and sp["elapsed"] > 10, f"t={sp['elapsed']:.1f}s pontos={sp['score']}")
+    fps = pg.evaluate("""() => new Promise(res => { let n = 0; const t0 = performance.now();
+        const f = () => { n++; if (performance.now() - t0 < 1000) requestAnimationFrame(f); else res(n) }; requestAnimationFrame(f) })""")
+    check("quadros por segundo (Chromium headless, sem GPU)", fps >= 30, f"{fps} fps")
+    pg.screenshot(path=str(OUT / "corrida-07-piloto.png"))
+    check("piloto: sem erros", not errs, "; ".join(errs[:2]))
+    c.close()
+
+    # Layouts.
+    for (w, h, name, touch) in [
+        (390, 844, "iphone-em-pe", True),
+        (844, 390, "iphone-deitado", True),
+        (932, 430, "promax-deitado", True),
+        (667, 375, "pequeno-deitado", True),
+        (1024, 768, "tablet", True),
+        (1280, 800, "desktop", False),
+    ]:
+        c = browser.new_context(viewport={"width": w, "height": h}, has_touch=touch, is_mobile=touch)
+        pg = c.new_page()
+        errs = []
+        pg.on("pageerror", lambda e: errs.append(str(e)))
+        pg.goto(URL)
+        pg.wait_for_selector("text=CORRER")
+        menu = pg.locator(".menu").bounding_box()
+        fits = menu["y"] >= -1 and menu["y"] + menu["height"] <= h + 1 and menu["x"] >= -1 and menu["x"] + menu["width"] <= w + 1
+        check(f"{name} {w}x{h}: menu cabe na tela", fits)
+        btn = pg.locator("text=CORRER").bounding_box()
+        check(f"{name}: botão CORRER visível", btn["y"] + btn["height"] <= h and btn["height"] >= 44)
+        pg.screenshot(path=str(OUT / f"corrida-menu-{name}-{w}x{h}.png"))
+        pg.click("text=CORRER")
+        pg.wait_for_timeout(1200)
+        pg.screenshot(path=str(OUT / f"corrida-jogo-{name}-{w}x{h}.png"))
+        pause = pg.locator(".pause-btn").bounding_box()
+        check(f"{name}: botão de pausa visível e ≥ 44px", pause and pause["width"] >= 44 and pause["x"] >= 0 and pause["y"] >= 0)
+        if name == "iphone-em-pe":
+            check("celular em pé sugere deitar", pg.locator(".rotate-hint").count() == 1)
+        elif touch:
+            check(f"{name}: deitado não mostra aviso", pg.locator(".rotate-hint").count() == 0)
+        check(f"{name}: sem erros", not errs, "; ".join(errs[:2]))
+        c.close()
+
+    browser.close()
+
+ok = sum(1 for r in results if r[1])
+print(f"\n{ok}/{len(results)} verificações passaram")
+sys.exit(0 if ok == len(results) else 1)

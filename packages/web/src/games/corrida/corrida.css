@@ -1,0 +1,206 @@
+/* Ajustes visuais da Disparada sobre o tema compartilhado (painéis, botões). */
+.corrida {
+  --bg: #24553a;
+  background: #2f6e43;
+}
+
+.corrida .title-accent {
+  color: #ffb347;
+  text-shadow: 0 0.06em 0 #b4661a, 0 0 0.6em rgba(255, 179, 71, 0.35);
+}
+
+.corrida .btn-primary {
+  background: linear-gradient(180deg, #ffd08a, #ff9f2e);
+  box-shadow: 0 0.3em 0 #b4661a, 0 0.6em 1.4em rgba(255, 159, 46, 0.3);
+}
+
+.corrida .btn-primary:active {
+  box-shadow: 0 0.15em 0 #b4661a;
+}
+
+/* A interface ocupa a superfície inteira (a faixa do jogo em pé é baixa demais
+   para os painéis); os painéis ficam centralizados e com largura máxima. */
+.corrida .panel {
+  left: 50%;
+  right: auto;
+  width: min(92%, 25em);
+  transform: translate(-50%, -50%);
+  animation: corrida-pop 160ms ease-out;
+  background: rgba(14, 32, 24, 0.82);
+  border-color: rgba(190, 255, 200, 0.22);
+}
+
+@keyframes corrida-pop {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.96);
+  }
+}
+
+.corrida .pause-btn {
+  top: max(calc(var(--u) * 8), env(safe-area-inset-top));
+  left: max(calc(var(--u) * 8), env(safe-area-inset-left));
+}
+
+.corrida .hub-back {
+  top: max(calc(var(--u) * 8), env(safe-area-inset-top));
+  right: max(calc(var(--u) * 8), env(safe-area-inset-right));
+}
+
+.corrida .tagline {
+  margin: 0;
+  color: var(--dim);
+  font-weight: 600;
+}
+
+.corrida .controls {
+  list-style: none;
+  margin: 0;
+  padding: 0.6em 0.8em;
+  border-radius: 0.8em;
+  background: rgba(255, 255, 255, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35em;
+  font-size: 0.9em;
+  line-height: 1.35;
+  color: var(--dim);
+}
+
+.corrida .controls strong {
+  color: var(--text);
+}
+
+.corrida .controls .keys {
+  font-size: 0.85em;
+}
+
+/* Em telas de toque, o teclado não interessa. */
+@media (pointer: coarse) {
+  .corrida .controls .keys {
+    display: none;
+  }
+}
+
+.corrida .cause {
+  margin: -0.3em 0 0;
+  color: #ffb3a8;
+  font-weight: 700;
+}
+
+.run-stats {
+  margin: 0;
+  display: flex;
+  gap: 0.9em;
+  justify-content: center;
+  flex-wrap: wrap;
+  font-size: 0.9em;
+  color: var(--dim);
+}
+
+.run-stats strong {
+  color: var(--text);
+}
+
+/* Botão do dash: grande, no canto de baixo à direita (polegar direito). */
+.dash-btn {
+  position: absolute;
+  right: max(calc(var(--u) * 14), env(safe-area-inset-right));
+  bottom: max(calc(var(--u) * 14), env(safe-area-inset-bottom));
+  min-width: 96px;
+  min-height: 64px;
+  padding: 0.5em 1.1em;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  font-weight: 900;
+  font-size: 1em;
+  letter-spacing: 0.06em;
+  color: #2a1400;
+  background: linear-gradient(180deg, #ffd08a, #ff9f2e);
+  box-shadow: 0 0.25em 0 #b4661a, 0 0 1.4em rgba(255, 170, 60, 0.7);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  cursor: pointer;
+  touch-action: none;
+  animation: dash-pulse 0.8s ease-in-out infinite alternate;
+}
+
+.dash-arrow {
+  font-size: 1.5em;
+  line-height: 1;
+}
+
+@keyframes dash-pulse {
+  to {
+    transform: scale(1.06);
+  }
+}
+
+/* Celular deitado (pouca altura): menu em duas colunas. */
+@media (orientation: landscape) and (max-height: 560px) {
+  .corrida .panel {
+    width: min(94%, 44em);
+    padding: 0.9em 1.1em;
+    gap: 0.5em;
+  }
+  .corrida .menu {
+    display: grid;
+    grid-template-columns: 1.15fr 1fr;
+    column-gap: 1.2em;
+    align-items: center;
+    text-align: left;
+  }
+  .corrida .menu > .title,
+  .corrida .menu > .tagline,
+  .corrida .menu > .controls {
+    grid-column: 1;
+  }
+  .corrida .menu > :not(.title):not(.tagline):not(.controls) {
+    grid-column: 2;
+  }
+  .corrida .menu > .title {
+    grid-row: 1;
+  }
+  .corrida .menu > .tagline {
+    grid-row: 2;
+  }
+  .corrida .menu > .controls {
+    grid-row: 3 / span 3;
+  }
+  .corrida .menu .title {
+    font-size: 2.2em;
+  }
+  .corrida .gameover {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr;
+    column-gap: 1.2em;
+    align-items: center;
+    justify-items: center;
+  }
+  .corrida .gameover > .panel-title,
+  .corrida .gameover > .cause,
+  .corrida .gameover > .badge,
+  .corrida .gameover > .final-score,
+  .corrida .gameover > .run-stats,
+  .corrida .gameover > .best {
+    grid-column: 1;
+  }
+  .corrida .gameover > .save-box,
+  .corrida .gameover > .btn {
+    grid-column: 2;
+  }
+  .corrida .gameover > .save-box {
+    grid-row: 1 / span 3;
+  }
+  .corrida .final-score .value {
+    font-size: 2.6em;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-btn {
+    animation: none;
+  }
+}
