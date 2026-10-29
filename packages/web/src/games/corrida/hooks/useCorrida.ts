@@ -6,7 +6,7 @@ import { SwipeDetector } from '../game/Gestures';
 import { Autopilot } from '../game/testing/planner';
 import { GameState, type DeathCause } from '../game/types';
 import { Effects } from '../rendering/effects';
-import { isRainy } from '../rendering/weather';
+import { rainAt } from '../rendering/weather';
 import { COLORS, Renderer } from '../rendering/Renderer';
 import { InputController } from '../../../shared/input/InputController';
 import { effectiveDpr } from '../../../shared/layout/layout';
@@ -255,8 +255,8 @@ export function useCorrida() {
         sfx.buzz(near);
       }
       if (!frozen) {
-        const raining = (st === GameState.PLAYING || st === GameState.GAME_OVER || st === GameState.CONTINUE) && isRainy(engine.score.meters, engine.runId);
-        renderer.weather.update(fdt, raining, fx.reducedMotion);
+        const active = st === GameState.PLAYING || st === GameState.GAME_OVER || st === GameState.CONTINUE;
+        renderer.weather.update(fdt, active ? rainAt(engine.score.meters, engine.runId) : 0, fx.reducedMotion);
         // No inverno a "chuva" vira nevasca: sem trovão e com chiado bem mais baixo.
         if (renderer.weather.thunder && !renderer.winter) sfx.thunder();
         sfx.rain(st === GameState.PLAYING ? renderer.weather.rain * (renderer.winter ? 0.3 : 1) : 0);

@@ -256,8 +256,9 @@ Toque curto = pulo baixo (~85 u, passa pedras pequenas); segurar = pulo cheio (~
 - **Pontos** = metros + 5 por tufo de capim + 10 por quebra/pisão. 12 capins enchem o medidor do dash.
 - **Chuva**: de vez em quando (≈30 % dos trechos de 450 m, nunca nos primeiros 150 m) o céu fecha, chove, troveja ao longe e aparece "CHUVA!". É só visual e som — a física e os obstáculos não mudam. Agenda em `rendering/weather.ts`.
 - **Capim**: maço verde com contorno escuro, amarradinho de palha e disco creme atrás, para se destacar da mata em qualquer paleta e na chuva.
-- O cenário muda a cada 800 m e se repete em ciclo: Mata → Entardecer → **Inverno na serra** (a partir de 1600 m) → Noite na mata → Amanhecer. A troca é gradual (120 m de mistura). Os obstáculos mantêm as cores em todos.
-- **Inverno na serra**: araucárias com geada na copa, chão branco de geada, céu pálido e neve fininha caindo. Nos trechos de chuva do inverno, cai uma **nevasca** ("NEVASCA!", sem trovão e com chiado baixo). Só visual: a física não muda. Paleta em `rendering/palette.ts`.
+- **Estações na ordem real**, em ciclo: **verão → outono → inverno → primavera → verão…**, 900 m cada. A troca é **lenta** (300 m, ~7–10 s de corrida): no inverno as araucárias vão tomando o lugar das árvores uma a uma, a geada cobre o chão aos poucos e a neve começa fininha. Outono tem folhas secas caindo; primavera, ipês roxos e amarelos florindo. Faixas: "OUTONO", "CHEGOU O INVERNO!", "PRIMAVERA!", "VERÃO".
+- **Hora do dia** em ciclo independente (dia → entardecer → noite → amanhecer, 3.600 m), por cima da estação. Sem vaga-lumes no frio.
+- **Chuva**: no máximo uma por estação (≈50 % das estações, 220–340 m), sempre **no miolo da estação, longe de qualquer troca** — nunca muda de cenário chovendo. Sobe e desce pela distância (60 m). No inverno, em vez de chuva cai **nevasca** ("NEVASCA!", sem trovão). Só visual: a física não muda. Código em `rendering/palette.ts` e `rendering/weather.ts`.
 
 ### Orientação
 

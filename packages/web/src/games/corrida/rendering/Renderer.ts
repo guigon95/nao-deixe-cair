@@ -4,7 +4,7 @@ import { SIZES } from '../game/patterns';
 import { GameState, type Crate, type Fruit, type Platform, type Rock, type Spring, type Thorns, type Vine } from '../game/types';
 import { computeLayout, type Layout } from '../../../shared/layout/layout';
 import type { Effects } from './effects';
-import { biomeIndex, paletteAt, PALETTES, type Palette } from './palette';
+import { dominantSeason, paletteAt, SEASONS, type Palette, type SeasonId } from './palette';
 import { drawCapivara, type Pose } from './capivara';
 import { Weather } from './weather';
 
@@ -26,6 +26,8 @@ export const COLORS = {
   petal: '#ff6fae',
   vine: '#7cb342',
   vineDark: '#4e6b25',
+  ipeRoxo: '#c45bd6',
+  ipeAmarelo: '#ffd23a',
   grassBlade: '#3fd23f',
   grassDark: '#1f9a2a',
   grassOutline: '#123d0c',
@@ -60,7 +62,7 @@ export class Renderer {
   lift = 0;
   private skyCache = new Map<string, CanvasGradient>();
   private hazeCache: CanvasGradient | null = null;
-  private lastBiome = 0;
+  private lastSeason: SeasonId = 'verao';
   /** Chuva (atualizada pelo hook a cada quadro). */
   readonly weather = new Weather();
   /** Trecho de inverno na tela agora (o som da chuva vira o da neve). */
@@ -126,9 +128,10 @@ export class Renderer {
 
     const meters = engine.score.meters;
     const pal = paletteAt(engine.state === GameState.READY ? 0 : meters);
-    const biome = biomeIndex(meters);
-    if (engine.state === GameState.PLAYING && biome !== this.lastBiome && meters > 0) fx.showBanner(PALETTES[biome].name);
-    this.lastBiome = engine.state === GameState.PLAYING ? biome : 0;
+    // Faixa quando a estação muda (no meio da transição, que é lenta).
+    const season = engine.state === GameState.READY ? 'verao' : dominantSeason(meters);
+    if (engine.state === GameState.PLAYING && season !== this.lastSeason) fx.showBanner(SEASONS.banner[season]);
+    this.lastSeason = season;
     this.winter = pal.winter >= 0.5;
     if (engine.state === GameState.PLAYING && this.weather.started) fx.showBanner(this.winter ? 'NEVASCA!' : 'CHUVA!');
 
@@ -151,6 +154,7 @@ export class Renderer {
     this.drawSwarm(engine, opts.time);
     if (pal.fireflies > 0.05) this.drawFireflies(pal, opts.time);
     if (pal.winter > 0.05) this.drawSnow(pal.winter * (1 - this.weather.rain), opts.time, false);
+    if (pal.autumn > 0.05) this.drawLeaves(pal.autumn, opts.time);
     if (this.weather.rain > 0) {
       if (pal.winter >= 0.5) this.drawSnow(this.weather.rain, opts.time, true);
       else this.drawRain(fx);
@@ -229,14 +233,14 @@ export class Renderer {
     const offset = this.camX * par;
     const first = Math.floor((this.viewL + offset) / spacing) - 1;
     const last = Math.ceil((this.viewR + offset) / spacing) + 1;
-    const winter = pal.winter >= 0.5;
     for (let i = first; i <= last; i++) {
       const r1 = hash(i * 1.37);
       const r2 = hash(i * 2.91 + 4);
       const x = i * spacing + r1 * 40 - offset;
       const h = 70 + r2 * 90;
       const base = ground - 8 + this.lift * 0.4;
-      if (winter) {
+      // No inverno as araucárias vão tomando o lugar das árvores uma a uma (transição gradual).
+      if (hash(i * 4.41 + 7) < pal.winter) {
         this.drawAraucaria(x, base, h + 25, 26 + r2 * 18, r1 > 0.5 ? pal.mid : pal.midDark, pal.midDark);
         continue;
       }
@@ -251,8 +255,20 @@ export class Renderer {
       ctx.moveTo(x + cr * 0.8 + cr * 0.75, base - h + cr * 0.3);
       ctx.arc(x + cr * 0.8, base - h + cr * 0.3, cr * 0.75, 0, Math.PI * 2);
       ctx.fill();
-      // Palmeira de vez em quando.
-      if (r2 > 0.82) {
+      // Primavera: ipês floridos (roxos e amarelos) aparecendo aos poucos.
+      if (pal.spring > 0 && hash(i * 6.13 + 1) < pal.spring * 0.75) {
+        ctx.fillStyle = hash(i * 3.3) < 0.5 ? COLORS.ipeRoxo : COLORS.ipeAmarelo;
+        ctx.beginPath();
+        for (let k = 0; k < 9; k++) {
+          const fx2 = x + (hash(i * 9.1 + k) - 0.5) * cr * 2.2;
+          const fy = base - h + (hash(i * 5.7 + k * 2) - 0.6) * cr * 1.2;
+          ctx.moveTo(fx2 + 3.4, fy);
+          ctx.arc(fx2, fy, 3.4, 0, Math.PI * 2);
+        }
+        ctx.fill();
+      }
+      // Palmeira de vez em quando (não no frio).
+      if (r2 > 0.82 && pal.winter < 0.3) {
         ctx.strokeStyle = pal.mid;
         ctx.lineWidth = 5;
         ctx.lineCap = 'round';
@@ -344,6 +360,28 @@ export class Renderer {
       ctx.arc(x, y, r, 0, Math.PI * 2);
     }
     ctx.fill();
+  }
+
+  /** Outono: folhas secas caindo e rodopiando (poucas, para não atrapalhar a leitura). */
+  private drawLeaves(amount: number, time: number): void {
+    const ctx = this.ctx;
+    const W = this.viewR - this.viewL;
+    const H = this.viewB - this.viewT;
+    const n = Math.round(22 * amount);
+    for (let i = 0; i < n; i++) {
+      const a = hash(i * 2.71 + 3);
+      const b = hash(i * 8.17 + 5);
+      const y = this.viewT + ((b * H + time * (35 + a * 25)) % (H + 10)) - 5;
+      const x = this.viewL + ((((a * W - time * 45 + Math.sin(time * 1.7 + i) * 18) % W) + W) % W);
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(time * (1.5 + a * 2) + i);
+      ctx.fillStyle = i % 3 === 0 ? '#d9822b' : i % 3 === 1 ? '#c0502a' : '#e6b83a';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 4.5, 2.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
   }
 
   /** Chão (trechos) e rio (buracos). */

@@ -1,18 +1,23 @@
 /**
- * Clima: de vez em quando chove. Só visual e som — a física não muda, então
- * a chuva nunca torna um trecho injusto. A agenda é determinística por
- * partida (trechos de `RAIN.segment` metros, sorteados pelo número da
- * partida), e a intensidade sobe e desce aos poucos.
+ * Clima: de vez em quando chove (no inverno, neva). Só visual e som — a
+ * física não muda, então a chuva nunca torna um trecho injusto. No máximo
+ * uma chuva por estação, sorteada por partida, sempre longe das trocas de
+ * estação; a intensidade sobe e desce pela distância.
  */
+import { SEASONS, type SeasonId } from './palette';
+
 export const RAIN = {
-  /** Metros de cada trecho de clima. */
-  segment: 450,
-  /** Chance de um trecho ser chuvoso. */
-  chance: 0.3,
+  /** Chance de uma estação ter uma chuva (no inverno, nevasca). */
+  chance: 0.5,
+  /** Comprimento da chuva (m), entre min e max. */
+  minLength: 220,
+  maxLength: 340,
+  /** Metros para a chuva chegar e para ir embora. */
+  ramp: 60,
+  /** Folga (m) entre a chuva e qualquer troca de estação — nunca muda de cenário chovendo. */
+  margin: 60,
   /** Começo sempre seco (m). */
   dryStart: 150,
-  /** Tempo para a chuva chegar/ir embora (s). */
-  fade: 2.5,
 } as const;
 
 function hash(n: number): number {
@@ -20,11 +25,35 @@ function hash(n: number): number {
   return s - Math.floor(s);
 }
 
-/** Este trecho da partida está chovendo? */
+/**
+ * Janela de chuva da estação `i` nesta partida (ou null): sorteada pelo
+ * número da partida, sempre no miolo estável da estação — depois do fim da
+ * transição anterior e antes do começo da próxima.
+ */
+export function rainWindow(i: number, runId: number): { start: number; end: number; season: SeasonId } | null {
+  if (hash(i * 7.31 + runId * 3.17) >= RAIN.chance) return null;
+  const base = i * SEASONS.length;
+  const lo = Math.max(base + RAIN.margin, RAIN.dryStart);
+  const hi = base + SEASONS.length - SEASONS.blend - RAIN.margin;
+  const len = RAIN.minLength + hash(i * 2.13 + runId * 5.9) * (RAIN.maxLength - RAIN.minLength);
+  const room = hi - lo - len;
+  if (room < 0) return null;
+  const start = lo + hash(i * 4.77 + runId * 1.3) * room;
+  return { start, end: start + len, season: SEASONS.order[i % SEASONS.order.length] };
+}
+
+/** Intensidade da chuva (0..1) neste ponto: sobe e desce aos poucos dentro da janela. */
+export function rainAt(meters: number, runId: number): number {
+  if (meters < RAIN.dryStart) return 0;
+  const w = rainWindow(Math.floor(meters / SEASONS.length), runId);
+  if (!w || meters < w.start || meters > w.end) return 0;
+  const k = Math.min(1, Math.min(meters - w.start, w.end - meters) / RAIN.ramp);
+  return k * k * (3 - 2 * k);
+}
+
+/** Compatível com o uso antigo: este ponto tem chuva? */
 export function isRainy(meters: number, runId: number): boolean {
-  if (meters < RAIN.dryStart) return false;
-  const seg = Math.floor(meters / RAIN.segment);
-  return hash(seg * 7.31 + runId * 3.17) < RAIN.chance;
+  return rainAt(meters, runId) > 0;
 }
 
 export interface Drop {
@@ -58,12 +87,13 @@ export class Weather {
     this.nextBolt = 6;
   }
 
-  update(dt: number, raining: boolean, reducedMotion: boolean): void {
+  /** `intensity` vem de `rainAt` (pela distância); aqui só suaviza um pouco. */
+  update(dt: number, intensity: number, reducedMotion: boolean): void {
     const was = this.target;
-    this.target = raining ? 1 : 0;
-    this.started = this.target === 1 && was === 0;
-    const step = dt / RAIN.fade;
-    this.rain = this.target > this.rain ? Math.min(this.target, this.rain + step) : Math.max(this.target, this.rain - step);
+    this.target = Math.max(0, Math.min(1, intensity));
+    this.started = this.target > 0 && was === 0;
+    this.rain += (this.target - this.rain) * Math.min(1, dt * 4);
+    if (this.target === 0 && this.rain < 0.01) this.rain = 0;
     this.lightning = Math.max(0, this.lightning - dt * 3);
     this.thunder = false;
     if (this.rain > 0.85) {
