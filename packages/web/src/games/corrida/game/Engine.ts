@@ -1,10 +1,10 @@
-import { CONTINUES, CRATE_LOOT, DASH, GOLDEN, ITEMS, MAGNET, SCORING, SHIELD, SIM, SWARM, TOCA } from './config';
+import { CONTINUES, CRATE_LOOT, DASH, EMA, EMA_JUMP, GOLDEN, ITEMS, JUMP, MAGNET, SCORING, SHIELD, SIM, SWARM, TOCA } from './config';
 import { speedAt, tierAt } from './Difficulty';
 import { createRunner, runnerSpeed, stepRunner, type Controls, type StepSink } from './Physics';
 import { CANOPY } from './patterns';
 import { Score } from './Score';
 import { Track } from './Track';
-import { GameState, type Crate, type DeathCause, type Fruit, type GameEvent, type ItemKind, type Loot, type Rock, type Runner, type Spring, type Thorns } from './types';
+import { GameState, type Crate, type DeathCause, type Fruit, type GameEvent, type ItemKind, type Loot, type Mount, type Rock, type Runner, type Spring, type Thorns } from './types';
 import { createRng, randomSeed } from '../../../shared/random';
 import type { Storage } from '../../../shared/storage/storage';
 
@@ -29,6 +29,8 @@ const TRANSITIONS: Record<GameState, readonly GameState[]> = {
 };
 
 /** Intervalo para capins contarem como sequência (o som sobe de tom). */
+/** No resgate do rio pela ema, a capivara sai pelo menos desta altura. */
+const PIT_SAFE_Y = -10;
 const STREAK_WINDOW = 0.7;
 
 /**
@@ -66,6 +68,10 @@ export class Engine {
   inBurrow = false;
   /** Prêmios saindo dos caixotes, voando até a capivara. */
   readonly loot: Loot[] = [];
+  /** Montaria (ema) solta, montada ou fugindo; null = nenhuma. */
+  mount: Mount | null = null;
+  /** Rampa da velocidade extra da montaria (0..1). */
+  ride = 0;
   /** Tempo restante do capim dourado (s). */
   golden = 0;
   /** Pousada na copa das árvores (para avisar uma vez por subida). */
@@ -122,7 +128,11 @@ export class Engine {
   /** Velocidade real da capivara (com caixote/dash). */
   /** Multiplicador de velocidade do embalo do ímã (1 = normal). */
   get speedFactor(): number {
-    return 1 + MAGNET.boost * this.boost;
+    return (1 + MAGNET.boost * this.boost) * (1 + EMA.speed * this.ride);
+  }
+
+  get riding(): boolean {
+    return this.mount?.state === 'ridden';
   }
 
   get runSpeed(): number {
@@ -160,6 +170,8 @@ export class Engine {
     this.golden = 0;
     this.inBurrow = false;
     this.loot.length = 0;
+    this.mount = null;
+    this.ride = 0;
     this.track.update(0, 0, speedAt(0));
     this.setState(GameState.PLAYING);
   }
@@ -257,6 +269,10 @@ export class Engine {
     const target = this.magnet > 0 ? 1 : 0;
     const k = dt / MAGNET.boostRamp;
     this.boost = target > this.boost ? Math.min(1, this.boost + k) : Math.max(0, this.boost - k);
+    const kr = dt / EMA.ramp;
+    this.ride = this.riding ? Math.min(1, this.ride + kr) : Math.max(0, this.ride - kr);
+    // Montada não agarra cipó (a ema não balança).
+    if (this.riding) r.vineCooldown = Math.max(r.vineCooldown, 0.1);
     const base = this.speed * this.speedFactor;
     this.elapsed += dt;
 
@@ -279,7 +295,7 @@ export class Engine {
     if (this.pendingDrop && !r.grounded && !r.fastFall) this.emit({ type: 'fastFall' });
     this.pendingDrop = false;
 
-    const death = stepRunner(r, ctl, this.track.level, base, dt, this.sink);
+    const death = stepRunner(r, ctl, this.track.level, base, dt, this.sink, this.riding ? EMA_JUMP : JUMP);
 
     if (wasDashing && r.dash <= 0) this.emit({ type: 'dash', on: false });
     if (r.gliding !== wasGliding) this.emit({ type: 'glide', on: r.gliding });
@@ -292,11 +308,14 @@ export class Engine {
     else this.swarm = SWARM.rest;
 
     this.stepItems(r, dt);
+    this.stepMount(r, dt);
     // Caiu no buraco escondido: a toca aparece e, um pouco mais fundo, entrou.
     if (!this.inBurrow && r.y < 0 && r.vy <= 0) {
       const b = this.track.level.burrowAt(r.x);
       if (b) {
         b.opened = true;
+        // A ema não entra na toca: pula o buraco e vai embora.
+        if (this.riding) this.dismount('toca');
         if (r.y < TOCA.below) {
           this.inBurrow = true;
           this.emit({ type: 'burrow', on: true, x: r.x, y: r.y });
@@ -308,10 +327,103 @@ export class Engine {
     const tier = tierAt(this.elapsed);
     if (tier !== this.tier) this.tier = tier;
 
+    if (death && this.riding && this.dismount(death)) return;
     if (death && this.shield && this.useShield(death)) return;
     if (death) return this.die(death);
     if (this.swarm <= 0) return this.die('swarm');
     if (this.score.checkRecord()) this.emit({ type: 'newRecord', score: this.score.score });
+  }
+
+  /** Ema solta: corre à frente esperando; montada: acompanha; fugindo: dispara. */
+  private stepMount(r: Runner, dt: number): void {
+    const m = this.mount;
+    if (!m) return;
+    m.t += dt;
+    const lvl = this.track.level;
+    const v = runnerSpeed(r, this.speed * this.speedFactor);
+    if (m.state === 'ridden') {
+      m.x = r.x;
+      m.y = r.y;
+      m.vy = r.vy;
+      return;
+    }
+    if (m.state === 'free') {
+      // Corre um pouco à frente; quando a capivara pula, deixa ela vir por cima.
+      const target = r.grounded ? r.x + EMA.ahead : r.x + 2;
+      m.x += (v + Math.max(-260, Math.min(260, (target - m.x) * 4))) * dt;
+    } else {
+      m.x += Math.max(v, this.speed) * EMA.flee * dt;
+    }
+    // Pulos da ema por conta própria (sobre buracos e no pulinho de sair do caixote).
+    if (m.y > 0 || m.vy > 0) {
+      m.vy -= JUMP.gravityDown * dt;
+      m.y += m.vy * dt;
+      if (m.y <= 0 && m.vy < 0) {
+        if (lvl.groundAt(m.x)) {
+          m.y = 0;
+          m.vy = 0;
+        } else m.vy = 700; // pula de novo por cima do rio
+      }
+    } else if (!lvl.groundAt(m.x + 30)) m.vy = 760;
+    if (m.state === 'fleeing') {
+      if (m.x > r.x + 1100 || m.t > 6) this.mount = null;
+      return;
+    }
+    // Montar: caindo nas costas da ema.
+    const feet = r.y - m.y;
+    if (!r.grounded && !r.swinging && r.vy <= 0 && Math.abs(r.x - m.x) < EMA.catchDx && feet >= EMA.catchMin && feet <= EMA.catchMax) {
+      m.state = 'ridden';
+      m.t = 0;
+      r.y = r.prevY = m.y;
+      r.vy = m.y > 0 ? Math.max(0, m.vy) : 0;
+      r.grounded = m.y <= 0 && lvl.groundAt(r.x);
+      r.jumped = !r.grounded;
+      r.cut = true;
+      r.airTime = 0;
+      r.glideTime = 0;
+      r.gliding = false;
+      r.fastFall = false;
+      r.justLanded = true;
+      r.landedAt = 0;
+      this.emit({ type: 'mount', phase: 'ride', x: r.x, y: r.y });
+      return;
+    }
+    if (m.t > EMA.freeTime) {
+      m.state = 'fleeing';
+      m.t = 0;
+      this.emit({ type: 'mount', phase: 'off', x: m.x, y: m.y, reason: 'timeout' });
+    }
+  }
+
+  /**
+   * Batida montada: a capivara pula da ema (sem perder vida) e a ema dispara
+   * embora. Na pedra/espinho/caixote o obstáculo quebra; no rio, a ema
+   * arremessa a capivara para cima (segunda chance).
+   */
+  private dismount(cause: DeathCause | 'crate' | 'toca'): boolean {
+    if (cause === 'swarm') return false;
+    const m = this.mount;
+    if (!m || m.state !== 'ridden') return false;
+    const r = this.runner;
+    m.state = 'fleeing';
+    m.t = 0;
+    m.x = r.x;
+    m.y = Math.max(0, r.y);
+    m.vy = cause === 'toca' ? 760 : 0;
+    if (cause !== 'toca') {
+      r.vy = cause === 'river' ? JUMP.springVelocity : JUMP.jumpVelocity * EMA.hop;
+      r.grounded = false;
+      r.jumped = true;
+      r.cut = true;
+      r.airTime = 0;
+      r.glideTime = 0;
+      r.gliding = false;
+      r.fastFall = false;
+      if (cause !== 'river') r.dashTail = Math.max(r.dashTail, SHIELD.grace);
+      if (cause === 'river') r.y = Math.max(r.y, PIT_SAFE_Y);
+    }
+    this.emit({ type: 'mount', phase: 'off', x: r.x, y: r.y, reason: cause === 'toca' ? 'toca' : cause === 'river' ? 'river' : 'hit' });
+    return true;
   }
 
   /** Efeito de um item especial pego (no percurso ou saído de um caixote). */
@@ -340,6 +452,12 @@ export class Engine {
     if (!loot) return;
     c.loot = undefined;
     const cx = (c.x0 + c.x1) / 2;
+    if (loot.kind === 'mount') {
+      if (this.mount && this.mount.state !== 'fleeing') return; // já tem uma
+      this.mount = { animal: loot.animal, state: 'free', x: cx, y: c.top * 0.5, vy: 520, t: 0 };
+      this.emit({ type: 'mount', phase: 'appear', x: cx, y: c.top });
+      return;
+    }
     const n = loot.kind === 'capim' ? loot.n : 1;
     for (let i = 0; i < n; i++) {
       const k = n === 1 ? 0 : i / (n - 1) - 0.5;
@@ -461,6 +579,10 @@ export class Engine {
 
   private die(cause: DeathCause): void {
     const r = this.runner;
+    if (this.mount?.state === 'ridden') {
+      this.mount.state = 'fleeing';
+      this.mount.t = 0;
+    }
     this.deathCause = cause;
     this.deadTime = 0;
     if (cause === 'swarm') this.swarm = 0;
@@ -485,6 +607,8 @@ export class Engine {
     this.track.level.clearZone(x - CONTINUES.clearBehind, x + this.speed * CONTINUES.clearAhead);
     Object.assign(r, createRunner(x));
     this.inBurrow = false;
+    this.mount = null;
+    this.ride = 0;
     this.swarm = Math.max(this.swarm, CONTINUES.swarm);
     this.deathCause = null;
     this.deadTime = 0;
@@ -535,6 +659,7 @@ export class Engine {
         const dashing = r.dash > 0 || r.dashTail > 0;
         if (stomp) this.score.addBonus(SCORING.stomp);
         else if (dashing) this.score.addBonus(SCORING.smash);
+        else if (this.riding) this.dismount('crate');
         else r.slow = Math.min(r.slow, SWARM.slowFactor);
         this.emit({ type: 'crate', x: (c.x0 + c.x1) / 2, y: c.top / 2, stomp: stomp || dashing });
       },

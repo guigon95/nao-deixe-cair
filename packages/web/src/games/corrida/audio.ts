@@ -335,6 +335,22 @@ export class RunnerSfx extends SynthAudio {
     this.tone(base * 1.5, base * 2, 0.16, 'sine', 0.22, 0.08);
   }
 
+  /** Ema: aparece (tum-tum grave, o "bum" da ema), monta (fanfarra curta) ou sai (piado). */
+  ema(phase: 'appear' | 'ride' | 'off'): void {
+    if (phase === 'appear') {
+      this.tone(120, 90, 0.18, 'sine', 0.45);
+      this.tone(110, 80, 0.2, 'sine', 0.4, 0.22);
+    } else if (phase === 'ride') {
+      this.tone(392, 392, 0.08, 'square', 0.18);
+      this.tone(523, 523, 0.08, 'square', 0.18, 0.08);
+      this.tone(659, 659, 0.08, 'square', 0.18, 0.16);
+      this.tone(784, 784, 0.2, 'square', 0.2, 0.24);
+    } else {
+      this.tone(900, 1400, 0.08, 'triangle', 0.25);
+      this.tone(1300, 700, 0.14, 'triangle', 0.22, 0.08);
+    }
+  }
+
   /** Capim dourado: arpejo brilhante subindo (ao pegar) ou descendo (acabou). */
   golden(on: boolean): void {
     const notes = on ? [784, 988, 1175, 1568] : [1175, 988, 784];

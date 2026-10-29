@@ -257,6 +257,21 @@ export function useCorrida() {
           fx.float(e.x + 20, e.y + 50, e.kind === 'capim' ? `+${e.n} CAPINS!` : 'PRÊMIO!', true, e.kind === 'capim' ? '#c8f58a' : '#ffd23f');
           if (e.kind !== 'capim') fx.burst(e.x, e.y, 14, 160, ['#ffd23f', '#fff3a0', '#ffffff'], 0.5, 2.6, false);
           break;
+        case 'mount':
+          sfx.ema(e.phase);
+          if (e.phase === 'appear') fx.float(e.x + 40, e.y + 80, 'UMA EMA! PULE NELA!', true, '#ffe08a');
+          else if (e.phase === 'ride') {
+            completed(missions.ema());
+            fx.float(e.x + 60, e.y + 110, 'MONTADA NA EMA!', true, '#ffe08a');
+            fx.burst(e.x, e.y + 40, 14, 150, ['#c4b9a4', '#a0947f', '#ffffff'], 0.5, 2.6, false);
+            vibrate(12);
+          } else if (e.reason !== 'timeout') {
+            fx.float(e.x + 40, e.y + 80, e.reason === 'river' ? 'A EMA TE SALVOU!' : 'CAIU DA EMA!', true, '#ffd9a0');
+            fx.burst(e.x, e.y + 30, 18, 200, ['#c4b9a4', '#a0947f', '#7c7262'], 0.6, 3, true);
+            fx.shake = 0.4;
+            vibrate([20, 30, 20]);
+          }
+          break;
         case 'acai':
           sfx.acai();
           fx.meterGlow = 1;

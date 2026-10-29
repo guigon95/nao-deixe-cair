@@ -138,6 +138,10 @@ export const CRATE_LOOT = {
   /** Chance de ter capim (3 a 5) e de ter um item especial. */
   capim: 0.45,
   item: 0.1,
+  /** Caixote de montaria (ema): raro, só depois de um tempo e espaçado. */
+  mount: 0.07,
+  mountAfter: 25,
+  mountGap: 30,
   capimMin: 3,
   capimMax: 5,
   /** Pulinho para fora antes de voar até a capivara (s) e velocidade do voo. */
@@ -235,6 +239,33 @@ export const TOCA = {
   /** Quanto a câmera desce para mostrar a toca. */
   camera: -130,
 } as const;
+
+/**
+ * Ema (montaria): sai de um caixote e corre do lado; pulando nas costas dela,
+ * a capivara monta. Montada: mais rápida e pulando mais alto. Batendo num
+ * obstáculo, a capivara pula fora (sem perder vida) e a ema dispara embora.
+ */
+export const EMA = {
+  /** Velocidade extra montada (+30%) e rampa (s). */
+  speed: 0.3,
+  ramp: 0.4,
+  /** Altura das costas da ema (onde a capivara senta). */
+  seat: 44,
+  /** Quanto tempo a ema solta espera a capivara (s) e quanto à frente corre. */
+  freeTime: 5,
+  ahead: 55,
+  /** Fugindo: velocidade em relação à da capivara. */
+  flee: 1.8,
+  /** Janela para montar: distância em x e altura dos pés acima da ema. */
+  catchDx: 30,
+  catchMin: 12,
+  catchMax: 90,
+  /** Pulinho ao cair da ema (× pulo normal). */
+  hop: 0.75,
+} as const;
+
+/** Pulo montada na ema: mais alto. */
+export const EMA_JUMP: JumpParams = { ...JUMP, jumpVelocity: 1060 };
 
 /** Chão: abaixo disso, dentro de um buraco, a capivara caiu no rio do jacaré. */
 export const PIT_DEATH_Y = -14;

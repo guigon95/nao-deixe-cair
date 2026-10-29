@@ -67,7 +67,18 @@ export interface Crate {
   loot?: CrateLoot;
 }
 
-export type CrateLoot = { kind: 'capim'; n: number } | { kind: 'item'; item: ItemKind };
+export type CrateLoot = { kind: 'capim'; n: number } | { kind: 'item'; item: ItemKind } | { kind: 'mount'; animal: 'ema' };
+
+/** Montaria: solta (esperando a capivara pular nela), montada ou fugindo. */
+export interface Mount {
+  animal: 'ema';
+  state: 'free' | 'ridden' | 'fleeing';
+  x: number;
+  y: number;
+  vy: number;
+  /** Tempo no estado atual (s). */
+  t: number;
+}
 
 /** Prêmio saindo de um caixote: pula para fora e voa até a capivara. */
 export interface Loot {
@@ -187,6 +198,7 @@ export type GameEvent =
   | { type: 'canopy'; x: number; y: number }
   | { type: 'magnet'; on: boolean; x: number; y: number }
   | { type: 'acai'; x: number; y: number }
+  | { type: 'mount'; phase: 'appear' | 'ride' | 'off'; x: number; y: number; reason?: 'hit' | 'river' | 'toca' | 'timeout' }
   | { type: 'loot'; x: number; y: number; kind: 'capim' | ItemKind; n: number }
   | { type: 'burrow'; on: boolean; x: number; y: number }
   | { type: 'golden'; on: boolean; x: number; y: number }

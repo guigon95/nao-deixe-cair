@@ -6,6 +6,7 @@ import { computeLayout, type Layout } from '../../../shared/layout/layout';
 import type { Effects } from './effects';
 import { dominantSeason, mix, paletteAt, SEASONS, type Palette, type SeasonId } from './palette';
 import { drawCapivara, type Pose } from './capivara';
+import { drawEma, EMA_SEAT_DRAW } from './ema';
 import { Weather } from './weather';
 import { boteShape, Gators, WATER_Y, type Gator } from './gators';
 
@@ -178,6 +179,26 @@ export class Renderer {
     const hidden = (x: number, y: number) => y < 0 && lvl.burrowAt(x)?.opened === false;
     for (const f of lvl.fruits) if (!f.taken && !hidden(f.x, f.y)) this.drawFruit(f, opts.time);
     for (const u of lvl.powerups) if (!u.taken && !hidden(u.x, u.y)) this.drawItem(u.kind, this.sx(u.x), this.sy(u.y) + Math.sin(opts.time * 3 + u.x) * 2, opts.time);
+    // Ema solta (esperando a capivara pular nela) ou fugindo.
+    const m = engine.mount;
+    if (m && m.state !== 'ridden') {
+      const ex = this.sx(m.x);
+      if (ex > this.viewL - 60 && ex < this.viewR + 60) {
+        drawEma(this.ctx, ex, this.sy(m.y), { run: m.x / 26, air: m.y > 0.5, lean: m.state === 'fleeing' ? 1 : 0.2 });
+        // Solta: setinha chamando para pular nela.
+        if (m.state === 'free' && m.t > 0.3) {
+          const a = 0.6 + 0.4 * Math.sin(opts.time * 8);
+          this.ctx.fillStyle = `rgba(255, 230, 120, ${a.toFixed(3)})`;
+          const ay = this.sy(m.y) - 108 + Math.sin(opts.time * 6) * 3;
+          this.ctx.beginPath();
+          this.ctx.moveTo(ex - 8, ay);
+          this.ctx.lineTo(ex + 8, ay);
+          this.ctx.lineTo(ex, ay + 10);
+          this.ctx.closePath();
+          this.ctx.fill();
+        }
+      }
+    }
     // Prêmios saindo dos caixotes (por cima do cenário, antes da capivara).
     for (const l of engine.loot) {
       if (l.kind === 'capim') this.drawFruit({ x: l.x, y: l.y, taken: false, risky: false }, opts.time);
@@ -825,6 +846,41 @@ export class Renderer {
       ctx.fillStyle = COLORS.grassBlade;
       ctx.fillRect(x0 + 5, top + h * 0.5 - 1, 5, 3);
       ctx.fillRect(x0 + w - 10, top + h * 0.35, 5, 3);
+    }
+    // Caixote de montaria: pena de ema escapando e pegada de três dedos carimbada.
+    if (c.loot?.kind === 'mount') {
+      ctx.save();
+      ctx.translate(x0 + w - 8, top);
+      ctx.rotate(0.5 + Math.sin(time * 3) * 0.08);
+      ctx.fillStyle = '#c4b9a4';
+      ctx.strokeStyle = '#7c7262';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.ellipse(0, -10, 4, 11, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0, 1);
+      ctx.lineTo(0, -20);
+      ctx.stroke();
+      ctx.restore();
+      const fx = x0 + w / 2;
+      const fy = top + h / 2 + 5;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(x0 + 5, top + 5, w - 10, h - 10);
+      ctx.strokeStyle = '#5a3a1a';
+      ctx.lineWidth = 2.6;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(fx, fy);
+      ctx.lineTo(fx, fy - 12);
+      ctx.moveTo(fx, fy);
+      ctx.lineTo(fx - 7, fy - 9);
+      ctx.moveTo(fx, fy);
+      ctx.lineTo(fx + 7, fy - 9);
+      ctx.moveTo(fx, fy);
+      ctx.lineTo(fx, fy + 4);
+      ctx.stroke();
     }
     // Caixote premiado: cinta dourada e brilho piscando.
     if (c.loot?.kind === 'item') {
@@ -1525,7 +1581,7 @@ export class Renderer {
   private drawRunner(engine: Engine, fx: Effects, time: number, beat: number | null): void {
     const r = engine.runner;
     const p = this.runnerPos(engine);
-    const x = this.sx(p.x);
+    const x0 = this.sx(p.x);
     let y = this.sy(p.y);
     let pose: Pose;
     let tilt = 0;
@@ -1548,6 +1604,16 @@ export class Renderer {
     else pose = r.vy > 60 ? 'rise' : 'fall';
 
     const ctx = this.ctx;
+    // Montada na ema: desenha a ema nos pés e a capivara sentada nas costas.
+    const riding = engine.riding && !isDead(engine);
+    const feetY = y;
+    let x = x0;
+    if (riding) {
+      drawEma(ctx, x, feetY, { run: r.grounded ? (p.x / 24) % (Math.PI * 2) : 0, air: !r.grounded, lean: 0.6 });
+      y -= EMA_SEAT_DRAW;
+      x -= 8;
+      if (pose === 'run') pose = 'idle';
+    }
     if (r.dash > 0 && !fx.reducedMotion) {
       // Rastro do dash.
       ctx.fillStyle = 'rgba(255, 170, 60, 0.35)';
@@ -1574,7 +1640,7 @@ export class Renderer {
       const h = Math.max(0, p.y - base);
       ctx.fillStyle = `rgba(0,0,0,${Math.max(0.06, 0.25 - h / 900).toFixed(3)})`;
       ctx.beginPath();
-      ctx.ellipse(x + 4, this.sy(base) + 1, Math.max(6, 18 - h / 20), 3.5, 0, 0, Math.PI * 2);
+      ctx.ellipse(x0 + 4, this.sy(base) + 1, Math.max(riding ? 22 : 6, 18 - h / 20), 3.5, 0, 0, Math.PI * 2);
       ctx.fill();
     }
     // Ímã ligado: aura dourada, estrelinhas de arco-íris girando e o ímã por cima

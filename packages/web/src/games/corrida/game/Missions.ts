@@ -27,6 +27,7 @@ export type MissionKind =
   | 'canopy'
   | 'magnets'
   | 'burrows'
+  | 'ema'
   | 'runs';
 
 interface MissionDef {
@@ -59,6 +60,7 @@ export const MISSION_DEFS: readonly MissionDef[] = [
   { kind: 'canopy', scope: 'total', base: 2, growth: 0.4, round: 1, minLevel: 2, text: (n) => `Chegue à copa das árvores ${n} vezes` },
   { kind: 'magnets', scope: 'total', base: 2, growth: 0.4, round: 1, minLevel: 2, text: (n) => `Pegue ${n} ímãs de capim` },
   { kind: 'burrows', scope: 'total', base: 2, growth: 0.4, round: 1, minLevel: 2, text: (n) => `Entre na toca secreta ${n} vezes` },
+  { kind: 'ema', scope: 'total', base: 2, growth: 0.4, round: 1, minLevel: 2, text: (n) => `Monte na ema ${n} vezes` },
   { kind: 'winter', scope: 'run', base: 1, growth: 0, round: 1, minLevel: 3, text: () => 'Chegue ao inverno numa corrida' },
 ];
 
@@ -177,6 +179,10 @@ export class Missions {
 
   burrow(): Mission[] {
     return this.bump({}, { burrows: 1 });
+  }
+
+  ema(): Mission[] {
+    return this.bump({}, { ema: 1 });
   }
 
   spring(): Mission[] {

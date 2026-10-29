@@ -33,6 +33,7 @@ export class Track {
   private itemRng: Rng = createRng(1);
   private crateRng: Rng = createRng(2);
   private lastItem = -Infinity;
+  private lastMount = -Infinity;
   /** Força uma lista de padrões (testes); vazio = sorteio. */
   forced: string[] = [];
 
@@ -47,6 +48,7 @@ export class Track {
     // Sorteio próprio dos caixotes: não mexe no percurso nem nos itens.
     this.crateRng = createRng((itemSeed ^ 0x9e3779b9) >>> 0);
     this.lastItem = -Infinity;
+    this.lastMount = -Infinity;
     this.level.clear();
     this.history.length = 0;
     this.prev = null;
@@ -106,8 +108,13 @@ export class Track {
       const n = this.crateRng();
       if (r < CRATE_LOOT.capim) {
         this.level.crates[i].loot = { kind: 'capim', n: CRATE_LOOT.capimMin + Math.floor(n * (CRATE_LOOT.capimMax - CRATE_LOOT.capimMin + 1)) };
-      } else if (r < CRATE_LOOT.capim + CRATE_LOOT.item && t >= ITEMS.firstAfter) {
-        this.level.crates[i].loot = { kind: 'item', item: pickKind(n) };
+      } else if (r < CRATE_LOOT.capim + CRATE_LOOT.item) {
+        if (t >= ITEMS.firstAfter) this.level.crates[i].loot = { kind: 'item', item: pickKind(n) };
+      } else if (r < CRATE_LOOT.capim + CRATE_LOOT.item + CRATE_LOOT.mount) {
+        if (t >= CRATE_LOOT.mountAfter && t - this.lastMount >= CRATE_LOOT.mountGap) {
+          this.level.crates[i].loot = { kind: 'mount', animal: 'ema' };
+          this.lastMount = t;
+        }
       }
     }
   }
