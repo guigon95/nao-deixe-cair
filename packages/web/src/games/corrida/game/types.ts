@@ -75,7 +75,7 @@ export interface Vine {
 }
 
 /** Itens especiais do percurso. */
-export type ItemKind = 'magnet' | 'shield' | 'golden';
+export type ItemKind = 'magnet' | 'shield' | 'golden' | 'acai';
 
 /** Item especial no percurso. */
 export interface PowerUp {
@@ -152,6 +152,7 @@ export type GameEvent =
   | { type: 'vine'; on: boolean; x: number; y: number }
   | { type: 'canopy'; x: number; y: number }
   | { type: 'magnet'; on: boolean; x: number; y: number }
+  | { type: 'acai'; x: number; y: number }
   | { type: 'golden'; on: boolean; x: number; y: number }
   | { type: 'shield'; on: boolean; x: number; y: number; saved?: DeathCause }
   | { type: 'fastFall' }

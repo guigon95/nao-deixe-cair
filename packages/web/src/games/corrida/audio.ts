@@ -237,6 +237,13 @@ export class RunnerSfx extends SynthAudio {
     }
   }
 
+  /** Açaí: "glup" gostoso + o acorde da Disparada pronta. */
+  acai(): void {
+    this.tone(260, 520, 0.12, 'sine', 0.3);
+    this.tone(330, 660, 0.12, 'sine', 0.25, 0.09);
+    this.meterFull();
+  }
+
   /** Capim dourado: arpejo brilhante subindo (ao pegar) ou descendo (acabou). */
   golden(on: boolean): void {
     const notes = on ? [784, 988, 1175, 1568] : [1175, 988, 784];

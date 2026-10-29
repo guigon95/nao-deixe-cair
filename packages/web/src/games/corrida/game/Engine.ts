@@ -313,6 +313,10 @@ export class Engine {
       } else if (u.kind === 'shield') {
         if (!this.shield) this.emit({ type: 'shield', on: true, x: u.x, y: u.y });
         this.shield = true;
+      } else if (u.kind === 'acai') {
+        // Açaí: enche o medidor da Disparada de uma vez.
+        this.meter = DASH.meterMax;
+        this.emit({ type: 'acai', x: u.x, y: u.y });
       } else if (u.kind === 'golden') {
         if (this.golden <= 0) this.emit({ type: 'golden', on: true, x: u.x, y: u.y });
         this.golden = GOLDEN.duration;

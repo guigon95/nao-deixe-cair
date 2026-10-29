@@ -55,6 +55,15 @@ interface DrawOptions {
  * esticar; as sobras (celular em pé, telas muito largas) mostram mais céu,
  * mais terra ou mais percurso — nunca tarja preta.
  */
+/** Grãos de granola por cima do açaí (posições fixas). */
+const ACAI_GRANOLA: ReadonlyArray<readonly [number, number]> = [
+  [-7, -3],
+  [-3, -6],
+  [1, -4],
+  [6, -5],
+  [8, -2],
+];
+
 export class Renderer {
   readonly ctx: CanvasRenderingContext2D;
   layout: Layout = computeLayout(1, 1, ARENA);
@@ -754,7 +763,70 @@ export class Renderer {
     ctx.arc(x, y, 17, 0, Math.PI * 2);
     ctx.fill();
     if (kind === 'shield') this.drawLilyLeaf(x, y, 12, time);
-    else if (kind === 'golden') this.drawGoldenTuft(x, y + 2, 1.3, time);
+    else if (kind === 'acai') this.drawAcai(x, y + 2, 1, time);
+  }
+
+  /** Tigela (cuia) de açaí com granola, rodela de banana e colherzinha. */
+  private drawAcai(x: number, y: number, s: number, time: number): void {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(s, s);
+    ctx.lineCap = 'round';
+    // Colher espetada atrás.
+    ctx.strokeStyle = '#e9e4da';
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    ctx.moveTo(4, -2);
+    ctx.lineTo(10, -14);
+    ctx.stroke();
+    // Açaí em cúpula.
+    ctx.fillStyle = '#4a1259';
+    ctx.strokeStyle = '#2a0733';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.ellipse(0, -1, 12.5, 7.5, 0, Math.PI, Math.PI * 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(210, 140, 240, 0.55)';
+    ctx.beginPath();
+    ctx.ellipse(-4, -5, 4, 1.6, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+    // Granola e banana.
+    ctx.fillStyle = '#d9a35a';
+    for (const [gx, gy] of ACAI_GRANOLA) {
+      ctx.beginPath();
+      ctx.arc(gx, gy, 1.4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#fff2b0';
+    ctx.strokeStyle = '#d9b84a';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(-1, -7.5, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    // Cuia.
+    ctx.fillStyle = '#8a4a1c';
+    ctx.strokeStyle = '#4a2208';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(-13.5, -1);
+    ctx.quadraticCurveTo(-12, 10, 0, 10);
+    ctx.quadraticCurveTo(12, 10, 13.5, -1);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.strokeStyle = '#b8743a';
+    ctx.beginPath();
+    ctx.moveTo(-9, 3);
+    ctx.quadraticCurveTo(0, 6, 9, 3);
+    ctx.stroke();
+    // Brilhinho.
+    const tw = Math.max(0, Math.sin(time * 4));
+    if (tw > 0.3) this.drawSparkle(-11, -9, 3.5 * tw, '#ffffff');
+    ctx.restore();
   }
 
   /** Tufo de capim dourado (o do Jalapão), cintilando. */

@@ -112,8 +112,9 @@ function speed(ctx: Ctx, t: number) {
 /** Rampa do embalo no instante t (mesma regra do motor). */
 function boostAt(ctx: Ctx, t: number): number {
   if (ctx.b0 <= 0 && ctx.mLeft <= 0) return 0;
-  const dt = t - ctx.t0;
-  if (dt < ctx.mLeft) return Math.min(1, ctx.b0 + dt / MAGNET.boostRamp);
+  // O motor atualiza a rampa ANTES de usar a velocidade no passo: por isso o +DT.
+  const dt = t - ctx.t0 + DT;
+  if (dt <= ctx.mLeft + 1e-9) return Math.min(1, ctx.b0 + dt / MAGNET.boostRamp);
   const atEnd = Math.min(1, ctx.b0 + ctx.mLeft / MAGNET.boostRamp);
   return Math.max(0, atEnd - (dt - ctx.mLeft) / MAGNET.boostRamp);
 }

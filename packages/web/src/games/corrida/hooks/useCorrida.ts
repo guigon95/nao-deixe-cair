@@ -252,6 +252,14 @@ export function useCorrida() {
             vibrate(12);
           }
           break;
+        case 'acai':
+          sfx.acai();
+          fx.meterGlow = 1;
+          setUi((u) => ({ ...u, meterFull: true }));
+          fx.float(e.x + 110, e.y + 60, 'AÇAÍ! DISPARADA PRONTA', true, '#d9a6ff');
+          fx.burst(e.x, e.y, 16, 150, ['#5b1a6e', '#8e3fb0', '#d9a6ff', '#fff3a0'], 0.6, 2.8, false);
+          vibrate(12);
+          break;
         case 'golden':
           sfx.golden(e.on);
           if (e.on) {
