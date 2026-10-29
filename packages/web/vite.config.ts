@@ -20,6 +20,7 @@ export default defineConfig({
         hub: 'index.html',
         bolinha: 'bolinha/index.html',
         aviao: 'aviao/index.html',
+        corrida: 'corrida/index.html',
       },
     },
   },

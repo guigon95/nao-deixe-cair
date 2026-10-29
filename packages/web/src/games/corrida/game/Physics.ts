@@ -1,0 +1,361 @@
+import { BODY, DASH, JUMP, PIT_DEATH_Y, SWARM, type JumpParams } from './config';
+import type { Level } from './Level';
+import type { Crate, DeathCause, Fruit, Rock, Runner, Spring, Thorns } from './types';
+
+/** Comandos de UM passo de simulação. */
+export interface Controls {
+  /** Dedo/tecla pressionado agora. */
+  hold: boolean;
+  /** Toque começou neste passo (borda). */
+  pressed: boolean;
+  /** Deslizar para baixo / ↓ neste passo. */
+  drop: boolean;
+}
+
+/**
+ * Efeitos colaterais da física. O motor do jogo marca caixotes quebrados,
+ * frutas pegas etc.; o piloto automático usa uma versão que só observa.
+ */
+export interface StepSink {
+  jump(r: Runner): void;
+  land(r: Runner, hard: boolean): void;
+  crate(c: Crate, stomp: boolean, r: Runner): void;
+  smash(o: Rock | Thorns, r: Runner): void;
+  spring(s: Spring, r: Runner): void;
+  fruit(f: Fruit, r: Runner): void;
+}
+
+export const NULL_SINK: StepSink = {
+  jump() {},
+  land() {},
+  crate() {},
+  smash() {},
+  spring() {},
+  fruit() {},
+};
+
+/** Metade da largura dos "pés": quanto do corpo precisa estar sobre o apoio. */
+const FOOT = 8;
+/** Pousar de quina: se o corpo afundou só isto no topo, sobe em vez de bater. */
+const STEP_UP = 7;
+/** Raio de coleta das frutas (somado à caixa do corpo). */
+const FRUIT_R = 13;
+
+export function createRunner(x = 0): Runner {
+  return {
+    x,
+    y: 0,
+    prevX: x,
+    prevY: 0,
+    vy: 0,
+    grounded: true,
+    airTime: 0,
+    jumped: false,
+    cut: true,
+    glideTime: 0,
+    gliding: false,
+    fastFall: false,
+    dropThrough: 0,
+    buffer: 0,
+    dash: 0,
+    dashTail: 0,
+    slow: 1,
+    landedAt: 10,
+    justLanded: false,
+  };
+}
+
+export function cloneRunner(r: Runner): Runner {
+  return { ...r };
+}
+
+/** Velocidade horizontal efetiva (u/s). */
+export function runnerSpeed(r: Runner, base: number): number {
+  return base * r.slow * (r.dash > 0 ? DASH.speedFactor : 1);
+}
+
+/**
+ * Um passo da física do quati. Retorna a causa da morte, ou null.
+ * Não aloca memória: seguro para rodar 120×/s e para o planejador.
+ */
+export function stepRunner(
+  r: Runner,
+  ctl: Controls,
+  level: Level,
+  baseSpeed: number,
+  dt: number,
+  sink: StepSink = NULL_SINK,
+  P: JumpParams = JUMP,
+): DeathCause | null {
+  r.prevX = r.x;
+  r.prevY = r.y;
+  r.justLanded = false;
+  r.landedAt += dt;
+  if (r.slow < 1) r.slow = Math.min(1, r.slow + ((1 - SWARM.slowFactor) / SWARM.slowRecover) * dt);
+  if (r.dropThrough > 0) r.dropThrough -= dt;
+  if (r.dashTail > 0) r.dashTail -= dt;
+
+  // ── comandos ──
+  if (ctl.pressed) r.buffer = P.jumpBuffer;
+  else if (r.buffer > 0) r.buffer = Math.max(0, r.buffer - dt);
+
+  const dashing = r.dash > 0;
+  const canJump = r.grounded || (!r.jumped && r.airTime <= P.coyote);
+  if (r.buffer > 0 && canJump && !dashing) {
+    r.vy = P.jumpVelocity;
+    r.grounded = false;
+    r.jumped = true;
+    r.cut = false;
+    r.buffer = 0;
+    r.airTime = 0;
+    r.glideTime = 0;
+    r.fastFall = false;
+    sink.jump(r);
+  }
+  // Pulo variável: soltar subindo corta a subida (toque curto = pulo baixo).
+  if (!ctl.hold && !r.cut && r.vy > P.releaseVelocity && r.airTime >= P.minCut) {
+    r.vy = P.releaseVelocity;
+    r.cut = true;
+  }
+  if (ctl.drop && !dashing) {
+    if (r.grounded) {
+      r.dropThrough = 0.2; // desce do galho (no chão não faz nada)
+    } else if (!r.fastFall) {
+      r.vy = -P.fastFallVelocity;
+      r.fastFall = true;
+      r.gliding = false;
+    }
+  }
+
+  // ── movimento ──
+  if (dashing) {
+    r.dash -= dt;
+    r.vy = 0;
+    r.gliding = false;
+    if (r.dash <= 0) {
+      r.dash = 0;
+      r.dashTail = DASH.tail;
+      if (!r.grounded) {
+        r.vy = DASH.exitVelocity;
+        r.cut = true;
+        r.jumped = true;
+        r.glideTime = 0;
+      }
+    }
+  } else if (!r.grounded) {
+    r.airTime += dt;
+    r.gliding = ctl.hold && r.vy <= 0 && !r.fastFall && r.glideTime < P.glideMax;
+    if (r.gliding) {
+      r.vy = Math.max(r.vy - P.glideGravity * dt, -P.glideMaxFall);
+      r.glideTime += dt;
+    } else {
+      r.vy -= (r.vy > 0 ? P.gravityUp : P.gravityDown) * dt;
+      r.vy = Math.max(r.vy, r.fastFall ? -P.fastFallVelocity : -P.maxFall);
+    }
+  }
+
+  r.x += runnerSpeed(r, baseSpeed) * dt;
+  if (!r.grounded) r.y += r.vy * dt;
+
+  // ── apoio (chão, pedras, galhos) ──
+  if (r.grounded) {
+    if (!supportAt(level, r, r.y)) {
+      r.grounded = false;
+      r.airTime = 0;
+      r.jumped = false;
+      r.vy = 0;
+    }
+  } else if (r.vy <= 0) {
+    const top = findLanding(level, r, sink);
+    if (top !== null) {
+      const hard = r.vy < -900;
+      r.y = top;
+      r.vy = 0;
+      r.grounded = true;
+      r.jumped = false;
+      r.cut = true;
+      r.airTime = 0;
+      r.glideTime = 0;
+      r.gliding = false;
+      r.fastFall = false;
+      r.justLanded = true;
+      r.landedAt = 0;
+      sink.land(r, hard);
+      // Toque guardado: pula assim que pousa.
+      if (r.buffer > 0 && r.dash <= 0) {
+        r.vy = P.jumpVelocity;
+        r.grounded = false;
+        r.jumped = true;
+        r.cut = false;
+        r.buffer = 0;
+        r.airTime = 0;
+        sink.jump(r);
+      }
+    }
+  }
+
+  // ── colisões laterais ──
+  const left = r.x - BODY.halfWidth;
+  const right = r.x + BODY.halfWidth;
+  const bottom = r.y;
+  const top = r.y + BODY.height;
+  const dash = r.dash > 0 || r.dashTail > 0;
+
+  for (const rock of level.rocks) {
+    if (rock.x0 > right) break;
+    if (rock.broken || rock.x1 < left) continue;
+    if (bottom >= rock.top - 0.5 || top <= 0) continue;
+    // Quina: afundou pouco no topo descendo → sobe na pedra.
+    if (!r.grounded && r.vy <= 0 && bottom >= rock.top - STEP_UP) {
+      r.y = rock.top;
+      r.vy = 0;
+      r.grounded = true;
+      r.jumped = false;
+      r.cut = true;
+      r.airTime = 0;
+      r.glideTime = 0;
+      r.gliding = false;
+      r.fastFall = false;
+      r.justLanded = true;
+      r.landedAt = 0;
+      sink.land(r, false);
+      continue;
+    }
+    if (dash) {
+      sink.smash(rock, r);
+      continue;
+    }
+    return 'rock';
+  }
+
+  for (const t of level.thorns) {
+    if (t.x0 > right - 3) break;
+    if (t.broken || t.x1 < left + 3) continue;
+    if (bottom >= t.top - 2) continue;
+    if (dash) {
+      sink.smash(t, r);
+      continue;
+    }
+    return 'thorns';
+  }
+
+  for (const c of level.crates) {
+    if (c.x0 > right) break;
+    if (c.broken || c.x1 < left) continue;
+    if (bottom >= c.top || top <= 0) continue;
+    sink.crate(c, false, r);
+  }
+
+  // Flor-mola: encostar já lança (correndo por cima ou caindo).
+  if (r.vy <= 0) {
+    for (const s of level.springs) {
+      if (s.x0 > right - 4) break;
+      if (s.x1 < left + 4 || bottom > s.top) continue;
+      launchSpring(r, s, sink);
+      break;
+    }
+  }
+
+  // ── frutas ──
+  for (const f of level.fruits) {
+    if (f.x - FRUIT_R > right) break;
+    if (f.taken || f.x + FRUIT_R < left) continue;
+    if (f.y + FRUIT_R < bottom || f.y - FRUIT_R > top) continue;
+    sink.fruit(f, r);
+  }
+
+  if (!r.grounded && r.y < PIT_DEATH_Y) return 'river';
+  return null;
+}
+
+function launchSpring(r: Runner, s: Spring, sink: StepSink): void {
+  r.y = Math.max(r.y, s.top);
+  r.vy = JUMP.springVelocity;
+  r.grounded = false;
+  r.jumped = true;
+  r.cut = true;
+  r.glideTime = 0;
+  r.fastFall = false;
+  r.dropThrough = 0;
+  sink.spring(s, r);
+}
+
+function pick(best: number | null, top: number, from: number, to: number): number | null {
+  return top <= from && top >= to && (best === null || top > best) ? top : best;
+}
+
+/** Há apoio exatamente na altura `y` sob os pés? */
+function supportAt(level: Level, r: Runner, y: number): boolean {
+  const a = r.x - FOOT;
+  const b = r.x + FOOT;
+  if (y === 0) {
+    for (const g of level.ground) {
+      if (g.x0 > b) break;
+      if (g.x1 >= a) return true;
+    }
+  }
+  for (const rock of level.rocks) {
+    if (rock.x0 > b) break;
+    if (!rock.broken && rock.x1 >= a && Math.abs(rock.top - y) < 0.5) return true;
+  }
+  if (r.dropThrough <= 0) {
+    for (const p of level.platforms) {
+      if (p.x0 > b) break;
+      if (p.x1 >= a && Math.abs(p.y - y) < 0.5) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Procura onde o quati pousa neste passo (caindo): o apoio mais alto cujo
+ * topo foi cruzado entre a posição anterior e a atual. Caixotes e flores
+ * não seguram: quicam (e o quicar já resolve o passo).
+ */
+function findLanding(level: Level, r: Runner, sink: StepSink): number | null {
+  const a = r.x - FOOT;
+  const b = r.x + FOOT;
+  const from = r.prevY + 0.01;
+  const to = r.y;
+  let best: number | null = null;
+  for (const g of level.ground) {
+    if (g.x0 > b) break;
+    if (g.x1 >= a) best = pick(best, 0, from, to);
+  }
+  for (const rock of level.rocks) {
+    if (rock.x0 > b) break;
+    if (!rock.broken && rock.x1 >= a) best = pick(best, rock.top, from, to);
+  }
+  if (r.dropThrough <= 0) {
+    for (const p of level.platforms) {
+      if (p.x0 > b) break;
+      if (p.x1 >= a) best = pick(best, p.y, from, to);
+    }
+  }
+  // Quicar: caixote (pisão) e flor-mola, se estiverem acima do apoio encontrado.
+  const hb = r.x - BODY.halfWidth + 2;
+  const he = r.x + BODY.halfWidth - 2;
+  for (const s of level.springs) {
+    if (s.x0 > he) break;
+    if (s.x1 < hb) continue;
+    if (s.top <= from && s.top >= to && (best === null || s.top >= best)) {
+      launchSpring(r, s, sink);
+      return null;
+    }
+  }
+  for (const c of level.crates) {
+    if (c.x0 > he) break;
+    if (c.broken || c.x1 < hb) continue;
+    if (c.top <= from && c.top >= to && (best === null || c.top >= best)) {
+      r.y = c.top;
+      r.vy = JUMP.crateBounceVelocity;
+      r.jumped = true;
+      r.cut = true;
+      r.glideTime = 0;
+      r.fastFall = false;
+      sink.crate(c, true, r);
+      return null;
+    }
+  }
+  return best;
+}

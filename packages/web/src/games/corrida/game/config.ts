@@ -1,0 +1,130 @@
+/**
+ * Parâmetros centralizados da Disparada (corrida infinita lateral).
+ *
+ * Coordenadas do MUNDO: x cresce para a direita, y cresce para CIMA, e o
+ * chão fica em y = 0. Só a renderização converte para o eixo do Canvas.
+ * Unidades = unidades da arena (640 × 360, paisagem).
+ *
+ * Tudo que é "tempo" nos padrões de obstáculos é medido em segundos e
+ * convertido em distância pela velocidade do momento: assim um padrão exige
+ * o mesmo tempo de pulo em qualquer velocidade (ver `patterns.ts`).
+ */
+
+import { gameKey } from '../../../shared/storage/keys';
+
+/** Arena lógica em paisagem: a corrida lateral precisa de visão à frente. */
+export const ARENA = { width: 640, height: 360 } as const;
+
+export const SIM = {
+  /** Passo fixo da simulação (s). */
+  fixedDt: 1 / 120,
+  /** Tempo máximo simulado por quadro (s): aba voltando não teleporta. */
+  maxFrameTime: 0.1,
+} as const;
+
+export const BODY = {
+  /** Caixa de colisão (pés no meio da base). Um pouco menor que o desenho: perdoa raspões. */
+  halfWidth: 13,
+  height: 34,
+  /** Posição do quati na tela (x da arena). */
+  screenX: 150,
+} as const;
+
+export interface JumpParams {
+  /** Gravidade subindo (u/s²). */
+  gravityUp: number;
+  /** Gravidade caindo (u/s²): um pouco maior, o pulo fica "firme". */
+  gravityDown: number;
+  /** Velocidade inicial do pulo (u/s). */
+  jumpVelocity: number;
+  /** Ao soltar subindo, a subida é cortada para esta velocidade (pulo variável). */
+  releaseVelocity: number;
+  /** Pulo mínimo: o corte só vale depois deste tempo subindo (toque muito rápido ainda passa uma pedra). */
+  minCut: number;
+  /** Velocidade máxima de queda (u/s). */
+  maxFall: number;
+  /** Planar (segurar caindo): gravidade e queda máxima. */
+  glideGravity: number;
+  glideMaxFall: number;
+  /** Tempo máximo planando por pulo (s). */
+  glideMax: number;
+  /** Descer rápido (deslizar para baixo). */
+  fastFallVelocity: number;
+  /** Tolerância depois de sair da beirada (s) — "coyote time". */
+  coyote: number;
+  /** Toque pouco antes de pousar vale como pulo ao pousar (s). */
+  jumpBuffer: number;
+  /** Mola (flor-trampolim). */
+  springVelocity: number;
+  /** Quicar em cima de um caixote. */
+  crateBounceVelocity: number;
+}
+
+export const JUMP: JumpParams = {
+  gravityUp: 2700,
+  gravityDown: 3000,
+  jumpVelocity: 930,
+  releaseVelocity: 380,
+  minCut: 0.08,
+  maxFall: 1350,
+  glideGravity: 700,
+  glideMaxFall: 165,
+  glideMax: 0.9,
+  fastFallVelocity: 1300,
+  coyote: 0.09,
+  jumpBuffer: 0.12,
+  springVelocity: 1330,
+  crateBounceVelocity: 640,
+};
+
+/** Velocidade da corrida (u/s) em função do tempo de partida. */
+export const SPEED = {
+  start: 290,
+  max: 480,
+  /** Constante de tempo da aproximação exponencial ao máximo (s). */
+  tau: 70,
+} as const;
+
+export const DASH = {
+  /** Jabuticabas para encher o medidor. */
+  meterMax: 12,
+  duration: 0.85,
+  speedFactor: 1.65,
+  /** Impulso para cima no fim (para não terminar já despencando). */
+  exitVelocity: 360,
+  /** Depois do dash, ainda quebra pedras por este tempo (s): sem morte injusta na saída. */
+  tail: 0.22,
+} as const;
+
+/** Enxame de marimbondos que persegue o quati (distância atrás dele, em u). */
+export const SWARM = {
+  start: 120,
+  /** Distância "confortável": o enxame não se afasta além disso. */
+  rest: 280,
+  /** Quanto o enxame fica para trás por segundo quando o quati corre normal. */
+  recover: 40,
+  /** Batida em caixote: velocidade cai para esta fração e volta em `slowRecover` s. */
+  slowFactor: 0.3,
+  slowRecover: 1.3,
+  /** Abaixo disso, o som de perigo e o aviso aparecem. */
+  warn: 130,
+} as const;
+
+export const SCORING = {
+  /** Unidades por metro. */
+  unitsPerMeter: 10,
+  /** Pontos por jabuticaba. */
+  fruit: 5,
+  /** Quebrar algo durante o dash. */
+  smash: 10,
+  /** Quicar num caixote. */
+  stomp: 10,
+} as const;
+
+/** Chão: abaixo disso, dentro de um buraco, o quati caiu no rio. */
+export const PIT_DEATH_Y = -14;
+
+export const STORAGE = {
+  best: gameKey('corrida', 'best'),
+  ranking: gameKey('corrida', 'ranking'),
+} as const;
