@@ -13,6 +13,8 @@ export interface Palette {
   stars: number;
   /** 0 = sem vaga-lumes, 1 = muitos. */
   fireflies: number;
+  /** 0 = clima normal, 1 = inverno (araucárias, geada, neve caindo). */
+  winter: number;
   far: string;
   mid: string;
   midDark: string;
@@ -33,6 +35,7 @@ export const PALETTES: readonly Palette[] = [
     sun: '#fff3b0',
     stars: 0,
     fireflies: 0,
+    winter: 0,
     far: '#8cc9a0',
     mid: '#4f9a63',
     midDark: '#3c7d4e',
@@ -51,6 +54,7 @@ export const PALETTES: readonly Palette[] = [
     sun: '#ffd27a',
     stars: 0,
     fireflies: 0.2,
+    winter: 0,
     far: '#c98e78',
     mid: '#7f7a4f',
     midDark: '#626039',
@@ -63,12 +67,33 @@ export const PALETTES: readonly Palette[] = [
     waterLight: '#ffd7a0',
   },
   {
+    // Inverno na serra (Sul do Brasil): araucárias, geada no chão, céu pálido e neve fininha.
+    name: 'INVERNO NA SERRA',
+    skyTop: '#8fb0d4',
+    skyBottom: '#e6eef6',
+    sun: '#fffbea',
+    stars: 0,
+    fireflies: 0,
+    winter: 1,
+    far: '#c3d1e0',
+    mid: '#4a6f5c',
+    midDark: '#365648',
+    near: '#dde7ee',
+    grass: '#eef3f8',
+    grassEdge: '#ffffff',
+    dirt: '#7a5c46',
+    dirtDark: '#5b4332',
+    water: '#8fc0dc',
+    waterLight: '#f4fbff',
+  },
+  {
     name: 'NOITE NA MATA',
     skyTop: '#121a3f',
     skyBottom: '#33467f',
     sun: '#e8f0ff',
     stars: 1,
     fireflies: 1,
+    winter: 0,
     far: '#2c3b6a',
     mid: '#22405a',
     midDark: '#1a3247',
@@ -87,6 +112,7 @@ export const PALETTES: readonly Palette[] = [
     sun: '#fff0c8',
     stars: 0.15,
     fireflies: 0.1,
+    winter: 0,
     far: '#a7b4d6',
     mid: '#5c8d73',
     midDark: '#46725a',
@@ -139,7 +165,12 @@ export function paletteAt(meters: number): Palette {
   let p = cache.get(key);
   if (!p) {
     const k = q / 24;
-    const out = { ...to, stars: lerp(from.stars, to.stars, k), fireflies: lerp(from.fireflies, to.fireflies, k) } as Palette;
+    const out = {
+      ...to,
+      stars: lerp(from.stars, to.stars, k),
+      fireflies: lerp(from.fireflies, to.fireflies, k),
+      winter: lerp(from.winter, to.winter, k),
+    } as Palette;
     for (const key2 of KEYS) (out as unknown as Record<string, string>)[key2] = mix(from[key2], to[key2], k);
     p = out;
     cache.set(key, p);

@@ -63,6 +63,8 @@ export class Renderer {
   private lastBiome = 0;
   /** Chuva (atualizada pelo hook a cada quadro). */
   readonly weather = new Weather();
+  /** Trecho de inverno na tela agora (o som da chuva vira o da neve). */
+  winter = false;
 
   constructor(private canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext('2d', { alpha: false });
@@ -127,7 +129,8 @@ export class Renderer {
     const biome = biomeIndex(meters);
     if (engine.state === GameState.PLAYING && biome !== this.lastBiome && meters > 0) fx.showBanner(PALETTES[biome].name);
     this.lastBiome = engine.state === GameState.PLAYING ? biome : 0;
-    if (engine.state === GameState.PLAYING && this.weather.started) fx.showBanner('CHUVA!');
+    this.winter = pal.winter >= 0.5;
+    if (engine.state === GameState.PLAYING && this.weather.started) fx.showBanner(this.winter ? 'NEVASCA!' : 'CHUVA!');
 
     this.drawSky(pal, opts.time);
     if (this.weather.rain > 0) this.drawStormClouds(opts.time);
@@ -147,7 +150,11 @@ export class Renderer {
     this.drawRunner(engine, fx, opts.time);
     this.drawSwarm(engine, opts.time);
     if (pal.fireflies > 0.05) this.drawFireflies(pal, opts.time);
-    if (this.weather.rain > 0) this.drawRain(fx);
+    if (pal.winter > 0.05) this.drawSnow(pal.winter * (1 - this.weather.rain), opts.time, false);
+    if (this.weather.rain > 0) {
+      if (pal.winter >= 0.5) this.drawSnow(this.weather.rain, opts.time, true);
+      else this.drawRain(fx);
+    }
     this.drawFloaters(fx);
     if (opts.showHud) this.drawHud(engine, fx, opts.time);
     if (fx.flash > 0) {
@@ -222,12 +229,17 @@ export class Renderer {
     const offset = this.camX * par;
     const first = Math.floor((this.viewL + offset) / spacing) - 1;
     const last = Math.ceil((this.viewR + offset) / spacing) + 1;
+    const winter = pal.winter >= 0.5;
     for (let i = first; i <= last; i++) {
       const r1 = hash(i * 1.37);
       const r2 = hash(i * 2.91 + 4);
       const x = i * spacing + r1 * 40 - offset;
       const h = 70 + r2 * 90;
       const base = ground - 8 + this.lift * 0.4;
+      if (winter) {
+        this.drawAraucaria(x, base, h + 25, 26 + r2 * 18, r1 > 0.5 ? pal.mid : pal.midDark, pal.midDark);
+        continue;
+      }
       ctx.fillStyle = pal.midDark;
       ctx.fillRect(x - 4, base - h, 8, h);
       ctx.fillStyle = r1 > 0.5 ? pal.mid : pal.midDark;
@@ -252,7 +264,7 @@ export class Renderer {
         }
       }
     }
-    // Moitas na beira do caminho.
+    // Moitas na beira do caminho (no inverno, montinhos de geada).
     const par2 = 0.7;
     const sp2 = 56;
     const off2 = this.camX * par2;
@@ -266,6 +278,70 @@ export class Renderer {
       const rr = 16 + r * 18;
       ctx.moveTo(x + rr, ground - 2);
       ctx.arc(x, ground - 2 + this.lift * 0.2, rr, 0, Math.PI, true);
+    }
+    ctx.fill();
+  }
+
+  /**
+   * Araucária (pinheiro-do-paraná): tronco reto e alto, galhos que sobem em
+   * curva formando a copa achatada de "candelabro", com geada por cima.
+   */
+  private drawAraucaria(x: number, base: number, h: number, w: number, crown: string, trunk: string): void {
+    const ctx = this.ctx;
+    const top = base - h;
+    ctx.fillStyle = trunk;
+    ctx.fillRect(x - 3, top, 6, h);
+    ctx.strokeStyle = trunk;
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    for (let k = -2; k <= 2; k++) {
+      if (k === 0) continue;
+      ctx.moveTo(x, top + 14);
+      ctx.quadraticCurveTo(x + k * w * 0.35, top + 10, x + k * w * 0.5, top - 4);
+    }
+    ctx.stroke();
+    // Copa: tufos achatados na ponta dos galhos e no centro.
+    ctx.fillStyle = crown;
+    ctx.beginPath();
+    for (let k = -2; k <= 2; k++) {
+      const cx = x + k * w * 0.5;
+      const cy = top - 4 - (k === 0 ? 4 : 0);
+      const rx = w * 0.32;
+      ctx.moveTo(cx + rx, cy);
+      ctx.ellipse(cx, cy, rx, 7, 0, 0, Math.PI * 2);
+    }
+    ctx.fill();
+    // Geada na copa.
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    ctx.beginPath();
+    for (let k = -2; k <= 2; k++) {
+      const cx = x + k * w * 0.5;
+      const cy = top - 9 - (k === 0 ? 4 : 0);
+      ctx.moveTo(cx + w * 0.26, cy);
+      ctx.ellipse(cx, cy, w * 0.26, 3, 0, 0, Math.PI * 2);
+    }
+    ctx.fill();
+  }
+
+  /** Neve caindo: flocos lentos em zigue-zague (determinísticos pelo tempo, sem alocação). */
+  private drawSnow(amount: number, time: number, heavy: boolean): void {
+    const ctx = this.ctx;
+    const W = this.viewR - this.viewL;
+    const H = this.viewB - this.viewT;
+    const n = Math.round((heavy ? 110 : 40) * amount);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+      const a = hash(i * 1.91);
+      const b = hash(i * 7.33 + 2);
+      const fall = 30 + b * 45 + (heavy ? 30 : 0);
+      const y = this.viewT + ((b * H + time * fall) % (H + 10)) - 5;
+      const drift = time * (heavy ? 40 : 15);
+      const x = this.viewL + ((((a * W - drift + Math.sin(time * 1.3 + i) * 12) % W) + W) % W);
+      const r = 1.2 + a * 1.8;
+      ctx.moveTo(x + r, y);
+      ctx.arc(x, y, r, 0, Math.PI * 2);
     }
     ctx.fill();
   }

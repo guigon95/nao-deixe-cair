@@ -256,7 +256,8 @@ Toque curto = pulo baixo (~85 u, passa pedras pequenas); segurar = pulo cheio (~
 - **Pontos** = metros + 5 por tufo de capim + 10 por quebra/pisão. 12 capins enchem o medidor do dash.
 - **Chuva**: de vez em quando (≈30 % dos trechos de 450 m, nunca nos primeiros 150 m) o céu fecha, chove, troveja ao longe e aparece "CHUVA!". É só visual e som — a física e os obstáculos não mudam. Agenda em `rendering/weather.ts`.
 - **Capim**: maço verde com contorno escuro, amarradinho de palha e disco creme atrás, para se destacar da mata em qualquer paleta e na chuva.
-- O cenário muda a cada 800 m (Mata → Entardecer → Noite na mata → Amanhecer); os obstáculos mantêm as cores em todos.
+- O cenário muda a cada 800 m e se repete em ciclo: Mata → Entardecer → **Inverno na serra** (a partir de 1600 m) → Noite na mata → Amanhecer. A troca é gradual (120 m de mistura). Os obstáculos mantêm as cores em todos.
+- **Inverno na serra**: araucárias com geada na copa, chão branco de geada, céu pálido e neve fininha caindo. Nos trechos de chuva do inverno, cai uma **nevasca** ("NEVASCA!", sem trovão e com chiado baixo). Só visual: a física não muda. Paleta em `rendering/palette.ts`.
 
 ### Orientação
 

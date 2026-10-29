@@ -257,8 +257,9 @@ export function useCorrida() {
       if (!frozen) {
         const raining = (st === GameState.PLAYING || st === GameState.GAME_OVER || st === GameState.CONTINUE) && isRainy(engine.score.meters, engine.runId);
         renderer.weather.update(fdt, raining, fx.reducedMotion);
-        if (renderer.weather.thunder) sfx.thunder();
-        sfx.rain(st === GameState.PLAYING ? renderer.weather.rain : 0);
+        // No inverno a "chuva" vira nevasca: sem trovão e com chiado bem mais baixo.
+        if (renderer.weather.thunder && !renderer.winter) sfx.thunder();
+        sfx.rain(st === GameState.PLAYING ? renderer.weather.rain * (renderer.winter ? 0.3 : 1) : 0);
         fx.update(fdt);
         renderer.follow(engine, fdt);
       }
