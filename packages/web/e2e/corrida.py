@@ -283,6 +283,36 @@ with sync_playwright() as p:
     check("missões: sem erros", not errs, "; ".join(errs[:2]))
     c.close()
 
+    # Copa das árvores: pular no cipó do padrão "copa" leva lá para cima.
+    c = browser.new_context(viewport={"width": 844, "height": 390})
+    pg = c.new_page()
+    errs = []
+    pg.on("pageerror", lambda e: errs.append(str(e)))
+    pg.goto(BASE + "/corrida/?debug&seed=5")
+    pg.wait_for_selector("text=CORRER")
+    pg.evaluate("() => { window.__NDC__.engine.track.forced = ['copa'] }")
+    pg.click("text=CORRER")
+    up = False
+    for i in range(500):
+        s = pg.evaluate("""() => { const e = window.__NDC__.engine, r = e.runner, v = e.track.level.vines[0];
+            return { st: e.state, x: r.x, y: r.y, sw: r.swinging, g: r.grounded, vx: v ? v.ax : null, s: e.speed } }""")
+        if s["st"] != "PLAYING":
+            break
+        if s["vx"] and not s["sw"] and s["g"] and s["y"] < 1 and 0 < s["vx"] - s["x"] < s["s"] * 0.33:
+            pg.keyboard.down("Space"); pg.wait_for_timeout(250); pg.keyboard.up("Space")
+        if s["g"] and s["y"] > 190:
+            up = True
+            break
+        pg.wait_for_timeout(15)
+    check("cipó do padrão copa leva à copa das árvores", up)
+    if up:
+        pg.wait_for_timeout(200)
+        pg.screenshot(path=str(OUT / "corrida-11-copa.png"))
+        lift = pg.evaluate("() => window.__NDC__.renderer.lift")
+        check("câmera sobe na copa", lift > 30, f"lift={lift:.0f}")
+    check("copa: sem erros", not errs, "; ".join(errs[:2]))
+    c.close()
+
     # Layouts.
     for (w, h, name, touch) in [
         (390, 844, "iphone-em-pe", True),

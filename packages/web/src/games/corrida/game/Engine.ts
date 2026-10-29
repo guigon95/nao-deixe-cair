@@ -1,6 +1,7 @@
 import { CONTINUES, DASH, SCORING, SIM, SWARM } from './config';
 import { speedAt, tierAt } from './Difficulty';
 import { createRunner, runnerSpeed, stepRunner, type Controls, type StepSink } from './Physics';
+import { CANOPY } from './patterns';
 import { Score } from './Score';
 import { Track } from './Track';
 import { GameState, type Crate, type DeathCause, type Fruit, type GameEvent, type Rock, type Runner, type Spring, type Thorns } from './types';
@@ -55,6 +56,8 @@ export class Engine {
   deathCause: DeathCause | null = null;
   /** Nível de dificuldade atual (o HUD avisa quando sobe). */
   tier = 0;
+  /** Pousada na copa das árvores (para avisar uma vez por subida). */
+  private onCanopy = false;
   private pendingPress = false;
   private pendingDrop = false;
   private pendingDash = false;
@@ -133,6 +136,7 @@ export class Engine {
     this.resumeCountdown = 0;
     this.pendingPress = this.pendingDrop = this.pendingDash = false;
     this.holding = false;
+    this.onCanopy = false;
     this.track.update(0, 0, speedAt(0));
     this.setState(GameState.PLAYING);
   }
@@ -330,7 +334,13 @@ export class Engine {
   private createSink(): StepSink {
     return {
       jump: (r) => this.emit({ type: 'jump', x: r.x, y: r.y }),
-      land: (r, hard) => this.emit({ type: 'land', x: r.x, y: r.y, hard }),
+      land: (r, hard) => {
+        this.emit({ type: 'land', x: r.x, y: r.y, hard });
+        // Chegou à copa das árvores (uma vez por subida).
+        const up = r.y >= CANOPY.y - 0.5;
+        if (up && !this.onCanopy) this.emit({ type: 'canopy', x: r.x, y: r.y });
+        this.onCanopy = up;
+      },
       crate: (c: Crate, stomp, r) => {
         if (c.broken) return;
         c.broken = true;

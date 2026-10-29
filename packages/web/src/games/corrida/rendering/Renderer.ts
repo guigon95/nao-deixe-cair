@@ -4,7 +4,7 @@ import { SIZES } from '../game/patterns';
 import { GameState, type Crate, type Fruit, type Platform, type Rock, type Spring, type Thorns, type Vine } from '../game/types';
 import { computeLayout, type Layout } from '../../../shared/layout/layout';
 import type { Effects } from './effects';
-import { dominantSeason, paletteAt, SEASONS, type Palette, type SeasonId } from './palette';
+import { dominantSeason, mix, paletteAt, SEASONS, type Palette, type SeasonId } from './palette';
 import { drawCapivara, type Pose } from './capivara';
 import { Weather } from './weather';
 
@@ -101,8 +101,9 @@ export class Renderer {
   follow(engine: Engine, dt: number, snap = false): void {
     const p = this.runnerPos(engine);
     this.camX = p.x - BODY.screenX;
-    // Sobe a câmera só quando a capivara vai muito alto (mola): o chão quase sempre visível.
-    const target = Math.min(80, Math.max(0, p.y - 190) * 0.55);
+    // Sobe a câmera só quando a capivara vai alto (copa das árvores, mola). Pulos
+    // normais (até ~160) não mexem a câmera; na copa (200) ela sobe ~55.
+    const target = Math.min(85, Math.max(0, p.y - 165) * 1.6);
     this.lift = snap ? target : this.lift + (target - this.lift) * Math.min(1, dt * 8);
   }
 
@@ -142,7 +143,8 @@ export class Renderer {
     this.drawGround(engine, pal, opts.time);
     this.drawGators(engine, opts.time);
     const lvl = engine.track.level;
-    for (const p of lvl.platforms) this.drawPlatform(p, pal);
+    for (const p of lvl.platforms) if (p.kind === 'copa') this.drawCanopy(p, pal);
+    for (const p of lvl.platforms) if (p.kind !== 'copa') this.drawPlatform(p, pal);
     for (const v of lvl.vines) this.drawVine(v, engine, opts.time);
     for (const sp of lvl.springs) this.drawSpring(sp, engine.elapsed);
     for (const c of lvl.crates) if (!c.broken) this.drawCrate(c);
@@ -439,6 +441,56 @@ export class Renderer {
         ctx.fillRect(x0, g0, 4, this.viewB - g0);
       }
     }
+  }
+
+  /**
+   * Copa de árvore: troncos que descem até o chão (mais escuros, "atrás" do
+   * caminho de baixo) e uma massa de folhas com o topo plano onde se corre.
+   * No inverno ganha geada por cima.
+   */
+  private drawCanopy(p: Platform, pal: Palette): void {
+    const ctx = this.ctx;
+    const x0 = this.sx(p.x0);
+    const x1 = this.sx(p.x1);
+    if (x1 < this.viewL - 40 || x0 > this.viewR + 40) return;
+    const top = this.sy(p.y);
+    const ground = this.sy(0);
+    const w = x1 - x0;
+    // Troncos.
+    ctx.fillStyle = mix(COLORS.branch, pal.midDark, 0.45);
+    const n = Math.max(1, Math.round(w / 110));
+    for (let i = 0; i < n; i++) {
+      const tx = x0 + ((i + 0.5) * w) / n;
+      ctx.fillRect(tx - 7, top + 10, 14, ground - top - 10);
+      ctx.beginPath();
+      ctx.moveTo(tx - 7, top + 26);
+      ctx.lineTo(tx - 26, top + 12);
+      ctx.lineTo(tx - 20, top + 10);
+      ctx.lineTo(tx, top + 20);
+      ctx.fill();
+    }
+    // Folhagem: faixa com bolas por baixo e topo reto (onde se pisa).
+    ctx.fillStyle = pal.midDark;
+    ctx.beginPath();
+    ctx.moveTo(x0 + 6, top);
+    ctx.lineTo(x1 - 6, top);
+    for (let x = x1; x >= x0; x -= 22) {
+      const k = hash(Math.floor((x + this.camX) / 22) * 1.7);
+      ctx.arc(x, top + 14, 14 + k * 8, 0, Math.PI);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = pal.mid;
+    ctx.beginPath();
+    for (let x = x0 + 8; x <= x1 - 8; x += 18) {
+      ctx.moveTo(x + 11, top + 3);
+      ctx.arc(x, top + 3, 11, Math.PI, 0);
+    }
+    ctx.fill();
+    ctx.fillRect(x0 + 2, top, w - 4, 8);
+    // Borda de cima clara: mostra onde dá para pisar.
+    ctx.fillStyle = pal.winter > 0.5 ? '#ffffff' : mix(pal.grassEdge, '#ffffff', 0.15);
+    ctx.fillRect(x0 + 2, top - 2, w - 4, 3);
   }
 
   private drawPlatform(p: Platform, pal: Palette): void {

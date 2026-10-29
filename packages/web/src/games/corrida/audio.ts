@@ -78,6 +78,13 @@ export class RunnerSfx extends SynthAudio {
     } else this.tone(420, 900, 0.18, 'sine', 0.28);
   }
 
+  /** Chegou à copa: farfalhar de folhas + duas notas subindo. */
+  canopy(): void {
+    this.noise(0.25, 0.08, 2600, 900, 'bandpass');
+    this.tone(587, 587, 0.1, 'triangle', 0.3, 0.05);
+    this.tone(880, 880, 0.16, 'triangle', 0.32, 0.13);
+  }
+
   dash(): void {
     this.noise(0.35, 0.12, 400, 2600, 'bandpass');
     this.tone(220, 660, 0.3, 'sawtooth', 0.12);

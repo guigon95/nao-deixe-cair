@@ -24,6 +24,7 @@ export type MissionKind =
   | 'noDash'
   | 'glide'
   | 'winter'
+  | 'canopy'
   | 'runs';
 
 interface MissionDef {
@@ -53,6 +54,7 @@ export const MISSION_DEFS: readonly MissionDef[] = [
   { kind: 'glide', scope: 'run', base: 4, growth: 0.3, round: 1, minLevel: 2, text: (n) => `Plane por ${n} s numa corrida` },
   { kind: 'noCrate', scope: 'run', base: 400, growth: 0.3, round: 50, minLevel: 2, text: (n) => `Corra ${n} m sem bater em caixote` },
   { kind: 'noDash', scope: 'run', base: 700, growth: 0.3, round: 50, minLevel: 3, text: (n) => `Corra ${n} m sem usar a Disparada` },
+  { kind: 'canopy', scope: 'total', base: 2, growth: 0.4, round: 1, minLevel: 2, text: (n) => `Chegue à copa das árvores ${n} vezes` },
   { kind: 'winter', scope: 'run', base: 1, growth: 0, round: 1, minLevel: 3, text: () => 'Chegue ao inverno numa corrida' },
 ];
 
@@ -159,6 +161,10 @@ export class Missions {
 
   smash(): Mission[] {
     return this.bump({}, { smashes: 1 });
+  }
+
+  canopy(): Mission[] {
+    return this.bump({}, { canopy: 1 });
   }
 
   spring(): Mission[] {

@@ -28,6 +28,19 @@ export const SIZES = {
 /** Altura onde os cipós ficam presos (acima do topo da tela). */
 export const VINE_Y = 300;
 
+/**
+ * Caminho alto pelas copas das árvores (como as copas do Banana Kong): só se
+ * chega lá pelo cipó do começo do padrão; o caminho de baixo continua
+ * seguro (chão contínuo, só caixotes), então cair de uma copa nunca mata.
+ */
+export const CANOPY = {
+  /** Altura do "chão" das copas. */
+  y: 200,
+  /** Cipó de entrada: altura de onde pende e comprimento. */
+  vineY: 330,
+  vineLen: 175,
+} as const;
+
 /** Galhos: alturas usadas pelos padrões. */
 export const PLATFORM_Y = { low: 78, mid: 118, high: 150 } as const;
 
@@ -68,8 +81,8 @@ export class Builder {
     this.pits.push([this.X(t), this.X(t + dur)]);
   }
 
-  platform(t0: number, t1: number, y: number): void {
-    this.level.platforms.push({ x0: this.X(t0), x1: this.X(t1), y });
+  platform(t0: number, t1: number, y: number, kind: 'galho' | 'copa' = 'galho'): void {
+    this.level.platforms.push({ x0: this.X(t0), x1: this.X(t1), y, kind });
   }
 
   spring(t: number): void {
@@ -367,6 +380,33 @@ export const PATTERNS: readonly Pattern[] = [
       b.vine(0.5, VINE_Y, 180);
       b.swingArc(0.5, VINE_Y, 165, 4);
       return 1.3;
+    },
+  },
+  {
+    // Copa das árvores: pule no cipó e ele te lança lá em cima, onde há muito
+    // capim e pequenos vãos entre as copas. Embaixo, o caminho segue com caixotes.
+    id: 'copa',
+    tier: 2,
+    weight: 2,
+    build(b) {
+      b.vine(0.35, CANOPY.vineY, CANOPY.vineLen);
+      const segs: Array<[number, number]> = [
+        [0.6, 1.9],
+        [2.15, 3.3],
+        [3.55, 4.4],
+      ];
+      for (const [a, z] of segs) {
+        b.platform(a, z, CANOPY.y, 'copa');
+        b.row(a + 0.15, z - 0.1, CANOPY.y, Math.max(3, Math.round((z - a) * 6)));
+      }
+      // Arcos de capim sobre os vãos (recompensa por pular de copa em copa).
+      b.arc(1.82, HOLD_TAP, 3, CANOPY.y);
+      b.arc(3.22, HOLD_TAP, 3, CANOPY.y);
+      // Embaixo: caminho seguro com caixotes e pouco capim.
+      b.crate(1.3);
+      b.crate(2.9);
+      b.row(1.8, 2.3, 0, 3);
+      return 4.45;
     },
   },
   {

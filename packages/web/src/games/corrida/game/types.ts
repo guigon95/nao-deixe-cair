@@ -33,6 +33,8 @@ export interface Platform {
   x0: number;
   x1: number;
   y: number;
+  /** 'galho' (padrão) ou 'copa' (caminho alto pelas copas das árvores). */
+  kind?: 'galho' | 'copa';
 }
 
 /** Caixote: atravessar atrasa (o enxame chega perto); cair em cima quica. */
@@ -137,6 +139,7 @@ export type GameEvent =
   | { type: 'spring'; x: number; y: number }
   | { type: 'dash'; on: boolean }
   | { type: 'vine'; on: boolean; x: number; y: number }
+  | { type: 'canopy'; x: number; y: number }
   | { type: 'fastFall' }
   | { type: 'death'; cause: DeathCause; x: number; y: number; score: number; best: number; isNewRecord: boolean; livesLeft: number }
   | { type: 'continue'; livesLeft: number }

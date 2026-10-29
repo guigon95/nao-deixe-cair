@@ -234,6 +234,11 @@ export function useCorrida() {
           sfx.spring();
           fx.burst(e.x, e.y, 8, 120, [COLORS.petal, '#ffd23f'], 0.5, 2.6, false);
           break;
+        case 'canopy':
+          completed(missions.canopy());
+          fx.float(e.x + 40, e.y + 70, 'COPA DAS ÁRVORES!', true, '#c8f58a');
+          sfx.canopy();
+          break;
         case 'vine':
           if (e.on) completed(missions.vine());
           sfx.vine(e.on);

@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { SPEED } from '../game/config';
 import { Level } from '../game/Level';
-import { createRunner } from '../game/Physics';
-import { airTime, Builder, HOLD_FULL, HOLD_TAP, jumpHeightAt, PATTERNS, SIZES } from '../game/patterns';
+import { createRunner, stepRunner } from '../game/Physics';
+import { byId } from '../game/Track';
+import { airTime, Builder, CANOPY, HOLD_FULL, HOLD_TAP, jumpHeightAt, PATTERNS, SIZES } from '../game/patterns';
 import { planRoute } from '../game/testing/planner';
 import { createRng } from '../../../shared/random';
 
@@ -83,4 +84,36 @@ describe('padrões de obstáculos', () => {
     // Cada nível libera algo novo.
     for (let t = 0; t <= 4; t++) expect(PATTERNS.some((p) => p.tier === t)).toBe(true);
   });
+
+  it('copa das árvores: pular no cipó sempre leva à copa, e o caminho de baixo é seguro', () => {
+    for (const v of SPEEDS) {
+      let grabs = 0;
+      let reached = 0;
+      for (let at = 0; at < 120; at += 3) {
+        for (const hold of [1, 24, 80]) {
+          const { level } = single((b) => byId('copa').build(b), v);
+          const r = createRunner(X0 - 0.5 * v);
+          let grabbed = false;
+          let up = false;
+          let death = null;
+          for (let i = 0; i < 400 && !death; i++) {
+            death = stepRunner(r, { hold: i >= at && i < at + hold, pressed: i === at, drop: false }, level, v, 1 / 120);
+            if (r.swinging) grabbed = true;
+            if (r.grounded && Math.abs(r.y - CANOPY.y) < 0.5) up = true;
+          }
+          if (grabbed) {
+            grabs++;
+            if (up) reached++;
+          }
+        }
+      }
+      expect(grabs).toBeGreaterThan(5);
+      expect(reached).toBe(grabs);
+    }
+    // Embaixo da copa não há nada que mate: só chão, caixotes e capim.
+    const { level } = single((b) => byId('copa').build(b), SPEED.max);
+    expect(level.rocks.length + level.thorns.length).toBe(0);
+    expect(level.ground).toHaveLength(1);
+  });
 });
+
