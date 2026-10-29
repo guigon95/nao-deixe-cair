@@ -206,16 +206,20 @@ export const CONTINUES = {
 
 /** Toca: caminho por baixo da terra. */
 export const TOCA = {
-  /** Chão e teto da toca (abaixo da superfície). */
-  floor: -96,
-  roof: -16,
+  /**
+   * Chão e teto da toca (abaixo da superfície). O buraco é fundo (sensação de
+   * queda); o túnel tem uma camada grossa de terra por cima e teto baixo.
+   */
+  floor: -170,
+  roof: -90,
   /** Abaixo disto a capivara está "na toca" (câmera desce, eventos). */
   below: -20,
   /** Na saída: anda isto dentro do buraco e é lançada para cima (u/s). */
   launchAfter: 12,
-  exitVelocity: 1050,
+  /** Lançamento da saída: joga a capivara bem para o alto (~250 acima do chão). */
+  exitVelocity: 1500,
   /** Quanto a câmera desce para mostrar a toca. */
-  camera: -62,
+  camera: -130,
 } as const;
 
 /** Chão: abaixo disso, dentro de um buraco, a capivara caiu no rio do jacaré. */

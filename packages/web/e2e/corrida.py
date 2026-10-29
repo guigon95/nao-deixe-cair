@@ -387,15 +387,15 @@ with sync_playwright() as p:
         l.rocks.length = l.thorns.length = l.crates.length = l.springs.length = l.platforms.length = l.vines.length = 0;
         l.fruits.length = 0; l.powerups.length = 0; l.burrows.length = 0;
         const v = e.speed, x0 = r.x + 300, X = (t) => x0 + t * v;
-        l.ground.length = 0; l.addGround(-800, X(0)); l.addGround(X(0.34), X(3.3)); l.addGround(X(3.72), X(40));
-        l.burrows.push({ x0: X(0), holeEnd: X(0.34), exitStart: X(3.3), x1: X(3.72), floor: -96, roof: -16, opened: false });
-        for (let i = 0; i < 8; i++) l.fruits.push({ x: X(0.6 + i * 0.3), y: -79, taken: false, risky: false });
+        l.ground.length = 0; l.addGround(-800, X(0)); l.addGround(X(0.4), X(3.3)); l.addGround(X(3.72), X(40));
+        l.burrows.push({ x0: X(0), holeEnd: X(0.4), exitStart: X(3.3), x1: X(3.72), floor: -170, roof: -90, opened: false });
+        for (let i = 0; i < 8; i++) l.fruits.push({ x: X(0.6 + i * 0.3), y: -153, taken: false, risky: false });
         l.rocks.push({ x0: X(1.2), x1: X(1.2) + 34, top: 30, variant: 0, broken: false });
         e.track.genX = X(40); window.__T = { x0, v, f0: e.score.fruits }; }""")
     pg.wait_for_function("() => window.__NDC__.engine.inBurrow", timeout=4000)
     check("toca: cai no buraco escondido", True)
     pg.wait_for_timeout(500)
-    check("toca: câmera desce para mostrar o túnel", pg.evaluate("() => window.__NDC__.renderer.lift") < -30)
+    check("toca: câmera desce para mostrar o túnel", pg.evaluate("() => window.__NDC__.renderer.lift") < -90)
     pg.wait_for_function("() => !window.__NDC__.engine.inBurrow || window.__NDC__.engine.state !== 'PLAYING'", timeout=6000)
     pg.wait_for_timeout(900)
     st = pg.evaluate("() => { const e = window.__NDC__.engine; return { st: e.state, y: e.runner.y, f: e.score.fruits - window.__T.f0 } }")

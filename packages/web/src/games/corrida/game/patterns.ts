@@ -428,7 +428,7 @@ export const PATTERNS: readonly Pattern[] = [
     tier: 2,
     weight: 2,
     build(b) {
-      b.burrow(0, 0.34, 3.3, 3.72);
+      b.burrow(0, 0.4, 3.3, 3.72);
       // Embaixo: fileiras no chão e uma no alto (pulinho).
       b.row(0.55, 1.25, TOCA.floor, 6);
       b.row(1.5, 1.95, TOCA.floor + 34, 4);
@@ -438,7 +438,8 @@ export const PATTERNS: readonly Pattern[] = [
       b.thorns(1.75, 0.28);
       b.rock(2.6, true);
       b.row(2.0, 2.3, 0, 2);
-      return 3.72 + 0.35;
+      // Folga para a capivara voltar do lançamento da saída (~1 s no ar).
+      return 3.72 + 0.65;
     },
   },
   {
