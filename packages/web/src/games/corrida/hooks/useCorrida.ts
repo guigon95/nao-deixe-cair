@@ -267,6 +267,7 @@ export function useCorrida() {
             fx.float(e.x + 110, e.y + 40, 'TOCA SECRETA!', true, '#ffd9a0');
             fx.burst(e.x, 0, 14, 140, ['#b5762c', '#8a5a22', '#c99a3a', '#6f8a2c'], 0.6, 3, true);
           } else {
+            sfx.uhul();
             fx.float(e.x + 60, e.y + 230, 'UHUUL!', true, '#ffd9a0');
             fx.burst(e.x, 0, 22, 240, ['#8a5a32', '#6b4426', '#c9a06a'], 0.7, 3.2, true);
             fx.shake = 0.35;

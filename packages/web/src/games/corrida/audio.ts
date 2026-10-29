@@ -255,6 +255,79 @@ export class RunnerSfx extends SynthAudio {
     }
   }
 
+  /**
+   * "U-HUUL!" da capivara saindo da toca: voz sintetizada (fonte dente-de-serra
+   * passando por filtros de formante da vogal "u"). Uma sílaba curta, um
+   * soprinho de "h" e um "HUUUL" que sobe de tom e cai no fim (o "l" abre o
+   * segundo formante).
+   */
+  uhul(): void {
+    if (!this.ready) return;
+    const ctx = this.ctx!;
+    try {
+      const t0 = ctx.currentTime + 0.01;
+      const voice = ctx.createGain();
+      voice.gain.value = 0.9;
+      voice.connect(this.master!);
+      // Formantes em paralelo.
+      const formants: Array<[number, number, number]> = [
+        [360, 6, 1],
+        [820, 9, 0.55],
+        [2500, 12, 0.12],
+      ];
+      const amp = ctx.createGain();
+      const filters = formants.map(([f, q, g]) => {
+        const bp = ctx.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.frequency.value = f;
+        bp.Q.value = q;
+        const fg = ctx.createGain();
+        fg.gain.value = g * 3;
+        amp.connect(bp).connect(fg).connect(voice);
+        return bp;
+      });
+      // "l" no fim: F1 e F2 abrem.
+      filters[0].frequency.setValueAtTime(360, t0 + 0.42);
+      filters[0].frequency.linearRampToValueAtTime(430, t0 + 0.6);
+      filters[1].frequency.setValueAtTime(820, t0 + 0.42);
+      filters[1].frequency.linearRampToValueAtTime(1200, t0 + 0.6);
+      // Fonte: dente-de-serra com vibrato leve e curva de entonação.
+      const osc = ctx.createOscillator();
+      osc.type = 'sawtooth';
+      const f = osc.frequency;
+      f.setValueAtTime(330, t0);
+      f.linearRampToValueAtTime(300, t0 + 0.12);
+      f.setValueAtTime(430, t0 + 0.17);
+      f.exponentialRampToValueAtTime(600, t0 + 0.32);
+      f.exponentialRampToValueAtTime(390, t0 + 0.64);
+      const vib = ctx.createOscillator();
+      vib.frequency.value = 6.5;
+      const vibAmt = ctx.createGain();
+      vibAmt.gain.value = 9;
+      vib.connect(vibAmt).connect(f);
+      osc.connect(amp);
+      // Envelope: "u" curto, pausa, "HUUUL" longo.
+      const a = amp.gain;
+      a.setValueAtTime(0.0001, t0);
+      a.exponentialRampToValueAtTime(0.5, t0 + 0.03);
+      a.setValueAtTime(0.5, t0 + 0.1);
+      a.exponentialRampToValueAtTime(0.02, t0 + 0.14);
+      a.setValueAtTime(0.02, t0 + 0.17);
+      a.exponentialRampToValueAtTime(0.75, t0 + 0.21);
+      a.setValueAtTime(0.75, t0 + 0.45);
+      a.exponentialRampToValueAtTime(0.0001, t0 + 0.68);
+      osc.start(t0);
+      vib.start(t0);
+      osc.stop(t0 + 0.7);
+      vib.stop(t0 + 0.7);
+      osc.onended = () => voice.disconnect();
+      // Soprinho do "h" entre as sílabas.
+      this.noise(0.07, 0.07, 1600, 1100, 'bandpass', 0.14);
+    } catch {
+      /* áudio nunca quebra o jogo */
+    }
+  }
+
   /** Capim dourado: arpejo brilhante subindo (ao pegar) ou descendo (acabou). */
   golden(on: boolean): void {
     const notes = on ? [784, 988, 1175, 1568] : [1175, 988, 784];
