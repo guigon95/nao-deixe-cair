@@ -32,7 +32,7 @@ describe('motor da partida', () => {
     expect(e.runner.x).toBe(x);
     e.resume();
     expect(e.state).toBe(GameState.PLAYING);
-    // Sem tocar, o quati bate no primeiro obstáculo.
+    // Sem tocar, a capivara bate no primeiro obstáculo.
     for (let i = 0; i < 120 * 30 && e.state === GameState.PLAYING; i++) e.step(DT);
     expect(e.state).toBe(GameState.GAME_OVER);
     e.start();
@@ -73,7 +73,7 @@ describe('motor da partida', () => {
     expect(steps).toBeLessThanOrEqual(Math.ceil(SIM.maxFrameTime / DT) + 1);
   });
 
-  it('caixote atrasa o quati e o enxame se aproxima; correr afasta de novo', () => {
+  it('caixote atrasa a capivara e o enxame se aproxima; correr afasta de novo', () => {
     const { e } = engine();
     e.start();
     e.swarm = SWARM.rest;
@@ -112,7 +112,7 @@ describe('motor da partida', () => {
     expect(e.swarm).toBeGreaterThan(150);
   });
 
-  it('frutas enchem o medidor e somam pontos; recorde salvo no fim', () => {
+  it('capins enchem o medidor e somam pontos; recorde salvo no fim', () => {
     const { e, storage } = engine();
     e.start();
     for (let i = 0; i < 300 && e.state === GameState.PLAYING; i++) e.step(DT);

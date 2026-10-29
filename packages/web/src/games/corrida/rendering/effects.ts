@@ -39,7 +39,7 @@ export class Effects {
   flash = 0;
   /** Brilho do medidor quando enche (0..1). */
   meterGlow = 0;
-  /** Pulso de toque (0..1): "squash" do quati. */
+  /** Pulso de toque (0..1): "squash" da capivara. */
   pressPulse = 0;
   /** Faixa de aviso quando sobe o nível. */
   banner = '';

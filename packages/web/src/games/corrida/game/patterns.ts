@@ -21,9 +21,12 @@ export const SIZES = {
   crate: { w: 36, h: 36 },
   thornsHeight: 24,
   spring: { w: 34, h: 12 },
-  /** Altura do centro de uma fruta sobre os pés. */
+  /** Altura do centro de um capim sobre os pés. */
   fruitLift: 17,
 } as const;
+
+/** Altura onde os cipós ficam presos (acima do topo da tela). */
+export const VINE_Y = 300;
 
 /** Galhos: alturas usadas pelos padrões. */
 export const PLATFORM_Y = { low: 78, mid: 118, high: 150 } as const;
@@ -38,7 +41,7 @@ export class Builder {
     /** Velocidade (u/s) usada para converter segundos em distância. */
     readonly v: number,
     readonly rng: Rng,
-    /** Chance de colocar frutas fora do caminho seguro. */
+    /** Chance de colocar capins fora do caminho seguro. */
     readonly risky = 0,
   ) {}
 
@@ -74,11 +77,25 @@ export class Builder {
     this.level.springs.push({ x0: x, x1: x + SIZES.spring.w, top: SIZES.spring.h, usedAt: -9 });
   }
 
+  /** Cipó pendurado em x(t), preso na altura `ay`, com comprimento `len`. */
+  vine(t: number, ay: number, len: number): void {
+    this.level.vines.push({ ax: this.X(t), ay, len });
+  }
+
+  /** Capins ao longo do balanço do cipó (círculo de raio `r` em volta da âncora). */
+  swingArc(t: number, ay: number, r: number, n: number): void {
+    const ax = this.X(t);
+    for (let i = 0; i < n; i++) {
+      const th = -0.15 + (0.95 * i) / Math.max(1, n - 1);
+      this.level.fruits.push({ x: ax + r * Math.sin(th), y: ay - r * Math.cos(th), taken: false, risky: false });
+    }
+  }
+
   fruit(t: number, y: number, risky = false): void {
     this.level.fruits.push({ x: this.X(t), y: y + SIZES.fruitLift, taken: false, risky });
   }
 
-  /** Fileira de `n` frutas de t0 a t1 na altura dos pés `y`. */
+  /** Fileira de `n` capins de t0 a t1 na altura dos pés `y`. */
   row(t0: number, t1: number, y: number, n: number, risky = false): void {
     for (let i = 0; i < n; i++) this.fruit(n === 1 ? (t0 + t1) / 2 : t0 + ((t1 - t0) * i) / (n - 1), y, risky);
   }
@@ -86,7 +103,7 @@ export class Builder {
   /**
    * Frutas ao longo da trajetória de um pulo que sai do chão (altura `base`)
    * em `takeoff`: segurando o tempo `hold` (s). Como a trajetória vem da
-   * própria física, toda fruta do arco é alcançável.
+   * própria física, todo capim do arco é alcançável.
    */
   arc(takeoff: number, hold: number, n: number, base = 0, risky = false): void {
     const air = airTime(hold);
@@ -96,7 +113,7 @@ export class Builder {
     }
   }
 
-  /** Talvez coloque uma fruta arriscada (ex.: no meio de um rio, na altura de um pulo baixo). */
+  /** Talvez coloque um capim arriscado (ex.: no meio de um rio, na altura de um pulo baixo). */
   maybeRisky(t: number, y: number): void {
     if (this.rng() < this.risky) this.fruit(t, y, true);
   }
@@ -240,7 +257,7 @@ export const PATTERNS: readonly Pattern[] = [
     },
   },
   {
-    // Galho com frutas por cima de uma pedra: caminho alto (frutas) ou pular a pedra.
+    // Galho com capins por cima de uma pedra: caminho alto (capins) ou pular a pedra.
     id: 'galho',
     tier: 1,
     weight: 3,
@@ -249,6 +266,18 @@ export const PATTERNS: readonly Pattern[] = [
       b.row(0.3, 1.05, PLATFORM_Y.low, 5);
       b.rock(0.7);
       return 1.15;
+    },
+  },
+  {
+    // Cipó por cima de uma pedra: pule e agarre para balançar pelos capins (ou só pule a pedra).
+    id: 'cipo-capim',
+    tier: 1,
+    weight: 2,
+    build(b) {
+      b.vine(0.45, VINE_Y, 175);
+      b.swingArc(0.45, VINE_Y, 160, 5);
+      b.rock(0.62);
+      return 0.75;
     },
   },
   {
@@ -271,7 +300,7 @@ export const PATTERNS: readonly Pattern[] = [
     build(b) {
       b.spring(0);
       b.pit(0.2, 0.75);
-      // Arco das frutas: altura da mola (aprox.), metade do caminho.
+      // Arco dos capins: altura da mola (aprox.), metade do caminho.
       for (let i = 0; i < 5; i++) {
         const tau = 0.2 + i * 0.16;
         const vy = JUMP.springVelocity;
@@ -326,6 +355,18 @@ export const PATTERNS: readonly Pattern[] = [
       b.platform(0.42, 0.82, PLATFORM_Y.low);
       b.row(0.48, 0.76, PLATFORM_Y.low, 3);
       return 1.2;
+    },
+  },
+  {
+    // Rio largo com cipó no meio: pular, agarrar e se lançar para o outro lado.
+    id: 'cipo',
+    tier: 2,
+    weight: 3,
+    build(b) {
+      b.pit(0.05, 1.25);
+      b.vine(0.5, VINE_Y, 180);
+      b.swingArc(0.5, VINE_Y, 165, 4);
+      return 1.3;
     },
   },
   {

@@ -33,7 +33,7 @@ export function restAt(t: number): { min: number; max: number } {
   return { min: 0.85 - 0.6 * k, max: 1.45 - 0.85 * k };
 }
 
-/** Chance de um padrão vir "espelhado" com frutas arriscadas extras. */
+/** Chance de um padrão vir "espelhado" com capins arriscados extras. */
 export function riskyFruitChance(t: number): number {
   return Math.min(0.6, 0.15 + t / 200);
 }

@@ -1,4 +1,4 @@
-import type { Crate, Fruit, GroundSpan, Platform, Rock, Spring, Thorns } from './types';
+import type { Crate, Fruit, GroundSpan, Platform, Rock, Spring, Thorns, Vine } from './types';
 
 /**
  * Conteúdo do percurso já gerado: listas em ordem crescente de x. O gerador
@@ -13,6 +13,7 @@ export class Level {
   thorns: Thorns[] = [];
   springs: Spring[] = [];
   fruits: Fruit[] = [];
+  vines: Vine[] = [];
 
   clear(): void {
     this.ground.length = 0;
@@ -22,6 +23,7 @@ export class Level {
     this.thorns.length = 0;
     this.springs.length = 0;
     this.fruits.length = 0;
+    this.vines.length = 0;
   }
 
   /** Acrescenta chão; emenda com o trecho anterior se encostar. */
@@ -41,6 +43,7 @@ export class Level {
     dropBefore(this.thorns, x, (t) => t.x1);
     dropBefore(this.springs, x, (s) => s.x1);
     dropBefore(this.fruits, x, (f) => f.x + 20);
+    dropBefore(this.vines, x, (v) => v.ax + v.len);
   }
 
   /** Existe chão sob [a, b]? (Usado pelos testes e pelo desenho.) */
@@ -61,7 +64,8 @@ export class Level {
       this.crates.length +
       this.thorns.length +
       this.springs.length +
-      this.fruits.length
+      this.fruits.length +
+      this.vines.length
     );
   }
 }

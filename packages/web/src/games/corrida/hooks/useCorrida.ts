@@ -32,7 +32,7 @@ export interface UiState {
 export const CAUSE_TEXT: Record<DeathCause, string> = {
   rock: 'Trombou numa pedra',
   thorns: 'Caiu nos espinhos',
-  river: 'Caiu no rio',
+  river: 'O jacaré pegou!',
   swarm: 'Os marimbondos alcançaram',
 };
 
@@ -156,7 +156,7 @@ export function useCorrida() {
           break;
         case 'fruit':
           sfx.fruit(e.streak);
-          fx.burst(e.x, e.y, 5, 70, ['#c49be0', '#ffffff'], 0.35, 2, false);
+          fx.burst(e.x, e.y, 5, 70, ['#b6f04a', '#ffffff'], 0.35, 2, false);
           if (e.meterFull) {
             sfx.meterFull();
             fx.meterGlow = 1;
@@ -181,6 +181,10 @@ export function useCorrida() {
           sfx.spring();
           fx.burst(e.x, e.y, 8, 120, [COLORS.petal, '#ffd23f'], 0.5, 2.6, false);
           break;
+        case 'vine':
+          sfx.vine(e.on);
+          if (e.on) vibrate(8);
+          break;
         case 'dash':
           if (e.on) {
             sfx.dash();
@@ -198,7 +202,7 @@ export function useCorrida() {
           sfx.crash();
           fx.shake = 1;
           fx.flash = e.cause === 'river' ? 0.2 : 0.7;
-          fx.burst(e.x, e.y + 17, 20, 200, e.cause === 'river' ? ['#9fdcff', '#ffffff'] : ['#c97a3c', '#ffffff', '#8c4f22'], 0.8, 3, true);
+          fx.burst(e.x, e.y + 17, 20, 200, e.cause === 'river' ? ['#9fdcff', '#ffffff'] : ['#9a6a40', '#ffffff', '#6e4826'], 0.8, 3, true);
           vibrate([30, 40, 60]);
           setUi((u) => ({
             ...u,

@@ -22,7 +22,7 @@ function run(r: Runner, level: Level, steps: number, ctl: (i: number) => Partial
 }
 
 function recorder() {
-  const log = { jumps: 0, lands: 0, crates: [] as Array<[Crate, boolean]>, fruits: [] as Fruit[], springs: 0 };
+  const log = { jumps: 0, lands: 0, crates: [] as Array<[Crate, boolean]>, fruits: [] as Fruit[], springs: 0, grabs: 0, letGos: 0 };
   const sink: StepSink = {
     jump: () => log.jumps++,
     land: () => log.lands++,
@@ -36,6 +36,8 @@ function recorder() {
       o.broken = true;
     },
     spring: () => log.springs++,
+    grab: () => log.grabs++,
+    letGo: () => log.letGos++,
     fruit: (f) => {
       if (!f.taken) {
         f.taken = true;
@@ -224,7 +226,7 @@ describe('colisões', () => {
     expect(s.vy).toBeGreaterThan(0);
   });
 
-  it('cada fruta é coletada uma única vez', () => {
+  it('cada capim é comido uma única vez', () => {
     const level = flat();
     level.fruits.push({ x: 80, y: 17, taken: false, risky: false }, { x: 120, y: 200, taken: false, risky: false });
     const { log, sink } = recorder();
@@ -259,5 +261,80 @@ describe('colisões', () => {
   it('a caixa de colisão é menor que o desenho (perdoa raspões)', () => {
     expect(BODY.halfWidth * 2).toBeLessThan(34);
     expect(BODY.height).toBeLessThan(40);
+  });
+});
+
+describe('cipós de balançar', () => {
+  const vineLevel = (pit = true, end = 480) => {
+    const l = new Level();
+    if (pit) {
+      l.addGround(-500, 100);
+      l.addGround(end, 5000);
+    } else l.addGround(-500, 5000);
+    l.vines.push({ ax: 260, ay: 300, len: 180 });
+    return l;
+  };
+
+  it('agarra sozinha ao encostar no ar, balança e solta para a frente (nunca fica presa)', () => {
+    const level = vineLevel();
+    const { log, sink } = recorder();
+    const r = createRunner(0);
+    let swingSteps = 0;
+    let death = null;
+    for (let i = 0; i < 500 && !death; i++) {
+      // pula segurando bem na beirada
+      death = stepRunner(r, { hold: i >= 36 && i < 96, pressed: i === 36, drop: false }, level, V, DT, sink);
+      if (r.swinging) swingSteps++;
+    }
+    expect(death).toBeNull();
+    expect(log.grabs).toBe(1);
+    expect(log.letGos).toBe(1);
+    expect(swingSteps).toBeGreaterThan(10);
+    expect(swingSteps * DT).toBeLessThan(1.6);
+    expect(r.x).toBeGreaterThan(480); // atravessou o rio
+  });
+
+  it('o rio do padrão do cipó é largo demais sem o cipó', () => {
+    const run = (withVine: boolean) => {
+      const level = vineLevel(true, 560);
+      if (!withVine) level.vines.length = 0;
+      let best = 0;
+      for (let at = 0; at < 40; at++) {
+        for (const hold of [10, 40, 80, 200]) {
+          const r = createRunner(0);
+          let death = null;
+          for (let i = 0; i < 500 && !death; i++) death = stepRunner(r, { hold: i >= at && i < at + hold, pressed: i === at, drop: false }, level, V, DT);
+          if (!death) best++;
+        }
+      }
+      return best;
+    };
+    expect(run(false)).toBe(0);
+    expect(run(true)).toBeGreaterThan(5);
+  });
+
+  it('toque no cipó solta na hora, com impulso para cima', () => {
+    const level = vineLevel(false);
+    const { log, sink } = recorder();
+    const r = createRunner(254);
+    r.grounded = false;
+    r.jumped = true;
+    r.y = 140;
+    stepRunner(r, { hold: false, pressed: false, drop: false }, level, V, DT, sink);
+    expect(r.swinging).toBe(true);
+    stepRunner(r, { hold: true, pressed: true, drop: false }, level, V, DT, sink);
+    expect(r.swinging).toBe(false);
+    expect(r.vy).toBeGreaterThan(100);
+    expect(log.letGos).toBe(1);
+    // não agarra de novo na hora
+    run(r, level, 10, () => ({}), sink);
+    expect(log.grabs).toBe(1);
+  });
+
+  it('correndo no chão não agarra o cipó', () => {
+    const level = vineLevel(false);
+    const { log, sink } = recorder();
+    run(createRunner(0), level, 200, () => ({}), sink);
+    expect(log.grabs).toBe(0);
   });
 });

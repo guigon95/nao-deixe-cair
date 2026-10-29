@@ -5,7 +5,7 @@ import type { Level } from '../Level';
 import type { Runner } from '../types';
 
 /**
- * Planejador de toques: procura uma sequência de pulos que leve o quati de
+ * Planejador de toques: procura uma sequência de pulos que leve a capivara de
  * um estado até uma posição x sem morrer e sem bater em caixote. Usa a mesma
  * função de física do jogo (determinística), então "existe um plano" é uma
  * prova de que o trecho é atravessável — base dos testes de justiça do
@@ -41,6 +41,8 @@ function probeSink(): ProbeSink {
     smash() {},
     spring() {},
     fruit() {},
+    grab() {},
+    letGo() {},
   };
   return s;
 }

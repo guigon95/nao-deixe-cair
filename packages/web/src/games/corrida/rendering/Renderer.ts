@@ -1,11 +1,11 @@
 import { ARENA, BODY, DASH, SWARM } from '../game/config';
 import type { Engine } from '../game/Engine';
 import { SIZES } from '../game/patterns';
-import { GameState, type Crate, type Fruit, type Platform, type Rock, type Spring, type Thorns } from '../game/types';
+import { GameState, type Crate, type Fruit, type Platform, type Rock, type Spring, type Thorns, type Vine } from '../game/types';
 import { computeLayout, type Layout } from '../../../shared/layout/layout';
 import type { Effects } from './effects';
 import { biomeIndex, paletteAt, PALETTES, type Palette } from './palette';
-import { drawQuati, type Pose } from './quati';
+import { drawCapivara, type Pose } from './capivara';
 
 /** Onde o chão (y = 0) aparece na arena, sem câmera subindo. */
 export const GROUND_Y = 288;
@@ -23,8 +23,11 @@ export const COLORS = {
   branchLight: '#a8703c',
   leaf: '#4caf50',
   petal: '#ff6fae',
-  fruit: '#3a1450',
-  fruitRim: '#c49be0',
+  vine: '#7cb342',
+  vineDark: '#4e6b25',
+  grassBlade: '#b6f04a',
+  grassDark: '#5aa51f',
+  gator: '#4f7a33',
   wasp: '#ffcc33',
   danger: '#ff3b5c',
   text: '#ffffff',
@@ -78,7 +81,7 @@ export class Renderer {
     this.hazeCache = null;
   }
 
-  /** x do quati interpolado entre passos (movimento suave em telas de 60–144 Hz). */
+  /** x da capivara interpolado entre passos (movimento suave em telas de 60–144 Hz). */
   private runnerPos(engine: Engine) {
     const r = engine.runner;
     const a = engine.alpha;
@@ -89,7 +92,7 @@ export class Renderer {
   follow(engine: Engine, dt: number, snap = false): void {
     const p = this.runnerPos(engine);
     this.camX = p.x - BODY.screenX;
-    // Sobe a câmera só quando o quati vai muito alto (mola): o chão quase sempre visível.
+    // Sobe a câmera só quando a capivara vai muito alto (mola): o chão quase sempre visível.
     const target = Math.min(80, Math.max(0, p.y - 190) * 0.55);
     this.lift = snap ? target : this.lift + (target - this.lift) * Math.min(1, dt * 8);
   }
@@ -124,8 +127,10 @@ export class Renderer {
     this.drawHills(pal);
     this.drawTrees(pal);
     this.drawGround(engine, pal, opts.time);
+    this.drawGators(engine, opts.time);
     const lvl = engine.track.level;
     for (const p of lvl.platforms) this.drawPlatform(p, pal);
+    for (const v of lvl.vines) this.drawVine(v, engine, opts.time);
     for (const sp of lvl.springs) this.drawSpring(sp, engine.elapsed);
     for (const c of lvl.crates) if (!c.broken) this.drawCrate(c);
     for (const r of lvl.rocks) if (!r.broken) this.drawRock(r);
@@ -341,6 +346,56 @@ export class Renderer {
     ctx.fill();
   }
 
+  /** Cipó: pendurado e balançando de leve; quando a capivara agarra, vai até as patas dela. */
+  private drawVine(v: Vine, engine: Engine, time: number): void {
+    const ctx = this.ctx;
+    const ax = this.sx(v.ax);
+    if (ax < this.viewL - v.len || ax > this.viewR + 40) return;
+    const ay = this.sy(v.ay);
+    const r = engine.runner;
+    const held = r.swinging && r.swAx === v.ax && engine.state !== GameState.GAME_OVER;
+    let ex: number;
+    let ey: number;
+    if (held) {
+      const p = this.runnerPos(engine);
+      ex = this.sx(p.x) + 6;
+      ey = this.sy(p.y + 24);
+    } else {
+      const sway = Math.sin(time * 1.6 + v.ax * 0.01) * 0.05;
+      ex = ax + Math.sin(sway) * v.len;
+      ey = ay + Math.cos(sway) * v.len;
+    }
+    const mx = (ax + ex) / 2 + (held ? 0 : 6);
+    const my = (ay + ey) / 2;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = COLORS.vineDark;
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(ax, Math.min(ay, this.viewT - 4));
+    ctx.lineTo(ax, ay);
+    ctx.quadraticCurveTo(mx, my, ex, ey);
+    ctx.stroke();
+    ctx.strokeStyle = COLORS.vine;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+    // Folhinhas ao longo do cipó e um nó na ponta (onde agarra).
+    ctx.fillStyle = COLORS.leaf;
+    for (let i = 1; i <= 4; i++) {
+      const k = i / 5;
+      const x = (1 - k) * (1 - k) * ax + 2 * (1 - k) * k * mx + k * k * ex;
+      const y = (1 - k) * (1 - k) * ay + 2 * (1 - k) * k * my + k * k * ey;
+      ctx.beginPath();
+      ctx.ellipse(x + (i % 2 ? 5 : -5), y, 5, 2.4, i % 2 ? 0.5 : -0.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    if (!held) {
+      ctx.fillStyle = COLORS.vineDark;
+      ctx.beginPath();
+      ctx.arc(ex, ey, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
   private drawRock(r: Rock): void {
     const ctx = this.ctx;
     const x0 = this.sx(r.x0);
@@ -455,31 +510,61 @@ export class Renderer {
     ctx.fill();
   }
 
+  /** Tufo de capim (o que a capivara come todo dia): verde-limão com halo claro para destacar da mata. */
   private drawFruit(f: Fruit, time: number): void {
     const ctx = this.ctx;
     const x = this.sx(f.x);
     if (x < this.viewL - 10 || x > this.viewR + 10) return;
     const y = this.sy(f.y) + Math.sin(time * 4 + f.x * 0.05) * 1.5;
-    if (f.risky) {
-      ctx.fillStyle = `rgba(255, 230, 120, ${(0.25 + 0.2 * Math.sin(time * 6)).toFixed(3)})`;
+    ctx.fillStyle = f.risky
+      ? `rgba(255, 230, 120, ${(0.35 + 0.2 * Math.sin(time * 6)).toFixed(3)})`
+      : 'rgba(255, 255, 220, 0.45)';
+    ctx.beginPath();
+    ctx.arc(x, y, f.risky ? 11 : 9, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.lineCap = 'round';
+    for (let k = 0; k < CAPIM.length; k++) {
+      const [dx, h, lean] = CAPIM[k];
+      ctx.strokeStyle = k % 2 ? COLORS.grassDark : COLORS.grassBlade;
+      ctx.lineWidth = 2.6;
       ctx.beginPath();
-      ctx.arc(x, y, 11, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.moveTo(x + dx, y + 6);
+      ctx.quadraticCurveTo(x + dx + lean * 0.4, y + 6 - h * 0.6, x + dx + lean, y + 6 - h);
+      ctx.stroke();
     }
-    ctx.fillStyle = 'rgba(255,255,255,0.35)';
-    ctx.beginPath();
-    ctx.arc(x, y, 7.6, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = COLORS.fruit;
-    ctx.beginPath();
-    ctx.arc(x, y, 6.4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = COLORS.fruitRim;
-    ctx.beginPath();
-    ctx.arc(x - 2, y - 2.2, 2, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#5fbf4a';
-    ctx.fillRect(x - 1, y - 8.5, 2, 3);
+  }
+
+  /** Jacaré de tocaia no rio: olhos e focinho na superfície, no meio de cada buraco. */
+  private drawGators(engine: Engine, time: number): void {
+    const ctx = this.ctx;
+    const ground = engine.track.level.ground;
+    const waterY = this.sy(-24);
+    for (let i = 0; i + 1 < ground.length; i++) {
+      const a = this.sx(ground[i].x1);
+      const b = this.sx(ground[i + 1].x0);
+      if (b < this.viewL || a > this.viewR || b - a < 50) continue;
+      const cx = (a + b) / 2 + Math.sin(time * 0.8 + i) * Math.min(14, (b - a) / 6);
+      const bobY = waterY + Math.sin(time * 2.2 + i) * 1.2;
+      ctx.save();
+      ctx.translate(cx, bobY);
+      ctx.scale(1.45, 1.45);
+      ctx.translate(-cx, -bobY);
+      ctx.fillStyle = COLORS.gator;
+      ctx.beginPath();
+      ctx.ellipse(cx + 12, bobY + 1, 16, 3.5, 0, 0, Math.PI * 2); // focinho
+      ctx.ellipse(cx - 8, bobY - 1, 5.5, 4.5, 0, 0, Math.PI * 2); // olhos (corcovas)
+      ctx.ellipse(cx + 1, bobY - 1, 5.5, 4.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#e8f27a';
+      ctx.beginPath();
+      ctx.arc(cx - 7.5, bobY - 2.5, 1.6, 0, Math.PI * 2);
+      ctx.arc(cx + 1.5, bobY - 2.5, 1.6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#16260f';
+      ctx.fillRect(cx - 7.8, bobY - 3.6, 0.8, 2.2);
+      ctx.fillRect(cx + 1.2, bobY - 3.6, 0.8, 2.2);
+      ctx.restore();
+    }
   }
 
   // ───────────────────────────── personagens
@@ -502,6 +587,9 @@ export class Renderer {
     else if (r.dash > 0) {
       pose = 'dash';
       tilt = 0.08;
+    } else if (r.swinging) {
+      pose = 'fall';
+      tilt = r.swTh * 0.6;
     } else if (r.grounded) pose = 'run';
     else if (r.gliding) pose = 'glide';
     else pose = r.vy > 60 ? 'rise' : 'fall';
@@ -535,11 +623,11 @@ export class Renderer {
       ctx.fill();
     }
     const landing = r.landedAt < 0.14 ? 1 - r.landedAt / 0.14 : 0;
-    drawQuati(ctx, x, y, {
+    drawCapivara(ctx, x, y, {
       pose,
-      run: engine.state === GameState.READY ? time * 14 : (p.x / 26) % (Math.PI * 2),
+      run: engine.state === GameState.READY ? time * 12 : (p.x / 28) % (Math.PI * 2),
       squash: fx.reducedMotion ? 0 : Math.max(landing * 0.8, fx.pressPulse * 0.4),
-      spin: time * 30,
+      time,
       tilt,
     });
   }
@@ -656,7 +744,7 @@ export class Renderer {
     ctx.strokeText(m, W / 2, 57);
     ctx.fillText(m, W / 2, 57);
 
-    // Medidor do dash (canto superior direito): 12 jabuticabas.
+    // Medidor do dash (canto superior direito): 12 tufos de capim.
     const n = DASH.meterMax;
     const full = engine.meterFull;
     const mx = W - 16 - n * 11;
@@ -666,7 +754,7 @@ export class Renderer {
     ctx.fill();
     for (let i = 0; i < n; i++) {
       const on = i < engine.meter;
-      ctx.fillStyle = on ? (full ? '#ffb347' : '#8e4fc4') : 'rgba(255,255,255,0.22)';
+      ctx.fillStyle = on ? (full ? '#ffb347' : COLORS.grassBlade) : 'rgba(255,255,255,0.22)';
       ctx.beginPath();
       ctx.arc(mx + i * 11, my, on ? 4.2 : 3, 0, Math.PI * 2);
       ctx.fill();
@@ -695,7 +783,7 @@ export class Renderer {
       ctx.fillStyle = COLORS.text;
       ctx.fillText(l1, W / 2, 112);
       ctx.font = '700 12px system-ui, sans-serif';
-      const l2 = 'Fuja dos marimbondos! Caixotes te atrasam.';
+      const l2 = 'Coma capim e fuja dos marimbondos! Cuidado com o jacaré.';
       ctx.strokeText(l2, W / 2, 132);
       ctx.fillText(l2, W / 2, 132);
       ctx.globalAlpha = 1;
@@ -724,6 +812,15 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.arcTo(x, y, x + w, y, rr);
   ctx.closePath();
 }
+
+/** Folhas do tufo de capim: deslocamento x, altura, inclinação. */
+const CAPIM: ReadonlyArray<readonly [number, number, number]> = [
+  [-4, 11, -5],
+  [-2, 14, -2],
+  [0, 16, 1],
+  [2, 13, 4],
+  [4, 10, 6],
+];
 
 /** Pseudoaleatório determinístico em [0, 1) para decoração. */
 export function hash(n: number): number {

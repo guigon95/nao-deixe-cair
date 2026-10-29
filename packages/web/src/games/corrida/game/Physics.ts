@@ -1,6 +1,6 @@
-import { BODY, DASH, JUMP, PIT_DEATH_Y, SWARM, type JumpParams } from './config';
+import { BODY, DASH, JUMP, PIT_DEATH_Y, SWARM, VINE, type JumpParams } from './config';
 import type { Level } from './Level';
-import type { Crate, DeathCause, Fruit, Rock, Runner, Spring, Thorns } from './types';
+import type { Crate, DeathCause, Fruit, Rock, Runner, Spring, Thorns, Vine } from './types';
 
 /** Comandos de UM passo de simulação. */
 export interface Controls {
@@ -14,7 +14,7 @@ export interface Controls {
 
 /**
  * Efeitos colaterais da física. O motor do jogo marca caixotes quebrados,
- * frutas pegas etc.; o piloto automático usa uma versão que só observa.
+ * capins comidos etc.; o piloto automático usa uma versão que só observa.
  */
 export interface StepSink {
   jump(r: Runner): void;
@@ -23,6 +23,8 @@ export interface StepSink {
   smash(o: Rock | Thorns, r: Runner): void;
   spring(s: Spring, r: Runner): void;
   fruit(f: Fruit, r: Runner): void;
+  grab(v: Vine, r: Runner): void;
+  letGo(r: Runner): void;
 }
 
 export const NULL_SINK: StepSink = {
@@ -32,13 +34,15 @@ export const NULL_SINK: StepSink = {
   smash() {},
   spring() {},
   fruit() {},
+  grab() {},
+  letGo() {},
 };
 
 /** Metade da largura dos "pés": quanto do corpo precisa estar sobre o apoio. */
 const FOOT = 8;
 /** Pousar de quina: se o corpo afundou só isto no topo, sobe em vez de bater. */
 const STEP_UP = 7;
-/** Raio de coleta das frutas (somado à caixa do corpo). */
+/** Raio de coleta dos capins (somado à caixa do corpo). */
 const FRUIT_R = 13;
 
 export function createRunner(x = 0): Runner {
@@ -59,6 +63,13 @@ export function createRunner(x = 0): Runner {
     buffer: 0,
     dash: 0,
     dashTail: 0,
+    swinging: false,
+    swAx: 0,
+    swAy: 0,
+    swL: 1,
+    swTh: 0,
+    swOm: 0,
+    vineCooldown: 0,
     slow: 1,
     landedAt: 10,
     justLanded: false,
@@ -75,7 +86,7 @@ export function runnerSpeed(r: Runner, base: number): number {
 }
 
 /**
- * Um passo da física do quati. Retorna a causa da morte, ou null.
+ * Um passo da física da capivara. Retorna a causa da morte, ou null.
  * Não aloca memória: seguro para rodar 120×/s e para o planejador.
  */
 export function stepRunner(
@@ -94,6 +105,12 @@ export function stepRunner(
   if (r.slow < 1) r.slow = Math.min(1, r.slow + ((1 - SWARM.slowFactor) / SWARM.slowRecover) * dt);
   if (r.dropThrough > 0) r.dropThrough -= dt;
   if (r.dashTail > 0) r.dashTail -= dt;
+  if (r.vineCooldown > 0) r.vineCooldown -= dt;
+
+  if (r.swinging) {
+    swingStep(r, ctl, dt, sink);
+    return collide(r, level, sink);
+  }
 
   // ── comandos ──
   if (ctl.pressed) r.buffer = P.jumpBuffer;
@@ -194,6 +211,78 @@ export function stepRunner(
     }
   }
 
+  // ── cipó: encostou no ar → agarra ──
+  if (!r.grounded && r.dash <= 0 && r.vineCooldown <= 0) {
+    const cy = r.y + BODY_CENTER;
+    for (const v of level.vines) {
+      if (v.ax - VINE.grabReach > r.x) break;
+      if (Math.abs(r.x - v.ax) > VINE.grabReach) continue;
+      if (cy > v.ay - v.len * 0.3 || cy < v.ay - v.len - 10) continue;
+      grabVine(r, v, runnerSpeed(r, baseSpeed), sink);
+      break;
+    }
+  }
+
+  return collide(r, level, sink);
+}
+
+/** Centro do corpo acima dos pés (onde as patas seguram o cipó). */
+const BODY_CENTER = 18;
+
+function grabVine(r: Runner, v: Vine, vx: number, sink: StepSink): void {
+  const cy = r.y + BODY_CENTER;
+  const L = Math.max(v.len * 0.4, Math.min(v.len, Math.hypot(r.x - v.ax, v.ay - cy)));
+  const th = Math.asin(Math.max(-0.9, Math.min(0.9, (r.x - v.ax) / L)));
+  // Velocidade tangencial; garante energia para chegar ao ângulo de soltar.
+  const vt = vx * Math.cos(th) + r.vy * Math.sin(th);
+  const need = Math.sqrt((2 * VINE.gravity * (Math.cos(th) - Math.cos(VINE.releaseAngle)) + 0) / L) * VINE.minEnergy;
+  r.swinging = true;
+  r.swAx = v.ax;
+  r.swAy = v.ay;
+  r.swL = L;
+  r.swTh = th;
+  r.swOm = Math.max(vt / L, Number.isFinite(need) ? need : 0, 0.8);
+  r.vy = 0;
+  r.gliding = false;
+  r.fastFall = false;
+  r.buffer = 0;
+  placeOnVine(r);
+  sink.grab(v, r);
+}
+
+function placeOnVine(r: Runner): void {
+  r.x = r.swAx + r.swL * Math.sin(r.swTh);
+  r.y = r.swAy - r.swL * Math.cos(r.swTh) - BODY_CENTER;
+}
+
+/** Pêndulo; toque solta com impulso, ↓ solta sem impulso, e no fim do balanço solta sozinha. */
+function swingStep(r: Runner, ctl: Controls, dt: number, sink: StepSink): void {
+  if (ctl.pressed || ctl.drop) {
+    letGo(r, !ctl.drop, sink);
+    return;
+  }
+  r.swOm += (-(VINE.gravity / r.swL) * Math.sin(r.swTh)) * dt;
+  r.swTh += r.swOm * dt;
+  placeOnVine(r);
+  if (r.swTh >= VINE.releaseAngle && r.swOm > 0) letGo(r, true, sink);
+}
+
+function letGo(r: Runner, boost: boolean, sink: StepSink): void {
+  const vt = r.swL * r.swOm;
+  r.swinging = false;
+  r.vy = vt * Math.sin(r.swTh) + (boost ? VINE.releaseBoost : 0);
+  r.grounded = false;
+  r.jumped = true;
+  r.cut = true;
+  r.airTime = 0;
+  r.glideTime = 0;
+  r.fastFall = false;
+  r.vineCooldown = VINE.cooldown;
+  sink.letGo(r);
+}
+
+/** Colisões laterais, coleta e queda no rio (comum a correr e balançar). */
+function collide(r: Runner, level: Level, sink: StepSink): DeathCause | null {
   // ── colisões laterais ──
   const left = r.x - BODY.halfWidth;
   const right = r.x + BODY.halfWidth;
@@ -256,7 +345,7 @@ export function stepRunner(
     }
   }
 
-  // ── frutas ──
+  // ── capins ──
   for (const f of level.fruits) {
     if (f.x - FRUIT_R > right) break;
     if (f.taken || f.x + FRUIT_R < left) continue;
@@ -264,7 +353,7 @@ export function stepRunner(
     sink.fruit(f, r);
   }
 
-  if (!r.grounded && r.y < PIT_DEATH_Y) return 'river';
+  if (!r.grounded && !r.swinging && r.y < PIT_DEATH_Y) return 'river';
   return null;
 }
 
@@ -308,7 +397,7 @@ function supportAt(level: Level, r: Runner, y: number): boolean {
 }
 
 /**
- * Procura onde o quati pousa neste passo (caindo): o apoio mais alto cujo
+ * Procura onde a capivara pousa neste passo (caindo): o apoio mais alto cujo
  * topo foi cruzado entre a posição anterior e a atual. Caixotes e flores
  * não seguram: quicam (e o quicar já resolve o passo).
  */

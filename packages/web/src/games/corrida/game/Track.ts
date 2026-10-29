@@ -3,7 +3,7 @@ import { Level } from './Level';
 import { Builder, PATTERNS, pickPattern, type Pattern } from './patterns';
 import { randRange, type Rng } from '../../../shared/random';
 
-/** Quanto gerar à frente do quati (u): mais que uma tela larga. */
+/** Quanto gerar à frente da capivara (u): mais que uma tela larga. */
 export const LOOKAHEAD = 1500;
 /** Quanto guardar atrás antes de descartar (u). */
 const KEEP_BEHIND = 500;
@@ -40,7 +40,7 @@ export class Track {
     this.history.length = 0;
     this.prev = null;
     this.genX = 0;
-    // Começo: chão livre desde antes da tela, com uma fileira de frutas.
+    // Começo: chão livre desde antes da tela, com uma fileira de capins.
     const v = speedAt(0);
     const introEnd = INTRO_TIME * v;
     this.level.addGround(-800, introEnd);
@@ -51,7 +51,7 @@ export class Track {
 
   /**
    * Gera até `playerX + LOOKAHEAD`. A velocidade usada em cada padrão é a
-   * que o quati terá ao chegar nele (estimativa pelo tempo de partida).
+   * que a capivara terá ao chegar nele (estimativa pelo tempo de partida).
    */
   update(playerX: number, elapsed: number, currentSpeed: number): void {
     while (this.genX < playerX + LOOKAHEAD) {
@@ -79,7 +79,7 @@ export class Track {
     }
     const end = this.genX + (dur + LANDING_TIME + randRange(this.rng, d.rest.min, d.rest.max)) * v;
     this.level.addGround(cursor, end);
-    // Mantém as listas em ordem (frutas de arcos podem sair um pouco fora de ordem).
+    // Mantém as listas em ordem (capins de arcos podem sair um pouco fora de ordem).
     this.level.fruits.sort((p, q) => p.x - q.x);
     this.genX = end;
   }

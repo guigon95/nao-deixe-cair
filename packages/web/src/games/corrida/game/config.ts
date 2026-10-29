@@ -26,7 +26,7 @@ export const BODY = {
   /** Caixa de colisão (pés no meio da base). Um pouco menor que o desenho: perdoa raspões. */
   halfWidth: 13,
   height: 34,
-  /** Posição do quati na tela (x da arena). */
+  /** Posição da capivara na tela (x da arena). */
   screenX: 150,
 } as const;
 
@@ -77,6 +77,22 @@ export const JUMP: JumpParams = {
   crateBounceVelocity: 640,
 };
 
+/** Cipós de balançar. */
+export const VINE = {
+  /** Gravidade do pêndulo (u/s²). */
+  gravity: 2100,
+  /** Solta sozinha ao passar deste ângulo para a frente (rad): nunca fica presa. */
+  releaseAngle: 0.85,
+  /** Impulso extra para cima ao soltar (u/s). */
+  releaseBoost: 300,
+  /** Distância horizontal do corpo ao cipó para agarrar (u). */
+  grabReach: 14,
+  /** Depois de soltar, não agarra de novo por este tempo (s). */
+  cooldown: 0.45,
+  /** Margem de energia: o balanço sempre chega ao ângulo de soltar (×). */
+  minEnergy: 1.15,
+} as const;
+
 /** Velocidade da corrida (u/s) em função do tempo de partida. */
 export const SPEED = {
   start: 290,
@@ -86,7 +102,7 @@ export const SPEED = {
 } as const;
 
 export const DASH = {
-  /** Jabuticabas para encher o medidor. */
+  /** Capins para encher o medidor. */
   meterMax: 12,
   duration: 0.85,
   speedFactor: 1.65,
@@ -96,12 +112,12 @@ export const DASH = {
   tail: 0.22,
 } as const;
 
-/** Enxame de marimbondos que persegue o quati (distância atrás dele, em u). */
+/** Enxame de marimbondos que persegue a capivara (distância atrás dele, em u). */
 export const SWARM = {
   start: 120,
   /** Distância "confortável": o enxame não se afasta além disso. */
   rest: 280,
-  /** Quanto o enxame fica para trás por segundo quando o quati corre normal. */
+  /** Quanto o enxame fica para trás por segundo quando a capivara corre normal. */
   recover: 40,
   /** Batida em caixote: velocidade cai para esta fração e volta em `slowRecover` s. */
   slowFactor: 0.3,
@@ -113,7 +129,7 @@ export const SWARM = {
 export const SCORING = {
   /** Unidades por metro. */
   unitsPerMeter: 10,
-  /** Pontos por jabuticaba. */
+  /** Pontos por capim. */
   fruit: 5,
   /** Quebrar algo durante o dash. */
   smash: 10,
@@ -121,7 +137,7 @@ export const SCORING = {
   stomp: 10,
 } as const;
 
-/** Chão: abaixo disso, dentro de um buraco, o quati caiu no rio. */
+/** Chão: abaixo disso, dentro de um buraco, a capivara caiu no rio do jacaré. */
 export const PIT_DEATH_Y = -14;
 
 export const STORAGE = {

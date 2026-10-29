@@ -2,7 +2,7 @@ import { SCORING, STORAGE } from './config';
 import type { Storage } from '../../../shared/storage/storage';
 
 /**
- * Pontuação: metros corridos + bônus (jabuticabas, quebras, pisões).
+ * Pontuação: metros corridos + bônus (tufos de capim, quebras, pisões).
  * O recorde fica em `ndc:corrida:best` (mesmo padrão dos outros jogos).
  */
 export class Score {

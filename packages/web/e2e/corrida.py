@@ -56,6 +56,7 @@ with sync_playwright() as p:
     page.wait_for_selector(".hub-card")
     names = page.locator(".hub-name").all_inner_texts()
     check("hub lista os três jogos", len(names) == 3 and "Disparada" in names, ", ".join(names))
+    check("Disparada é o segundo jogo do hub", names[1:2] == ["Disparada"], ", ".join(names))
     page.screenshot(path=str(OUT / "corrida-00-hub.png"))
     page.locator('.hub-card[data-game="corrida"] a').click()
     page.wait_for_selector("text=CORRER")
@@ -80,7 +81,7 @@ with sync_playwright() as p:
            l.ground.length = 0; l.addGround(-800, t.genX + 5000); t.genX += 5000 }"""
     )
     page.wait_for_timeout(300)
-    check("o quati corre sozinho", st(page)["x"] > s0["x"] + 60)
+    check("a capivara corre sozinha", st(page)["x"] > s0["x"] + 60)
 
     b = page.locator(".surface").bounding_box()
     cx, cy = b["x"] + b["width"] * 0.5, b["y"] + b["height"] * 0.6
@@ -149,6 +150,22 @@ with sync_playwright() as p:
     check("deslizar → dispara o dash", st(page)["dash"] > 0)
     page.wait_for_timeout(1100)
 
+    # Cipó: no ar, encostar agarra; toque solta.
+    wait_grounded(page)
+    page.evaluate(
+        """() => { const e = window.__NDC__.engine, r = e.runner;
+           e.track.level.vines.unshift({ ax: r.x + e.runSpeed * 0.3, ay: 300, len: 170 }) }"""
+    )
+    page.keyboard.down("Space")
+    page.wait_for_function("() => window.__NDC__.engine.runner.swinging", timeout=3000)
+    page.keyboard.up("Space")
+    check("encostar no cipó agarra e balança", st(page)["state"] == "PLAYING")
+    page.screenshot(path=str(OUT / "corrida-04b-cipo.png"))
+    page.keyboard.press("Space")
+    page.wait_for_timeout(30)
+    check("toque solta do cipó", not page.evaluate("() => window.__NDC__.engine.runner.swinging"))
+    wait_grounded(page)
+
     # Pausa ao ocultar a aba.
     page.evaluate("() => { Object.defineProperty(document, 'hidden', {value: true, configurable: true}); document.dispatchEvent(new Event('visibilitychange')) }")
     check("aba oculta pausa", st(page)["state"] == "PAUSED")
@@ -161,7 +178,7 @@ with sync_playwright() as p:
     page.wait_for_function("() => window.__NDC__.engine.state === 'PLAYING'", timeout=4000)
     check("retomada volta a jogar sem saltar posição", abs(st(page)["x"] - x) < 60)
 
-    # Sem tocar, o quati bate e a partida acaba.
+    # Sem tocar, a capivara bate e a partida acaba.
     page.wait_for_function("() => window.__NDC__.engine.state === 'GAME_OVER'", timeout=45000)
     page.wait_for_timeout(500)
     s5 = st(page)
@@ -171,7 +188,7 @@ with sync_playwright() as p:
 
     if page.locator("text=Só meu nome").count():
         page.click("text=Só meu nome")
-        page.fill("#player-name", "Teste Quati")
+        page.fill("#player-name", "Teste Capivara")
         page.press("#player-name", "Enter")
         page.wait_for_selector("text=lugar no ranking")
         check("ranking salva com Só meu nome", page.locator(".save-box.is-saved").count() == 1)

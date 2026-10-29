@@ -23,18 +23,18 @@ export const GAMES: readonly GameInfo[] = [
     accent: '#ffd23f',
   },
   {
+    id: 'corrida',
+    name: 'Disparada',
+    tagline: 'A capivara corre comendo capim. Pule o jacaré e fuja dos marimbondos.',
+    href: 'corrida/',
+    accent: '#ffb347',
+  },
+  {
     id: 'aviao',
     name: 'Acrobata',
     tagline: 'Segure para subir, solte para cair. Desvie e não encoste no chão.',
     href: 'aviao/',
     accent: '#ff7a45',
-  },
-  {
-    id: 'corrida',
-    name: 'Disparada',
-    tagline: 'Toque para pular, segure para planar. Fuja dos marimbondos.',
-    href: 'corrida/',
-    accent: '#ffb347',
   },
 ];
 

@@ -1,6 +1,6 @@
 import { SynthAudio } from '../../shared/audio/SynthAudio';
 
-/** Escala pentatônica (semitons) da sequência de frutas. */
+/** Escala pentatônica (semitons) da sequência de capins. */
 const PENTA = [0, 2, 4, 7, 9, 12, 14, 16];
 
 /**
@@ -29,16 +29,17 @@ export class RunnerSfx extends SynthAudio {
     this.tone(hard ? 150 : 190, hard ? 70 : 110, hard ? 0.12 : 0.07, 'sine', hard ? 0.45 : 0.22, 0, 0.002);
   }
 
-  /** Jabuticaba: "plim" que sobe de tom em sequência. */
+  /** Capim: "nhac" crocante (mastigada) + nota que sobe de tom em sequência. */
   fruit(streak: number): void {
     if (!this.ready) return;
     const now = this.ctx!.currentTime;
-    // Duas frutas no mesmo instante: um som só (evita estouro).
+    // Dois capins no mesmo instante: um som só (evita estouro).
     if (now - this.lastFruit < 0.03) return;
     this.lastFruit = now;
     const step = PENTA[Math.min(PENTA.length - 1, Math.max(0, streak - 1))];
     const f = 880 * Math.pow(2, step / 12);
-    this.tone(f, f, 0.09, 'sine', 0.3);
+    this.noise(0.045, 0.09, 3200, 1400, 'bandpass');
+    this.tone(f, f, 0.09, 'sine', 0.26, 0.02);
     this.tone(f * 2, f * 2, 0.06, 'sine', 0.1, 0.02);
   }
 
@@ -64,6 +65,14 @@ export class RunnerSfx extends SynthAudio {
   spring(): void {
     this.tone(200, 900, 0.22, 'sine', 0.4, 0, 0.003);
     this.tone(300, 1200, 0.18, 'triangle', 0.15, 0.03);
+  }
+
+  /** Agarrou o cipó: "vuuup" curto. Soltou: assobio subindo. */
+  vine(on: boolean): void {
+    if (on) {
+      this.noise(0.12, 0.06, 900, 2200, 'bandpass');
+      this.tone(260, 360, 0.12, 'triangle', 0.22);
+    } else this.tone(420, 900, 0.18, 'sine', 0.28);
   }
 
   dash(): void {

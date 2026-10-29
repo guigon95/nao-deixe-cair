@@ -6,7 +6,7 @@ Hub de jogos casuais para navegador (prioridade para celular). Cada jogo fica na
 |---|---|---|
 | **Bolinha** (nome provisório) | `bolinha/` | Segure para subir, solte para cair. Passe pelos vãos das barreiras. |
 | **Acrobata** | `aviao/` | Segure para subir, solte para cair (mesma física da bolinha). Desvie de balões, pássaros e torres e não encoste no chão. |
-| **Disparada** (nome provisório) | `corrida/` | Corrida infinita lateral: toque pula, segure para pular alto e planar. Fuja do enxame de marimbondos coletando jabuticabas. |
+| **Disparada** (nome provisório) | `corrida/` | Corrida infinita lateral com uma capivara: toque pula, segure para pular alto e planar. Coma capim, pule o rio do jacaré e fuja dos marimbondos. |
 
 React 19 + TypeScript estrito + Vite (multi-página) + Canvas 2D no front; **API Fastify + Prisma + Postgres** para contas e ranking de todos os jogadores (mesmo padrão do AquaOps). Sem anúncios, sem analytics. Sons sintetizados com Web Audio. Sem servidor (offline ou hospedagem estática) tudo continua funcionando com ranking e perfil locais.
 
@@ -229,14 +229,15 @@ Uma versão anterior do C usava dois toques rápidos para o loop; com o mergulho
 
 ## Disparada (corrida infinita)
 
-Inspirada no gênero de *Banana Kong* (corrida automática, pulo, planar, dash com medidor, perseguidor atrás), com identidade própria: um **quati** foge de um **enxame de marimbondos** pela mata, coletando **jabuticabas**. Tudo desenhado em Canvas 2D e sons sintetizados — nenhum recurso de terceiros.
+Inspirada no gênero de *Banana Kong* (corrida automática, pulo, planar, dash com medidor, perseguidor atrás), com identidade bem brasileira: uma **capivara** corre pela mata comendo **capim** (o que ela come todo dia), pula o rio onde o **jacaré** espera e foge de um **enxame de marimbondos**. Tudo desenhado em Canvas 2D e sons sintetizados — nenhum recurso de terceiros.
 
 ### Controles
 
 | Ação | Toque | Teclado |
 |---|---|---|
 | Pular (na hora, sem esperar gesto) | tocar em qualquer lugar | Espaço / ↑ / W |
-| Pulo alto e planar na descida (rabo vira hélice, até 0,9 s) | segurar | segurar |
+| Pulo alto e planar na descida (segurando uma folha de bananeira, até 0,9 s) | segurar | segurar |
+| Balançar no cipó (agarra sozinha ao encostar no ar; solta no fim do balanço) | toque solta com impulso | Espaço solta · ↓ solta sem impulso |
 | Descer rápido / atravessar o galho | deslizar ↓ | ↓ / S |
 | **Disparada** (dash: 0,85 s, ×1,65 de velocidade, quebra pedras, espinhos e caixotes, afasta o enxame) | deslizar → ou botão **DISPARAR** | → / D / Shift |
 | Pausar | botão ⏸ | Esc / P |
@@ -245,11 +246,12 @@ Toque curto = pulo baixo (~85 u, passa pedras pequenas); segurar = pulo cheio (~
 
 ### Regras
 
-- Pedra de lado, espinhos ou cair no rio = fim. Em cima de pedra dá para pousar (quinas de até 7 u sobem sozinhas).
+- Pedra de lado, espinhos ou cair no rio (o jacaré pega) = fim. Em cima de pedra dá para pousar (quinas de até 7 u sobem sozinhas).
 - **Caixote**: atravessar atrasa (velocidade cai a 30 % e volta em 1,3 s) e o enxame se aproxima; pisar em cima quica (+10).
+- **Cipós**: pendurados sobre rios largos e pedras; a capivara agarra ao encostar no ar, balança como pêndulo (sempre com força para chegar ao fim do balanço) e é lançada para a frente. Alguns rios só dá para atravessar pelo cipó.
 - **Flor-mola**: encostar lança bem alto. **Galhos** (presos por cipós) são caminhos altos com frutas; dá para descer deles com ↓.
 - **Enxame**: começa perto e vai ficando para trás (até 280 u) enquanto você corre; caixotes o aproximam, o dash afasta; se alcançar, acabou. Perto, a tela ganha borda vermelha e zumbido.
-- **Pontos** = metros + 5 por jabuticaba + 10 por quebra/pisão. 12 jabuticabas enchem o medidor do dash.
+- **Pontos** = metros + 5 por tufo de capim + 10 por quebra/pisão. 12 capins enchem o medidor do dash.
 - O cenário muda a cada 800 m (Mata → Entardecer → Noite na mata → Amanhecer); os obstáculos mantêm as cores em todos.
 
 ### Orientação
@@ -258,8 +260,8 @@ Paisagem (arena lógica 640×360): a corrida lateral precisa de visão à frente
 
 ### Percurso justo
 
-- Obstáculos vêm de **padrões escritos em segundos** (`game/patterns.ts`): o `Builder` converte em distância pela velocidade prevista para quando o quati chegar. "Um rio de 0,44 s" pede o mesmo pulo a 290 ou 480 u/s.
-- Um **planejador** (`game/testing/planner.ts`) usa a mesma física e procura uma sequência de toques que atravessa: os testes provam que **os 20 padrões** são atravessáveis em três velocidades e três sementes sem bater em caixote, e que ele recusa trechos impossíveis.
+- Obstáculos vêm de **padrões escritos em segundos** (`game/patterns.ts`): o `Builder` converte em distância pela velocidade prevista para quando a capivara chegar. "Um rio de 0,44 s" pede o mesmo pulo a 290 ou 480 u/s.
+- Um **planejador** (`game/testing/planner.ts`) usa a mesma física e procura uma sequência de toques que atravessa: os testes provam que **os 22 padrões** são atravessáveis em três velocidades e três sementes sem bater em caixote, e que ele recusa trechos impossíveis.
 - Um piloto automático (o planejador replanejando a cada pouso) sobrevive **150 s em 16 sementes** do percurso gerado de verdade.
 - Jogadores **simulados** (pulam no meio da janela, com erro de tempo aleatório e toque ±25 %): mediana de **73 s** com ±25 ms e **27 s** com ±70 ms. É simulação, não medição com pessoas.
 
@@ -268,8 +270,8 @@ Paisagem (arena lógica 640×360): a corrida lateral precisa de visão à frente
 | Tempo | Nível | Novidades |
 |---|---|---|
 | 0–10 s | 0 | pedras, pedrona, caixote, riacho; 2,2 s iniciais livres |
-| 10–25 s | 1 | rio médio, espinhos, duas pedras, galho, caixotes, flor-mola |
-| 25–45 s | 2 | pedra + rio, pedras juntas, rio largo, ponte de galho, pedrona + caixote |
+| 10–25 s | 1 | rio médio, espinhos, duas pedras, galho, caixotes, flor-mola, cipó com capim |
+| 25–45 s | 2 | pedra + rio, pedras juntas, rio largo, rio do cipó, ponte de galho, pedrona + caixote |
 | 45–75 s | 3 | escada de galhos, espinhos longos (pedem planar), ritmo de três pulos |
 | 75 s+ | 4 | galhos sobre rio comprido, corredor de obstáculos |
 
@@ -277,7 +279,7 @@ Velocidade 290 → 480 u/s (aproximação exponencial, τ = 70 s); folga entre p
 
 ### Arquitetura
 
-`game/` não conhece DOM nem React: `Physics.ts` (passo puro a 120 Hz, sem alocação), `Level.ts` (listas que se limpam atrás da tela), `Track.ts` (gerador), `Engine.ts` (estados, enxame, dash, pontos, eventos), `Gestures.ts` (deslizes). `rendering/` desenha (paletas, quati, efeitos em pools fixos); `hooks/useCorrida.ts` liga tudo ao `GameLoop`, `InputController`, `SynthAudio`, ranking e configurações do hub. Recorde e ranking em `ndc:corrida:best` / `ndc:corrida:ranking`; ranking online pelo mesmo backend (id `corrida`, teto de 200 pontos/s).
+`game/` não conhece DOM nem React: `Physics.ts` (passo puro a 120 Hz, sem alocação), `Level.ts` (listas que se limpam atrás da tela), `Track.ts` (gerador), `Engine.ts` (estados, enxame, dash, pontos, eventos), `Gestures.ts` (deslizes). `rendering/` desenha (paletas, capivara, jacaré, efeitos em pools fixos); `hooks/useCorrida.ts` liga tudo ao `GameLoop`, `InputController`, `SynthAudio`, ranking e configurações do hub. Recorde e ranking em `ndc:corrida:best` / `ndc:corrida:ranking`; ranking online pelo mesmo backend (id `corrida`, teto de 200 pontos/s).
 
 `?debug&piloto` liga o piloto automático no navegador.
 

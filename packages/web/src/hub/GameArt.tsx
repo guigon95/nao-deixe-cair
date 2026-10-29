@@ -69,7 +69,7 @@ function PlaneArt() {
   );
 }
 
-/** Disparada: o quati pulando uma pedra, jabuticabas em arco e o enxame atrás. */
+/** Disparada: a capivara pulando o rio do jacaré, capim em arco e o enxame atrás. */
 function RunnerArt() {
   return (
     <svg viewBox="0 0 200 120" width="100%" height="100%">
@@ -81,7 +81,7 @@ function RunnerArt() {
       </defs>
       <rect width="200" height="120" fill="url(#ra-sky)" />
       <path d="M0 80 Q 30 56 60 72 T 120 66 T 200 70 V120 H0 Z" fill="#8cc9a0" />
-      {[18, 70, 128, 176].map((x) => (
+      {[18, 70, 176].map((x) => (
         <g key={x}>
           <rect x={x - 2} y="52" width="4" height="40" fill="#3c7d4e" />
           <circle cx={x} cy="50" r="16" fill="#4f9a63" />
@@ -89,14 +89,23 @@ function RunnerArt() {
       ))}
       <rect y="94" width="200" height="26" fill="#8a5a33" />
       <rect y="91" width="200" height="7" fill="#58b548" />
-      <path d="M118 94 L121 80 Q 128 74 136 78 L140 94 Z" fill="#8d929c" />
+      {/* rio com o jacaré */}
+      <rect x="96" y="91" width="56" height="29" fill="#2f86c6" />
+      <ellipse cx="128" cy="101" rx="11" ry="2.4" fill="#3f5d2a" />
+      <ellipse cx="114" cy="100" rx="4" ry="3" fill="#3f5d2a" />
+      <ellipse cx="121" cy="100" rx="4" ry="3" fill="#3f5d2a" />
+      <circle cx="114.5" cy="99" r="1.2" fill="#e8f27a" />
+      <circle cx="121.5" cy="99" r="1.2" fill="#e8f27a" />
       {[
-        [92, 70],
-        [106, 56],
-        [122, 50],
-        [138, 54],
+        [92, 64],
+        [108, 50],
+        [124, 46],
+        [140, 52],
       ].map(([x, y]) => (
-        <circle key={x} cx={x} cy={y} r="3.6" fill="#3a1450" stroke="#fff" strokeOpacity="0.4" strokeWidth="1" />
+        <g key={x} stroke="#b6f04a" strokeWidth="2.2" strokeLinecap="round">
+          <circle cx={x} cy={y - 4} r="6" fill="#fffde0" fillOpacity="0.5" stroke="none" />
+          <path d={`M${x - 3} ${y} L${x - 5} ${y - 8} M${x} ${y} L${x} ${y - 10} M${x + 3} ${y} L${x + 5} ${y - 8}`} />
+        </g>
       ))}
       {[
         [14, 70],
@@ -108,16 +117,13 @@ function RunnerArt() {
       ].map(([x, y]) => (
         <ellipse key={`${x}-${y}`} cx={x} cy={y} rx="3" ry="2" fill="#ffcc33" />
       ))}
-      <g className="art-bob" transform="translate(116 64) rotate(-10)">
-        <path d="M-10 -2 Q -22 -2 -24 -16" stroke="#c97a3c" strokeWidth="6" fill="none" strokeLinecap="round" />
-        <path d="M-10 -2 Q -22 -2 -24 -16" stroke="#4a2a14" strokeWidth="6" fill="none" strokeLinecap="round" strokeDasharray="3 4" />
-        <ellipse cx="0" cy="0" rx="13" ry="8" fill="#c97a3c" />
-        <circle cx="11" cy="-4" r="6.5" fill="#c97a3c" />
-        <path d="M14 -7 Q 21 -5 23 -2 L14 0 Z" fill="#c97a3c" />
-        <circle cx="23" cy="-2.5" r="1.8" fill="#1d120b" />
-        <ellipse cx="13" cy="-6" rx="3.4" ry="2.2" fill="#3a2214" />
-        <circle cx="13.5" cy="-6.3" r="1.2" fill="#fff" />
-        <path d="M-6 6 L-9 12 M6 6 L9 11" stroke="#8c4f22" strokeWidth="3" strokeLinecap="round" />
+      <g className="art-bob" transform="translate(84 74) rotate(-8)">
+        <path d="M-12 6 L-13 13 M-6 7 L-5 13 M6 7 L5 13 M11 6 L13 12" stroke="#6e4826" strokeWidth="4" strokeLinecap="round" />
+        <ellipse cx="-2" cy="0" rx="16" ry="10" fill="#9a6a40" />
+        <path d="M6 -12 L18 -12 Q 25 -11 25 -5 Q 25 1 19 1 L8 3 Q 4 -4 6 -12 Z" fill="#9a6a40" />
+        <path d="M20 -11 Q 25 -10 25 -5 Q 25 1 20 1.4 Z" fill="#5a3a20" />
+        <circle cx="9" cy="-13" r="2.6" fill="#6e4826" />
+        <path d="M13.5 -8.6 a1.6 1.6 0 0 0 3 0" stroke="#1b120a" strokeWidth="1.3" fill="none" />
       </g>
     </svg>
   );

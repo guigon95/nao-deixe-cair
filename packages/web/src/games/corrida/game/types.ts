@@ -60,6 +60,16 @@ export interface Spring {
   usedAt: number;
 }
 
+/**
+ * Cipó de balançar: pendurado em (ax, ay), comprimento `len`. A capivara
+ * agarra sozinha ao encostar nele no ar e é lançada para a frente ao soltar.
+ */
+export interface Vine {
+  ax: number;
+  ay: number;
+  len: number;
+}
+
 export interface Fruit {
   x: number;
   y: number;
@@ -68,7 +78,7 @@ export interface Fruit {
   risky: boolean;
 }
 
-/** Estado físico do quati. Objeto simples: dá para clonar (piloto automático). */
+/** Estado físico da capivara. Objeto simples: dá para clonar (piloto automático). */
 export interface Runner {
   x: number;
   /** Pés (y para cima). */
@@ -94,6 +104,16 @@ export interface Runner {
   dash: number;
   /** Depois do dash, um instante em que ainda quebra pedras (s). */
   dashTail: number;
+  /** Pendurada num cipó. */
+  swinging: boolean;
+  /** Cipó atual: âncora, raio, ângulo (0 = na vertical, + = para a frente) e velocidade angular. */
+  swAx: number;
+  swAy: number;
+  swL: number;
+  swTh: number;
+  swOm: number;
+  /** Tempo sem poder agarrar de novo depois de soltar (s). */
+  vineCooldown: number;
   /** Multiplicador de velocidade (caixote atrasa). */
   slow: number;
   /** Tempo desde o último pouso (animação de "squash"). */
@@ -114,6 +134,7 @@ export type GameEvent =
   | { type: 'smash'; x: number; y: number }
   | { type: 'spring'; x: number; y: number }
   | { type: 'dash'; on: boolean }
+  | { type: 'vine'; on: boolean; x: number; y: number }
   | { type: 'fastFall' }
   | { type: 'death'; cause: DeathCause; x: number; y: number; score: number; best: number; isNewRecord: boolean }
   | { type: 'newRecord'; score: number };

@@ -24,7 +24,7 @@ const TRANSITIONS: Record<GameState, readonly GameState[]> = {
   GAME_OVER: [GameState.PLAYING, GameState.READY],
 };
 
-/** Intervalo para frutas contarem como sequência (o som sobe de tom). */
+/** Intervalo para capins contarem como sequência (o som sobe de tom). */
 const STREAK_WINDOW = 0.7;
 
 /**
@@ -38,9 +38,9 @@ export class Engine {
   readonly score: Score;
   /** Tempo de partida simulado (s). */
   elapsed = 0;
-  /** Distância do enxame atrás do quati (u). 0 = alcançou. */
+  /** Distância do enxame atrás da capivara (u). 0 = alcançou. */
   swarm: number = SWARM.start;
-  /** Jabuticabas no medidor do dash. */
+  /** Capins no medidor do dash. */
   meter = 0;
   holding = false;
   alpha = 0;
@@ -96,7 +96,7 @@ export class Engine {
     return speedAt(this.elapsed);
   }
 
-  /** Velocidade real do quati (com caixote/dash). */
+  /** Velocidade real da capivara (com caixote/dash). */
   get runSpeed(): number {
     return runnerSpeed(this.runner, this.speed);
   }
@@ -149,7 +149,7 @@ export class Engine {
   toMenu(): void {
     this.setHolding(false);
     if (this.setState(GameState.READY)) {
-      // Menu mostra o quati correndo no começo do percurso.
+      // Menu mostra a capivara correndo no começo do percurso.
       this.track.reset(createRng(this.fixedSeed ?? randomSeed()));
       Object.assign(this.runner, createRunner(0));
       this.swarm = SWARM.start;
@@ -244,8 +244,9 @@ export class Engine {
     if (wasDashing && r.dash <= 0) this.emit({ type: 'dash', on: false });
     if (r.gliding !== wasGliding) this.emit({ type: 'glide', on: r.gliding });
 
-    // Enxame: ganha terreno quando o quati é atrasado, perde quando ele corre (ou no dash).
-    const actual = runnerSpeed(r, base);
+    // Enxame: ganha terreno quando a capivara é atrasado, perde quando ele corre (ou no dash).
+    // Velocidade real do passo (no cipó o pêndulo manda no x).
+    const actual = (r.x - r.prevX) / dt;
     this.swarm += (actual - base) * dt;
     if (this.swarm < SWARM.rest) this.swarm = Math.min(SWARM.rest, this.swarm + SWARM.recover * dt);
     else this.swarm = SWARM.rest;
@@ -271,7 +272,7 @@ export class Engine {
     this.emit({ type: 'death', cause, x: r.x, y: r.y, ...res });
   }
 
-  /** Menu: o quati corre sozinho pelo começo do percurso (sem obstáculos). */
+  /** Menu: a capivara corre sozinho pelo começo do percurso (sem obstáculos). */
   private attract(dt: number): void {
     const r = this.runner;
     r.prevX = r.x;
@@ -316,6 +317,8 @@ export class Engine {
         this.meter = Math.min(DASH.meterMax, this.meter + 1);
         this.emit({ type: 'fruit', x: f.x, y: f.y, streak: this.streak, meterFull: !wasFull && this.meterFull });
       },
+      grab: (_v, r) => this.emit({ type: 'vine', on: true, x: r.x, y: r.y }),
+      letGo: (r) => this.emit({ type: 'vine', on: false, x: r.x, y: r.y }),
     };
   }
 }

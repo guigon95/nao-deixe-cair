@@ -134,13 +134,13 @@ export function GameScreen() {
             <h1 id="title" className="title">
               <span className="title-accent">Disparada</span>
             </h1>
-            <p className="tagline">O quati corre sozinho. Fuja dos marimbondos!</p>
+            <p className="tagline">A capivara corre sozinha, comendo capim. Fuja dos marimbondos!</p>
             <ul className="controls" aria-label="Controles">
               <li>
-                <strong>Toque</strong> pula · <strong>segure</strong> para pular alto e planar
+                <strong>Toque</strong> pula · <strong>segure</strong> para pular alto e planar · encoste no <strong>cipó</strong> para balançar (toque solta)
               </li>
               <li>
-                <strong>Deslize ↓</strong> desce rápido · <strong>deslize →</strong> com 12 jabuticabas: DISPARADA
+                <strong>Deslize ↓</strong> desce rápido · <strong>deslize →</strong> com 12 capins: DISPARADA
               </li>
               <li className="keys">Teclado: Espaço/↑ · ↓ · → · P pausa</li>
             </ul>
@@ -220,7 +220,7 @@ export function GameScreen() {
                 <strong>{ui.meters}</strong> m
               </span>
               <span>
-                <strong>{ui.fruits}</strong> {ui.fruits === 1 ? 'jabuticaba' : 'jabuticabas'}
+                <strong>{ui.fruits}</strong> {ui.fruits === 1 ? 'capim' : 'capins'}
               </span>
             </p>
             <p className="best">
