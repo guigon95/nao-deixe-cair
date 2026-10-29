@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CRATE_LOOT, EMA, JUMP, SIM, TOCA } from '../game/config';
+import { CRATE_LOOT, JUMP, MOUNT, MOUNTS, SIM, TOCA } from '../game/config';
 import { Engine } from '../game/Engine';
 import { Track } from '../game/Track';
 import { GameState, type GameEvent } from '../game/types';
@@ -66,7 +66,7 @@ describe('ema (montaria)', () => {
     expect(mounts(events, 'ride')).toHaveLength(1);
     expect(e.riding).toBe(true);
     run(e, 1);
-    expect(e.speedFactor).toBeCloseTo(1 + EMA.speed, 5);
+    expect(e.speedFactor).toBeCloseTo(1 + MOUNTS.ema.speed, 5);
   });
 
   it('montada pula mais alto', () => {
@@ -155,7 +155,7 @@ describe('ema (montaria)', () => {
   it('a ema solta espera um tempo e depois vai embora', () => {
     const { e, events } = flat();
     e.mount = { animal: 'ema', state: 'free', x: e.runner.x + 50, y: 0, vy: 0, t: 0 };
-    run(e, EMA.freeTime + 0.2);
+    run(e, MOUNT.freeTime + 0.2);
     expect(mounts(events, 'off').some((ev) => ev.type === 'mount' && ev.reason === 'timeout')).toBe(true);
   });
 
@@ -167,5 +167,60 @@ describe('ema (montaria)', () => {
     run(e, 1);
     expect(e.state).toBe(GameState.GAME_OVER);
     expect(e.deathCause).toBe('swarm');
+  });
+});
+
+describe('anta (montaria)', () => {
+  function antaRidden(e: Engine) {
+    e.mount = { animal: 'anta', state: 'ridden', x: e.runner.x, y: 0, vy: 0, t: 0 };
+  }
+
+  it('atropela caixotes e espinhos sem cair', () => {
+    const { e, l, events } = flat();
+    antaRidden(e);
+    const x = e.runner.x;
+    l.crates.push({ x0: x + 60, x1: x + 96, top: 36, broken: false, brokenAt: 0 });
+    l.thorns.push({ x0: x + 200, x1: x + 290, top: 24, broken: false });
+    run(e, 1.2);
+    expect(e.state).toBe(GameState.PLAYING);
+    expect(e.riding).toBe(true);
+    expect(mounts(events, 'off')).toHaveLength(0);
+    expect(e.runner.slow).toBe(1);
+    expect(l.crates[0]?.broken ?? true).toBe(true);
+  });
+
+  it('só a pedra derruba da anta', () => {
+    const { e, l, events } = flat();
+    antaRidden(e);
+    l.rocks.push({ x0: e.runner.x + 80, x1: e.runner.x + 114, top: 30, variant: 0, broken: false });
+    run(e, 1);
+    expect(e.state).toBe(GameState.PLAYING);
+    expect(mounts(events, 'off').some((ev) => ev.type === 'mount' && ev.reason === 'hit' && ev.animal === 'anta')).toBe(true);
+  });
+
+  it('montada na anta: +15% (menos que a ema) e pulo normal', () => {
+    const { e, l } = flat();
+    const x = e.runner.x + 70;
+    l.crates.push({ x0: x, x1: x + 36, top: 36, broken: false, brokenAt: 0, loot: { kind: 'mount', animal: 'anta' } });
+    run(e, 1.2);
+    e.setHolding(true);
+    run(e, 0.1);
+    e.setHolding(false);
+    run(e, 2);
+    expect(e.riding).toBe(true);
+    expect(e.speedFactor).toBeCloseTo(1 + MOUNTS.anta.speed, 5);
+    expect(MOUNTS.anta.speed).toBeLessThan(MOUNTS.ema.speed);
+  });
+
+  it('caixotes de montaria sorteiam ema e anta', () => {
+    const seen = new Set<string>();
+    for (let seed = 1; seed <= 10; seed++) {
+      const t = new Track(createRng(seed));
+      for (let x = 0; x < 150_000; x += 400) {
+        t.update(x, x / 380, 380);
+        for (const c of t.level.crates) if (c.loot?.kind === 'mount') seen.add(c.loot.animal);
+      }
+    }
+    expect([...seen].sort()).toEqual(['anta', 'ema']);
   });
 });

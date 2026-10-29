@@ -241,31 +241,43 @@ export const TOCA = {
 } as const;
 
 /**
- * Ema (montaria): sai de um caixote e corre do lado; pulando nas costas dela,
- * a capivara monta. Montada: mais rápida e pulando mais alto. Batendo num
- * obstáculo, a capivara pula fora (sem perder vida) e a ema dispara embora.
+ * Montarias: saem de um caixote e correm do lado; pulando nelas, a capivara
+ * monta. Montada: mais rápida. Batendo num obstáculo, a capivara pula fora
+ * (sem perder vida) e a montaria dispara embora.
  */
-export const EMA = {
-  /** Velocidade extra montada (+30%) e rampa (s). */
-  speed: 0.3,
+export const MOUNT = {
+  /** Rampa da velocidade extra (s). */
   ramp: 0.4,
-  /** Altura das costas da ema (onde a capivara senta). */
-  seat: 44,
-  /** Quanto tempo a ema solta espera a capivara (s) e quanto à frente corre. */
+  /** Quanto tempo a montaria solta espera a capivara (s) e quanto à frente corre. */
   freeTime: 5,
   ahead: 55,
   /** Fugindo: velocidade em relação à da capivara. */
   flee: 1.8,
-  /** Janela para montar: distância em x e altura dos pés acima da ema. */
+  /** Janela para montar: distância em x e altura dos pés acima da montaria. */
   catchDx: 30,
   catchMin: 12,
   catchMax: 90,
-  /** Pulinho ao cair da ema (× pulo normal). */
+  /** Pulinho ao cair da montaria (× pulo normal). */
   hop: 0.75,
 } as const;
 
-/** Pulo montada na ema: mais alto. */
-export const EMA_JUMP: JumpParams = { ...JUMP, jumpVelocity: 1060 };
+export type MountAnimal = 'ema' | 'anta';
+
+export interface MountSpec {
+  /** Velocidade extra montada (fração). */
+  speed: number;
+  /** Parâmetros do pulo montada. */
+  jump: JumpParams;
+  /** Atropela caixotes e espinhos sem cair (só pedra derruba). */
+  tank: boolean;
+}
+
+export const MOUNTS: Record<MountAnimal, MountSpec> = {
+  /** Ema: a mais rápida (+30%) e pula mais alto. */
+  ema: { speed: 0.3, jump: { ...JUMP, jumpVelocity: 1060 }, tank: false },
+  /** Anta: +15%, pesada (pulo normal), mas atropela caixotes e espinhos. */
+  anta: { speed: 0.15, jump: JUMP, tank: true },
+};
 
 /** Chão: abaixo disso, dentro de um buraco, a capivara caiu no rio do jacaré. */
 export const PIT_DEATH_Y = -14;

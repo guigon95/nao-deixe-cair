@@ -6,7 +6,7 @@ import { computeLayout, type Layout } from '../../../shared/layout/layout';
 import type { Effects } from './effects';
 import { dominantSeason, mix, paletteAt, SEASONS, type Palette, type SeasonId } from './palette';
 import { drawCapivara, type Pose } from './capivara';
-import { drawEma, EMA_SEAT_DRAW } from './ema';
+import { drawMount, MOUNT_SEAT_DRAW } from './mounts';
 import { Weather } from './weather';
 import { boteShape, Gators, WATER_Y, type Gator } from './gators';
 
@@ -184,7 +184,7 @@ export class Renderer {
     if (m && m.state !== 'ridden') {
       const ex = this.sx(m.x);
       if (ex > this.viewL - 60 && ex < this.viewR + 60) {
-        drawEma(this.ctx, ex, this.sy(m.y), { run: m.x / 26, air: m.y > 0.5, lean: m.state === 'fleeing' ? 1 : 0.2 });
+        drawMount(this.ctx, m.animal, ex, this.sy(m.y), { run: m.x / 26, air: m.y > 0.5, lean: m.state === 'fleeing' ? 1 : 0.2 });
         // Solta: setinha chamando para pular nela.
         if (m.state === 'free' && m.t > 0.3) {
           const a = 0.6 + 0.4 * Math.sin(opts.time * 8);
@@ -847,8 +847,31 @@ export class Renderer {
       ctx.fillRect(x0 + 5, top + h * 0.5 - 1, 5, 3);
       ctx.fillRect(x0 + w - 10, top + h * 0.35, 5, 3);
     }
-    // Caixote de montaria: pena de ema escapando e pegada de três dedos carimbada.
-    if (c.loot?.kind === 'mount') {
+    // Caixote de anta: folha escapando e pegada redonda de quatro dedos.
+    if (c.loot?.kind === 'mount' && c.loot.animal === 'anta') {
+      ctx.save();
+      ctx.translate(x0 + w - 9, top);
+      ctx.rotate(0.4 + Math.sin(time * 3) * 0.08);
+      ctx.fillStyle = '#4f9a3a';
+      ctx.beginPath();
+      ctx.ellipse(0, -9, 5, 10, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      const fx = x0 + w / 2;
+      const fy = top + h / 2 + 3;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(x0 + 5, top + 5, w - 10, h - 10);
+      ctx.fillStyle = '#5a3a1a';
+      ctx.beginPath();
+      ctx.ellipse(fx, fy + 3, 6, 4.5, 0, 0, Math.PI * 2);
+      for (const [dx, dy] of [[-6, -5], [-2, -8], [2, -8], [6, -5]] as const) {
+        ctx.moveTo(fx + dx + 2, fy + dy);
+        ctx.arc(fx + dx, fy + dy, 2, 0, Math.PI * 2);
+      }
+      ctx.fill();
+    }
+    // Caixote de ema: pena escapando e pegada de três dedos carimbada.
+    if (c.loot?.kind === 'mount' && c.loot.animal === 'ema') {
       ctx.save();
       ctx.translate(x0 + w - 8, top);
       ctx.rotate(0.5 + Math.sin(time * 3) * 0.08);
@@ -1609,8 +1632,9 @@ export class Renderer {
     const feetY = y;
     let x = x0;
     if (riding) {
-      drawEma(ctx, x, feetY, { run: r.grounded ? (p.x / 24) % (Math.PI * 2) : 0, air: !r.grounded, lean: 0.6 });
-      y -= EMA_SEAT_DRAW;
+      const animal = engine.mount!.animal;
+      drawMount(ctx, animal, x, feetY, { run: r.grounded ? (p.x / 24) % (Math.PI * 2) : 0, air: !r.grounded, lean: 0.6 });
+      y -= MOUNT_SEAT_DRAW[animal];
       x -= 8;
       if (pose === 'run') pose = 'idle';
     }

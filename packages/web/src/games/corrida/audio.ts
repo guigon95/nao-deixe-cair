@@ -335,9 +335,13 @@ export class RunnerSfx extends SynthAudio {
     this.tone(base * 1.5, base * 2, 0.16, 'sine', 0.22, 0.08);
   }
 
-  /** Ema: aparece (tum-tum grave, o "bum" da ema), monta (fanfarra curta) ou sai (piado). */
-  ema(phase: 'appear' | 'ride' | 'off'): void {
-    if (phase === 'appear') {
+  /** Montaria: aparece (ema: "bum" grave; anta: assobio), monta (fanfarra curta) ou sai (piado). */
+  mount(phase: 'appear' | 'ride' | 'off', animal: 'ema' | 'anta' = 'ema'): void {
+    if (phase === 'appear' && animal === 'anta') {
+      // Anta: assobio agudo (é assim que ela chama).
+      this.tone(1500, 2100, 0.18, 'sine', 0.25);
+      this.tone(1600, 2300, 0.2, 'sine', 0.22, 0.24);
+    } else if (phase === 'appear') {
       this.tone(120, 90, 0.18, 'sine', 0.45);
       this.tone(110, 80, 0.2, 'sine', 0.4, 0.22);
     } else if (phase === 'ride') {

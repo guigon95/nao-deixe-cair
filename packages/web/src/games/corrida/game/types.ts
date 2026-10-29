@@ -1,3 +1,4 @@
+import type { MountAnimal } from './config';
 export const GameState = {
   READY: 'READY',
   PLAYING: 'PLAYING',
@@ -67,11 +68,11 @@ export interface Crate {
   loot?: CrateLoot;
 }
 
-export type CrateLoot = { kind: 'capim'; n: number } | { kind: 'item'; item: ItemKind } | { kind: 'mount'; animal: 'ema' };
+export type CrateLoot = { kind: 'capim'; n: number } | { kind: 'item'; item: ItemKind } | { kind: 'mount'; animal: MountAnimal };
 
 /** Montaria: solta (esperando a capivara pular nela), montada ou fugindo. */
 export interface Mount {
-  animal: 'ema';
+  animal: MountAnimal;
   state: 'free' | 'ridden' | 'fleeing';
   x: number;
   y: number;
@@ -164,6 +165,8 @@ export interface Runner {
   dash: number;
   /** Depois do dash, um instante em que ainda quebra pedras (s). */
   dashTail: number;
+  /** Montada na anta: atropela caixotes e espinhos. */
+  tank: boolean;
   /** Pendurada num cipó. */
   swinging: boolean;
   /** Cipó atual: âncora, raio, ângulo (0 = na vertical, + = para a frente) e velocidade angular. */
@@ -198,7 +201,7 @@ export type GameEvent =
   | { type: 'canopy'; x: number; y: number }
   | { type: 'magnet'; on: boolean; x: number; y: number }
   | { type: 'acai'; x: number; y: number }
-  | { type: 'mount'; phase: 'appear' | 'ride' | 'off'; x: number; y: number; reason?: 'hit' | 'river' | 'toca' | 'timeout' }
+  | { type: 'mount'; phase: 'appear' | 'ride' | 'off'; animal: MountAnimal; x: number; y: number; reason?: 'hit' | 'river' | 'toca' | 'timeout' }
   | { type: 'loot'; x: number; y: number; kind: 'capim' | ItemKind; n: number }
   | { type: 'burrow'; on: boolean; x: number; y: number }
   | { type: 'golden'; on: boolean; x: number; y: number }

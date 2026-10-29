@@ -65,6 +65,7 @@ export function createRunner(x = 0): Runner {
     buffer: 0,
     dash: 0,
     dashTail: 0,
+    tank: false,
     swinging: false,
     swAx: 0,
     swAy: 0,
@@ -356,7 +357,7 @@ function collide(r: Runner, level: Level, sink: StepSink): DeathCause | null {
     if (t.x0 > right - 3) break;
     if (t.broken || t.x1 < left + 3) continue;
     if (bottom >= t.top - 2 || top <= 0) continue;
-    if (dash) {
+    if (dash || r.tank) {
       sink.smash(t, r);
       continue;
     }

@@ -2,7 +2,7 @@ import { difficultyAt, riskyFruitChance, speedAt } from './Difficulty';
 import { Level } from './Level';
 import { Builder, PATTERNS, pickPattern, type Pattern } from './patterns';
 import { createRng, randRange, type Rng } from '../../../shared/random';
-import { CRATE_LOOT, ITEMS } from './config';
+import { CRATE_LOOT, ITEMS, type MountAnimal } from './config';
 import type { ItemKind } from './types';
 
 /** Quanto gerar à frente da capivara (u): mais que uma tela larga. */
@@ -22,6 +22,9 @@ const LANDING_TIME = 0.6;
  * Gera o percurso à frente: padrões validados encadeados com folgas que
  * dependem da dificuldade. Determinístico para uma semente.
  */
+/** Montarias que podem sair dos caixotes. */
+export const MOUNT_ANIMALS: readonly MountAnimal[] = ['ema', 'anta'];
+
 export class Track {
   readonly level = new Level();
   /** Até onde já foi gerado (x). */
@@ -112,7 +115,7 @@ export class Track {
         if (t >= ITEMS.firstAfter) this.level.crates[i].loot = { kind: 'item', item: pickKind(n) };
       } else if (r < CRATE_LOOT.capim + CRATE_LOOT.item + CRATE_LOOT.mount) {
         if (t >= CRATE_LOOT.mountAfter && t - this.lastMount >= CRATE_LOOT.mountGap) {
-          this.level.crates[i].loot = { kind: 'mount', animal: 'ema' };
+          this.level.crates[i].loot = { kind: 'mount', animal: MOUNT_ANIMALS[Math.floor(this.crateRng() * MOUNT_ANIMALS.length)] };
           this.lastMount = t;
         }
       }

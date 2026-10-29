@@ -1,4 +1,4 @@
-import { CONTINUES, CRATE_LOOT, DASH, EMA, EMA_JUMP, GOLDEN, ITEMS, JUMP, MAGNET, SCORING, SHIELD, SIM, SWARM, TOCA } from './config';
+import { CONTINUES, CRATE_LOOT, DASH, GOLDEN, ITEMS, JUMP, MAGNET, MOUNT, MOUNTS, SCORING, SHIELD, SIM, SWARM, TOCA } from './config';
 import { speedAt, tierAt } from './Difficulty';
 import { createRunner, runnerSpeed, stepRunner, type Controls, type StepSink } from './Physics';
 import { CANOPY } from './patterns';
@@ -72,6 +72,8 @@ export class Engine {
   mount: Mount | null = null;
   /** Rampa da velocidade extra da montaria (0..1). */
   ride = 0;
+  /** Velocidade extra da montaria atual (fica durante a rampa de saída). */
+  private rideSpeed = 0;
   /** Tempo restante do capim dourado (s). */
   golden = 0;
   /** Pousada na copa das árvores (para avisar uma vez por subida). */
@@ -128,7 +130,7 @@ export class Engine {
   /** Velocidade real da capivara (com caixote/dash). */
   /** Multiplicador de velocidade do embalo do ímã (1 = normal). */
   get speedFactor(): number {
-    return (1 + MAGNET.boost * this.boost) * (1 + EMA.speed * this.ride);
+    return (1 + MAGNET.boost * this.boost) * (1 + this.rideSpeed * this.ride);
   }
 
   get riding(): boolean {
@@ -172,6 +174,7 @@ export class Engine {
     this.loot.length = 0;
     this.mount = null;
     this.ride = 0;
+    this.rideSpeed = 0;
     this.track.update(0, 0, speedAt(0));
     this.setState(GameState.PLAYING);
   }
@@ -269,10 +272,11 @@ export class Engine {
     const target = this.magnet > 0 ? 1 : 0;
     const k = dt / MAGNET.boostRamp;
     this.boost = target > this.boost ? Math.min(1, this.boost + k) : Math.max(0, this.boost - k);
-    const kr = dt / EMA.ramp;
+    const kr = dt / MOUNT.ramp;
     this.ride = this.riding ? Math.min(1, this.ride + kr) : Math.max(0, this.ride - kr);
-    // Montada não agarra cipó (a ema não balança).
+    // Montada não agarra cipó (montaria não balança); a anta atropela.
     if (this.riding) r.vineCooldown = Math.max(r.vineCooldown, 0.1);
+    r.tank = this.riding && MOUNTS[this.mount!.animal].tank;
     const base = this.speed * this.speedFactor;
     this.elapsed += dt;
 
@@ -295,7 +299,7 @@ export class Engine {
     if (this.pendingDrop && !r.grounded && !r.fastFall) this.emit({ type: 'fastFall' });
     this.pendingDrop = false;
 
-    const death = stepRunner(r, ctl, this.track.level, base, dt, this.sink, this.riding ? EMA_JUMP : JUMP);
+    const death = stepRunner(r, ctl, this.track.level, base, dt, this.sink, this.riding ? MOUNTS[this.mount!.animal].jump : JUMP);
 
     if (wasDashing && r.dash <= 0) this.emit({ type: 'dash', on: false });
     if (r.gliding !== wasGliding) this.emit({ type: 'glide', on: r.gliding });
@@ -349,10 +353,10 @@ export class Engine {
     }
     if (m.state === 'free') {
       // Corre um pouco à frente; quando a capivara pula, deixa ela vir por cima.
-      const target = r.grounded ? r.x + EMA.ahead : r.x + 2;
+      const target = r.grounded ? r.x + MOUNT.ahead : r.x + 2;
       m.x += (v + Math.max(-260, Math.min(260, (target - m.x) * 4))) * dt;
     } else {
-      m.x += Math.max(v, this.speed) * EMA.flee * dt;
+      m.x += Math.max(v, this.speed) * MOUNT.flee * dt;
     }
     // Pulos da ema por conta própria (sobre buracos e no pulinho de sair do caixote).
     if (m.y > 0 || m.vy > 0) {
@@ -371,9 +375,10 @@ export class Engine {
     }
     // Montar: caindo nas costas da ema.
     const feet = r.y - m.y;
-    if (!r.grounded && !r.swinging && r.vy <= 0 && Math.abs(r.x - m.x) < EMA.catchDx && feet >= EMA.catchMin && feet <= EMA.catchMax) {
+    if (!r.grounded && !r.swinging && r.vy <= 0 && Math.abs(r.x - m.x) < MOUNT.catchDx && feet >= MOUNT.catchMin && feet <= MOUNT.catchMax) {
       m.state = 'ridden';
       m.t = 0;
+      this.rideSpeed = MOUNTS[m.animal].speed;
       r.y = r.prevY = m.y;
       r.vy = m.y > 0 ? Math.max(0, m.vy) : 0;
       r.grounded = m.y <= 0 && lvl.groundAt(r.x);
@@ -385,13 +390,13 @@ export class Engine {
       r.fastFall = false;
       r.justLanded = true;
       r.landedAt = 0;
-      this.emit({ type: 'mount', phase: 'ride', x: r.x, y: r.y });
+      this.emit({ type: 'mount', phase: 'ride', animal: m.animal, x: r.x, y: r.y });
       return;
     }
-    if (m.t > EMA.freeTime) {
+    if (m.t > MOUNT.freeTime) {
       m.state = 'fleeing';
       m.t = 0;
-      this.emit({ type: 'mount', phase: 'off', x: m.x, y: m.y, reason: 'timeout' });
+      this.emit({ type: 'mount', phase: 'off', animal: m.animal, x: m.x, y: m.y, reason: 'timeout' });
     }
   }
 
@@ -411,7 +416,7 @@ export class Engine {
     m.y = Math.max(0, r.y);
     m.vy = cause === 'toca' ? 760 : 0;
     if (cause !== 'toca') {
-      r.vy = cause === 'river' ? JUMP.springVelocity : JUMP.jumpVelocity * EMA.hop;
+      r.vy = cause === 'river' ? JUMP.springVelocity : JUMP.jumpVelocity * MOUNT.hop;
       r.grounded = false;
       r.jumped = true;
       r.cut = true;
@@ -422,7 +427,7 @@ export class Engine {
       if (cause !== 'river') r.dashTail = Math.max(r.dashTail, SHIELD.grace);
       if (cause === 'river') r.y = Math.max(r.y, PIT_SAFE_Y);
     }
-    this.emit({ type: 'mount', phase: 'off', x: r.x, y: r.y, reason: cause === 'toca' ? 'toca' : cause === 'river' ? 'river' : 'hit' });
+    this.emit({ type: 'mount', phase: 'off', animal: m.animal, x: r.x, y: r.y, reason: cause === 'toca' ? 'toca' : cause === 'river' ? 'river' : 'hit' });
     return true;
   }
 
@@ -455,7 +460,7 @@ export class Engine {
     if (loot.kind === 'mount') {
       if (this.mount && this.mount.state !== 'fleeing') return; // já tem uma
       this.mount = { animal: loot.animal, state: 'free', x: cx, y: c.top * 0.5, vy: 520, t: 0 };
-      this.emit({ type: 'mount', phase: 'appear', x: cx, y: c.top });
+      this.emit({ type: 'mount', phase: 'appear', animal: loot.animal, x: cx, y: c.top });
       return;
     }
     const n = loot.kind === 'capim' ? loot.n : 1;
@@ -609,6 +614,7 @@ export class Engine {
     this.inBurrow = false;
     this.mount = null;
     this.ride = 0;
+    this.rideSpeed = 0;
     this.swarm = Math.max(this.swarm, CONTINUES.swarm);
     this.deathCause = null;
     this.deadTime = 0;
@@ -659,9 +665,10 @@ export class Engine {
         const dashing = r.dash > 0 || r.dashTail > 0;
         if (stomp) this.score.addBonus(SCORING.stomp);
         else if (dashing) this.score.addBonus(SCORING.smash);
+        else if (r.tank) this.score.addBonus(SCORING.smash);
         else if (this.riding) this.dismount('crate');
         else r.slow = Math.min(r.slow, SWARM.slowFactor);
-        this.emit({ type: 'crate', x: (c.x0 + c.x1) / 2, y: c.top / 2, stomp: stomp || dashing });
+        this.emit({ type: 'crate', x: (c.x0 + c.x1) / 2, y: c.top / 2, stomp: stomp || dashing || r.tank });
       },
       smash: (o: Rock | Thorns) => {
         if (o.broken) return;
