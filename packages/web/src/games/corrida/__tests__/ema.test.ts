@@ -212,7 +212,7 @@ describe('anta (montaria)', () => {
     expect(MOUNTS.anta.speed).toBeLessThan(MOUNTS.ema.speed);
   });
 
-  it('caixotes de montaria sorteiam ema e anta', () => {
+  it('caixotes de montaria sorteiam ema, anta e tucano', () => {
     const seen = new Set<string>();
     for (let seed = 1; seed <= 10; seed++) {
       const t = new Track(createRng(seed));
@@ -221,6 +221,81 @@ describe('anta (montaria)', () => {
         for (const c of t.level.crates) if (c.loot?.kind === 'mount') seen.add(c.loot.animal);
       }
     }
-    expect([...seen].sort()).toEqual(['anta', 'ema']);
+    expect([...seen].sort()).toEqual(['anta', 'ema', 'tucano']);
+  });
+});
+
+describe('tucano (montaria que voa)', () => {
+  function tucanoRidden(e: Engine) {
+    e.mount = { animal: 'tucano', state: 'ridden', x: e.runner.x, y: 0, vy: 0, t: 0 };
+  }
+
+  it('solto, voa à frente; pulando até ele, a capivara é carregada', () => {
+    const { e, l, events } = flat();
+    const x = e.runner.x + 70;
+    l.crates.push({ x0: x, x1: x + 36, top: 36, broken: false, brokenAt: 0, loot: { kind: 'mount', animal: 'tucano' } });
+    run(e, 1.2);
+    expect(e.mount?.state).toBe('free');
+    expect(e.mount!.y).toBeGreaterThan(5);
+    e.setHolding(true);
+    run(e, 0.05);
+    e.setHolding(false);
+    run(e, 0.6);
+    expect(mounts(events, 'ride').some((ev) => ev.type === 'mount' && ev.animal === 'tucano')).toBe(true);
+    run(e, 1);
+    expect(e.speedFactor).toBeCloseTo(1 + MOUNTS.tucano.speed, 5);
+  });
+
+  it('segurando, voa até o teto; soltando, desce devagar', () => {
+    const { e } = flat();
+    tucanoRidden(e);
+    e.setHolding(true);
+    run(e, 0.05);
+    run(e, 1.5);
+    const fly = MOUNTS.tucano.jump.fly!;
+    expect(e.runner.y).toBeCloseTo(fly.ceiling, 3);
+    e.setHolding(false);
+    run(e, 0.3);
+    expect(e.runner.vy).toBeGreaterThanOrEqual(-fly.maxFall - 1);
+    expect(e.runner.y).toBeGreaterThan(fly.ceiling - 120);
+  });
+
+  it('voando, passa por cima de pedras e rios', () => {
+    const { e, l } = flat();
+    tucanoRidden(e);
+    const x = e.runner.x;
+    l.ground.length = 0;
+    l.addGround(-800, x + 200);
+    l.addGround(x + 900, 40_000);
+    l.rocks.push({ x0: x + 1000, x1: x + 1046, top: 50, variant: 0, broken: false });
+    e.setHolding(true);
+    run(e, 0.05);
+    run(e, 4.5);
+    expect(e.state).toBe(GameState.PLAYING);
+    expect(e.riding).toBe(true);
+    expect(e.runner.x).toBeGreaterThan(x + 1100);
+  });
+
+  it('cansa depois de um tempo: desce e deixa a capivara no chão', () => {
+    const { e, events } = flat();
+    tucanoRidden(e);
+    e.setHolding(true);
+    run(e, 0.05);
+    run(e, MOUNT.tucanoTime + 0.5);
+    expect(e.tucanoTired || !e.riding).toBe(true);
+    e.setHolding(false);
+    run(e, 2);
+    expect(e.riding).toBe(false);
+    expect(mounts(events, 'off').some((ev) => ev.type === 'mount' && ev.reason === 'tired')).toBe(true);
+    expect(e.state).toBe(GameState.PLAYING);
+  });
+
+  it('bater numa pedra carregada pelo tucano derruba (sem perder vida)', () => {
+    const { e, l, events } = flat();
+    tucanoRidden(e);
+    l.rocks.push({ x0: e.runner.x + 80, x1: e.runner.x + 114, top: 30, variant: 0, broken: false });
+    run(e, 1);
+    expect(e.state).toBe(GameState.PLAYING);
+    expect(mounts(events, 'off').some((ev) => ev.type === 'mount' && ev.reason === 'hit')).toBe(true);
   });
 });

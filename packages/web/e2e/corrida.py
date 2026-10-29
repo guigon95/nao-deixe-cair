@@ -428,6 +428,35 @@ with sync_playwright() as p:
     check("ema: sem erros", not errs, "; ".join(errs[:2]))
     c.close()
 
+    # Tucano: pula até ele, é carregada e voa segurando.
+    c = browser.new_context(viewport={"width": 844, "height": 390})
+    pg = c.new_page()
+    errs = []
+    pg.on("pageerror", lambda e: errs.append(str(e)))
+    pg.goto(BASE + "/corrida/?debug&seed=5")
+    pg.wait_for_selector("text=CORRER")
+    pg.click("text=CORRER")
+    pg.wait_for_timeout(150)
+    pg.evaluate("""() => { const e = window.__NDC__.engine, r = e.runner, l = e.track.level;
+        l.rocks.length = l.thorns.length = l.crates.length = l.springs.length = 0; l.fruits.length = 0; l.powerups.length = 0;
+        l.ground.length = 0; l.addGround(-800, r.x + 20000); e.track.genX = r.x + 20000;
+        l.crates.push({ x0: r.x + 260, x1: r.x + 296, top: 36, broken: false, brokenAt: 0, loot: { kind: 'mount', animal: 'tucano' } }); }""")
+    pg.wait_for_function("() => window.__NDC__.engine.mount", timeout=4000)
+    pg.wait_for_timeout(500)
+    for k in range(40):
+        st = pg.evaluate("() => { const e = window.__NDC__.engine; return [e.mount && e.mount.state, e.runner.grounded] }")
+        if st[0] == "ridden":
+            break
+        if st[1]:
+            pg.keyboard.down("Space"); pg.wait_for_timeout(120); pg.keyboard.up("Space")
+        pg.wait_for_timeout(60)
+    check("tucano: pulando até ele, a capivara é carregada", pg.evaluate("() => window.__NDC__.engine.riding"))
+    pg.keyboard.down("Space"); pg.wait_for_timeout(1300)
+    check("tucano: segurando, voa alto", pg.evaluate("() => window.__NDC__.engine.runner.y") > 180)
+    pg.keyboard.up("Space")
+    check("tucano: sem erros", not errs, "; ".join(errs[:2]))
+    c.close()
+
     # Toca: buraco escondido sob folhas, túnel com capim e saída que lança de volta.
     c = browser.new_context(viewport={"width": 844, "height": 390})
     pg = c.new_page()

@@ -23,7 +23,7 @@ const LANDING_TIME = 0.6;
  * dependem da dificuldade. Determinístico para uma semente.
  */
 /** Montarias que podem sair dos caixotes. */
-export const MOUNT_ANIMALS: readonly MountAnimal[] = ['ema', 'anta'];
+export const MOUNT_ANIMALS: readonly MountAnimal[] = ['ema', 'anta', 'tucano'];
 
 export class Track {
   readonly level = new Level();

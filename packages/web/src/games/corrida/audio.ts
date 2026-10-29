@@ -336,8 +336,12 @@ export class RunnerSfx extends SynthAudio {
   }
 
   /** Montaria: aparece (ema: "bum" grave; anta: assobio), monta (fanfarra curta) ou sai (piado). */
-  mount(phase: 'appear' | 'ride' | 'off', animal: 'ema' | 'anta' = 'ema'): void {
-    if (phase === 'appear' && animal === 'anta') {
+  mount(phase: 'appear' | 'ride' | 'off', animal: 'ema' | 'anta' | 'tucano' = 'ema'): void {
+    if (phase === 'appear' && animal === 'tucano') {
+      // Tucano: "grék-grék" rouco.
+      this.tone(520, 380, 0.09, 'square', 0.2);
+      this.tone(540, 400, 0.09, 'square', 0.2, 0.14);
+    } else if (phase === 'appear' && animal === 'anta') {
       // Anta: assobio agudo (é assim que ela chama).
       this.tone(1500, 2100, 0.18, 'sine', 0.25);
       this.tone(1600, 2300, 0.2, 'sine', 0.22, 0.24);

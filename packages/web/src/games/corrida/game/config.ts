@@ -59,6 +59,19 @@ export interface JumpParams {
   springVelocity: number;
   /** Quicar em cima de um caixote. */
   crateBounceVelocity: number;
+  /** Voando (tucano): segurar bate as asas e sobe; soltar desce devagar. */
+  fly?: FlyParams;
+}
+
+export interface FlyParams {
+  /** Aceleração para cima segurando e velocidade máxima de subida (u/s², u/s). */
+  lift: number;
+  rise: number;
+  /** Sem segurar: gravidade e queda máxima (plana devagar). */
+  gravity: number;
+  maxFall: number;
+  /** Teto do voo (altura dos pés). */
+  ceiling: number;
 }
 
 export const JUMP: JumpParams = {
@@ -259,9 +272,12 @@ export const MOUNT = {
   catchMax: 90,
   /** Pulinho ao cair da montaria (× pulo normal). */
   hop: 0.75,
+  /** Tucano: quanto tempo voa antes de cansar (s) e altura em que espera solto. */
+  tucanoTime: 10,
+  tucanoHover: 72,
 } as const;
 
-export type MountAnimal = 'ema' | 'anta';
+export type MountAnimal = 'ema' | 'anta' | 'tucano';
 
 export interface MountSpec {
   /** Velocidade extra montada (fração). */
@@ -277,6 +293,8 @@ export const MOUNTS: Record<MountAnimal, MountSpec> = {
   ema: { speed: 0.3, jump: { ...JUMP, jumpVelocity: 1060 }, tank: false },
   /** Anta: +15%, pesada (pulo normal), mas atropela caixotes e espinhos. */
   anta: { speed: 0.15, jump: JUMP, tank: true },
+  /** Tucano: +20% e voa segurando (cansa depois de um tempo). */
+  tucano: { speed: 0.2, jump: { ...JUMP, fly: { lift: 2600, rise: 380, gravity: 900, maxFall: 330, ceiling: 230 } }, tank: false },
 };
 
 /** Chão: abaixo disso, dentro de um buraco, a capivara caiu no rio do jacaré. */

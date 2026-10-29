@@ -201,7 +201,7 @@ export type GameEvent =
   | { type: 'canopy'; x: number; y: number }
   | { type: 'magnet'; on: boolean; x: number; y: number }
   | { type: 'acai'; x: number; y: number }
-  | { type: 'mount'; phase: 'appear' | 'ride' | 'off'; animal: MountAnimal; x: number; y: number; reason?: 'hit' | 'river' | 'toca' | 'timeout' }
+  | { type: 'mount'; phase: 'appear' | 'ride' | 'off'; animal: MountAnimal; x: number; y: number; reason?: 'hit' | 'river' | 'toca' | 'timeout' | 'tired' }
   | { type: 'loot'; x: number; y: number; kind: 'capim' | ItemKind; n: number }
   | { type: 'burrow'; on: boolean; x: number; y: number }
   | { type: 'golden'; on: boolean; x: number; y: number }

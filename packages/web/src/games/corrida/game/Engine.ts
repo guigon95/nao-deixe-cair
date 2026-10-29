@@ -1,4 +1,4 @@
-import { CONTINUES, CRATE_LOOT, DASH, GOLDEN, ITEMS, JUMP, MAGNET, MOUNT, MOUNTS, SCORING, SHIELD, SIM, SWARM, TOCA } from './config';
+import { CONTINUES, CRATE_LOOT, DASH, GOLDEN, ITEMS, JUMP, MAGNET, MOUNT, MOUNTS, SCORING, SHIELD, SIM, SWARM, TOCA, type JumpParams } from './config';
 import { speedAt, tierAt } from './Difficulty';
 import { createRunner, runnerSpeed, stepRunner, type Controls, type StepSink } from './Physics';
 import { CANOPY } from './patterns';
@@ -31,6 +31,8 @@ const TRANSITIONS: Record<GameState, readonly GameState[]> = {
 /** Intervalo para capins contarem como sequência (o som sobe de tom). */
 /** No resgate do rio pela ema, a capivara sai pelo menos desta altura. */
 const PIT_SAFE_Y = -10;
+/** Tucano carregando: voa esta altura acima dos pés da capivara. */
+export const TUCANO_CARRY = 46;
 const STREAK_WINDOW = 0.7;
 
 /**
@@ -135,6 +137,18 @@ export class Engine {
 
   get riding(): boolean {
     return this.mount?.state === 'ridden';
+  }
+
+  /** Tucano cansado: para de voar e procura o chão para deixar a capivara. */
+  get tucanoTired(): boolean {
+    const m = this.mount;
+    return !!m && m.state === 'ridden' && m.animal === 'tucano' && m.t > MOUNT.tucanoTime;
+  }
+
+  /** Pulo (e voo) da montaria atual. */
+  private get rideJump(): JumpParams {
+    if (!this.riding || this.tucanoTired) return JUMP;
+    return MOUNTS[this.mount!.animal].jump;
   }
 
   get runSpeed(): number {
@@ -299,7 +313,7 @@ export class Engine {
     if (this.pendingDrop && !r.grounded && !r.fastFall) this.emit({ type: 'fastFall' });
     this.pendingDrop = false;
 
-    const death = stepRunner(r, ctl, this.track.level, base, dt, this.sink, this.riding ? MOUNTS[this.mount!.animal].jump : JUMP);
+    const death = stepRunner(r, ctl, this.track.level, base, dt, this.sink, this.rideJump);
 
     if (wasDashing && r.dash <= 0) this.emit({ type: 'dash', on: false });
     if (r.gliding !== wasGliding) this.emit({ type: 'glide', on: r.gliding });
@@ -349,6 +363,12 @@ export class Engine {
       m.x = r.x;
       m.y = r.y;
       m.vy = r.vy;
+      // Tucano cansado: assim que chegar ao chão, deixa a capivara e vai embora.
+      if (this.tucanoTired && r.grounded) this.dismount('tired');
+      return;
+    }
+    if (m.animal === 'tucano') {
+      this.stepTucano(m, r, v, dt);
       return;
     }
     if (m.state === 'free') {
@@ -401,11 +421,46 @@ export class Engine {
   }
 
   /**
+   * Tucano solto: voa à frente esperando (a capivara pula até ele para ser
+   * carregada); fugindo, sobe e dispara.
+   */
+  private stepTucano(m: Mount, r: Runner, v: number, dt: number): void {
+    if (m.state === 'fleeing') {
+      m.x += Math.max(v, this.speed) * MOUNT.flee * dt;
+      m.y += 160 * dt;
+      if (m.x > r.x + 1100 || m.t > 6) this.mount = null;
+      return;
+    }
+    const target = r.grounded ? r.x + MOUNT.ahead : r.x + 2;
+    m.x += (v + Math.max(-260, Math.min(260, (target - m.x) * 4))) * dt;
+    // Altura dos pés de quem ele carrega (o tucano voa ~46 acima disso).
+    const hover = MOUNT.tucanoHover - TUCANO_CARRY + Math.sin(m.t * 4) * 5;
+    m.y += (hover - m.y) * Math.min(1, dt * 6);
+    // Pulando até ele: agarra a capivara e voa.
+    if (!r.grounded && !r.swinging && Math.abs(r.x - m.x) < MOUNT.catchDx && Math.abs(r.y - m.y) < 32) {
+      m.state = 'ridden';
+      m.t = 0;
+      this.rideSpeed = MOUNTS.tucano.speed;
+      r.cut = true;
+      r.gliding = false;
+      r.fastFall = false;
+      if (r.vy < 0) r.vy = 0;
+      this.emit({ type: 'mount', phase: 'ride', animal: 'tucano', x: r.x, y: r.y });
+      return;
+    }
+    if (m.t > MOUNT.freeTime) {
+      m.state = 'fleeing';
+      m.t = 0;
+      this.emit({ type: 'mount', phase: 'off', animal: 'tucano', x: m.x, y: m.y, reason: 'timeout' });
+    }
+  }
+
+  /**
    * Batida montada: a capivara pula da ema (sem perder vida) e a ema dispara
    * embora. Na pedra/espinho/caixote o obstáculo quebra; no rio, a ema
    * arremessa a capivara para cima (segunda chance).
    */
-  private dismount(cause: DeathCause | 'crate' | 'toca'): boolean {
+  private dismount(cause: DeathCause | 'crate' | 'toca' | 'tired'): boolean {
     if (cause === 'swarm') return false;
     const m = this.mount;
     if (!m || m.state !== 'ridden') return false;
@@ -415,7 +470,7 @@ export class Engine {
     m.x = r.x;
     m.y = Math.max(0, r.y);
     m.vy = cause === 'toca' ? 760 : 0;
-    if (cause !== 'toca') {
+    if (cause !== 'toca' && cause !== 'tired') {
       r.vy = cause === 'river' ? JUMP.springVelocity : JUMP.jumpVelocity * MOUNT.hop;
       r.grounded = false;
       r.jumped = true;
@@ -427,7 +482,7 @@ export class Engine {
       if (cause !== 'river') r.dashTail = Math.max(r.dashTail, SHIELD.grace);
       if (cause === 'river') r.y = Math.max(r.y, PIT_SAFE_Y);
     }
-    this.emit({ type: 'mount', phase: 'off', animal: m.animal, x: r.x, y: r.y, reason: cause === 'toca' ? 'toca' : cause === 'river' ? 'river' : 'hit' });
+    this.emit({ type: 'mount', phase: 'off', animal: m.animal, x: r.x, y: r.y, reason: cause === 'toca' || cause === 'tired' || cause === 'river' ? cause : 'hit' });
     return true;
   }
 
@@ -459,7 +514,7 @@ export class Engine {
     const cx = (c.x0 + c.x1) / 2;
     if (loot.kind === 'mount') {
       if (this.mount && this.mount.state !== 'fleeing') return; // já tem uma
-      this.mount = { animal: loot.animal, state: 'free', x: cx, y: c.top * 0.5, vy: 520, t: 0 };
+      this.mount = { animal: loot.animal, state: 'free', x: cx, y: loot.animal === 'tucano' ? c.top : c.top * 0.5, vy: loot.animal === 'tucano' ? 0 : 520, t: 0 };
       this.emit({ type: 'mount', phase: 'appear', animal: loot.animal, x: cx, y: c.top });
       return;
     }

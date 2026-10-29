@@ -162,6 +162,12 @@ export function stepRunner(
         r.glideTime = 0;
       }
     }
+  } else if (!r.grounded && P.fly) {
+    // Voando de tucano: segurar sobe batendo as asas; soltar desce planando.
+    r.airTime += dt;
+    r.gliding = false;
+    if (ctl.hold && !r.fastFall) r.vy = Math.min(P.fly.rise, r.vy + P.fly.lift * dt);
+    else r.vy = Math.max(r.vy - P.fly.gravity * dt, r.fastFall ? -P.fastFallVelocity : -P.fly.maxFall);
   } else if (!r.grounded) {
     r.airTime += dt;
     r.gliding = ctl.hold && r.vy <= 0 && !r.fastFall && r.glideTime < P.glideMax;
@@ -176,6 +182,10 @@ export function stepRunner(
 
   r.x += runnerSpeed(r, baseSpeed) * dt;
   if (!r.grounded) r.y += r.vy * dt;
+  if (P.fly && r.y > P.fly.ceiling) {
+    r.y = P.fly.ceiling;
+    if (r.vy > 0) r.vy = 0;
+  }
 
   // ── apoio (chão, pedras, galhos) ──
   if (r.grounded) {

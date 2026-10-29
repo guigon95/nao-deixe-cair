@@ -1,4 +1,4 @@
-import { ARENA, BODY, DASH, GOLDEN, MAGNET, SWARM, TOCA } from '../game/config';
+import { ARENA, BODY, DASH, GOLDEN, MAGNET, MOUNT, SWARM, TOCA } from '../game/config';
 import type { Engine } from '../game/Engine';
 import { SIZES } from '../game/patterns';
 import { GameState, type Burrow, type Crate, type Fruit, type ItemKind, type Platform, type Rock, type Spring, type Thorns, type Vine } from '../game/types';
@@ -6,7 +6,8 @@ import { computeLayout, type Layout } from '../../../shared/layout/layout';
 import type { Effects } from './effects';
 import { dominantSeason, mix, paletteAt, SEASONS, type Palette, type SeasonId } from './palette';
 import { drawCapivara, type Pose } from './capivara';
-import { drawMount, MOUNT_SEAT_DRAW } from './mounts';
+import { drawMount, MOUNT_SEAT_DRAW, TUCANO_CARRY_DRAW } from './mounts';
+import { drawTucano } from './tucano';
 import { Weather } from './weather';
 import { boteShape, Gators, WATER_Y, type Gator } from './gators';
 
@@ -870,6 +871,32 @@ export class Renderer {
       }
       ctx.fill();
     }
+    // Caixote de tucano: pena preta escapando e um bico laranja pintado.
+    if (c.loot?.kind === 'mount' && c.loot.animal === 'tucano') {
+      ctx.save();
+      ctx.translate(x0 + w - 8, top);
+      ctx.rotate(0.5 + Math.sin(time * 3) * 0.08);
+      ctx.fillStyle = '#1a1a1a';
+      ctx.beginPath();
+      ctx.ellipse(0, -10, 4, 11, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(x0 + 5, top + 5, w - 10, h - 10);
+      const bx = x0 + 8;
+      const by = top + h / 2;
+      ctx.fillStyle = '#ff8a1c';
+      ctx.beginPath();
+      ctx.moveTo(bx, by - 5);
+      ctx.quadraticCurveTo(bx + 14, by - 7, bx + 21, by + 2);
+      ctx.quadraticCurveTo(bx + 12, by + 3, bx, by + 3);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#1a1a1a';
+      ctx.beginPath();
+      ctx.arc(bx - 1, by - 1, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
     // Caixote de ema: pena escapando e pegada de três dedos carimbada.
     if (c.loot?.kind === 'mount' && c.loot.animal === 'ema') {
       ctx.save();
@@ -1633,10 +1660,12 @@ export class Renderer {
     let x = x0;
     if (riding) {
       const animal = engine.mount!.animal;
-      drawMount(ctx, animal, x, feetY, { run: r.grounded ? (p.x / 24) % (Math.PI * 2) : 0, air: !r.grounded, lean: 0.6 });
-      y -= MOUNT_SEAT_DRAW[animal];
-      x -= 8;
-      if (pose === 'run') pose = 'idle';
+      if (animal !== 'tucano') {
+        drawMount(ctx, animal, x, feetY, { run: r.grounded ? (p.x / 24) % (Math.PI * 2) : 0, air: !r.grounded, lean: 0.6 });
+        y -= MOUNT_SEAT_DRAW[animal];
+        x -= 8;
+        if (pose === 'run') pose = 'idle';
+      } else if (!r.grounded && pose !== 'dash') pose = 'fall';
     }
     if (r.dash > 0 && !fx.reducedMotion) {
       // Rastro do dash.
@@ -1685,6 +1714,13 @@ export class Renderer {
       time,
       tilt,
     });
+    // Tucano carregando: por cima da capivara, batendo as asas (rápido segurando).
+    if (riding && engine.mount!.animal === 'tucano') {
+      const m = engine.mount!;
+      const flap = time * (engine.holding ? 26 : 12);
+      const blink = engine.tucanoTired || (m.t > MOUNT.tucanoTime - 2 && Math.sin(time * 18) < 0);
+      drawTucano(ctx, x + 2, y - TUCANO_CARRY_DRAW, { flap, blink });
+    }
   }
 
   /** Enxame de marimbondos na borda esquerda: quanto mais perto, mais denso e visível. */
