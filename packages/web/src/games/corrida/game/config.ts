@@ -11,6 +11,7 @@
  */
 
 import { gameKey } from '../../../shared/storage/keys';
+import type { ItemKind } from './types';
 
 /** Arena lógica em paisagem: a corrida lateral precisa de visão à frente. */
 export const ARENA = { width: 640, height: 360 } as const;
@@ -115,6 +116,27 @@ export const MAGNET = {
   /** Embalo: velocidade a mais enquanto o ímã dura (+10%), com rampa de 0,5 s. */
   boost: 0.1,
   boostRamp: 0.5,
+} as const;
+
+/**
+ * Itens especiais no percurso: de vez em quando um capim vira um item. Um
+ * sorteio só para todos (nunca dois perto), com peso por tipo.
+ */
+export const ITEMS = {
+  /** Não aparece antes disto (s) e espera pelo menos isto entre itens. */
+  firstAfter: 12,
+  minGap: 14,
+  /** Chance por padrão, passado o intervalo. */
+  chance: 0.4,
+  weights: { magnet: 3, shield: 2 } as Record<ItemKind, number>,
+  /** Raio para pegar um item. */
+  pickup: 22,
+} as const;
+
+/** Escudo de vitória-régia: aguenta uma batida (pedra, espinho ou queda no rio). */
+export const SHIELD = {
+  /** Depois de salvar, ainda quebra o que encostar por este tempo (s). */
+  grace: 0.6,
 } as const;
 
 /** Velocidade da corrida (u/s) em função do tempo de partida. */

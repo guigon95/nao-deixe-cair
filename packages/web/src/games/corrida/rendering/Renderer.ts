@@ -1,7 +1,7 @@
 import { ARENA, BODY, DASH, MAGNET, SWARM } from '../game/config';
 import type { Engine } from '../game/Engine';
 import { SIZES } from '../game/patterns';
-import { GameState, type Crate, type Fruit, type Platform, type Rock, type Spring, type Thorns, type Vine } from '../game/types';
+import { GameState, type Crate, type Fruit, type ItemKind, type Platform, type Rock, type Spring, type Thorns, type Vine } from '../game/types';
 import { computeLayout, type Layout } from '../../../shared/layout/layout';
 import type { Effects } from './effects';
 import { dominantSeason, mix, paletteAt, SEASONS, type Palette, type SeasonId } from './palette';
@@ -153,14 +153,15 @@ export class Renderer {
     this.drawGators(engine, opts.time);
     const lvl = engine.track.level;
     for (const p of lvl.platforms) if (p.kind === 'copa') this.drawCanopy(p, pal);
-    for (const p of lvl.platforms) if (p.kind !== 'copa') this.drawPlatform(p, pal);
+    for (const p of lvl.platforms) if (p.kind === 'vitoria') this.drawLilyPads(p, opts.time);
+    for (const p of lvl.platforms) if (p.kind !== 'copa' && p.kind !== 'vitoria') this.drawPlatform(p, pal);
     for (const v of lvl.vines) this.drawVine(v, engine, opts.time);
     for (const sp of lvl.springs) this.drawSpring(sp, engine.elapsed);
     for (const c of lvl.crates) if (!c.broken) this.drawCrate(c);
     for (const r of lvl.rocks) if (!r.broken) this.drawRock(r);
     for (const t of lvl.thorns) if (!t.broken) this.drawThorns(t);
     for (const f of lvl.fruits) if (!f.taken) this.drawFruit(f, opts.time);
-    for (const u of lvl.powerups) if (!u.taken) this.drawMagnet(this.sx(u.x), this.sy(u.y) + Math.sin(opts.time * 3 + u.x) * 2, 1, opts.time);
+    for (const u of lvl.powerups) if (!u.taken) this.drawItem(u.kind, this.sx(u.x), this.sy(u.y) + Math.sin(opts.time * 3 + u.x) * 2, opts.time);
     this.drawParticles(fx);
     this.drawRunner(engine, fx, opts.time, opts.beat ?? null);
     this.drawSwarm(engine, opts.time);
@@ -743,6 +744,106 @@ export class Renderer {
     ctx.fillRect(x - 4.5, y + 2.5, 9, 3);
   }
 
+  /** Item especial no percurso, com brilho para chamar atenção. */
+  private drawItem(kind: ItemKind, x: number, y: number, time: number): void {
+    if (x < this.viewL - 20 || x > this.viewR + 20) return;
+    if (kind === 'magnet') return this.drawMagnet(x, y, 1, time);
+    const ctx = this.ctx;
+    ctx.fillStyle = `rgba(255, 255, 210, ${(0.4 + 0.2 * Math.sin(time * 6)).toFixed(3)})`;
+    ctx.beginPath();
+    ctx.arc(x, y, 17, 0, Math.PI * 2);
+    ctx.fill();
+    if (kind === 'shield') this.drawLilyLeaf(x, y, 12, time);
+  }
+
+  /** Folha redonda de vitória-régia (borda levantada, recorte e flor rosa). */
+  private drawLilyLeaf(x: number, y: number, r: number, time: number, alpha = 1): void {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(x, y);
+    ctx.fillStyle = '#2f8f3a';
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0.25, Math.PI * 2 - 0.25);
+    ctx.lineTo(0, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#a7e07a';
+    ctx.lineWidth = Math.max(1.5, r * 0.18);
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.9, 0.3, Math.PI * 2 - 0.3);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(20, 70, 25, 0.6)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let k = 0; k < 6; k++) {
+      const a = 0.6 + k * 0.9;
+      ctx.moveTo(0, 0);
+      ctx.lineTo(Math.cos(a) * r * 0.85, Math.sin(a) * r * 0.85);
+    }
+    ctx.stroke();
+    // Florzinha rosa.
+    ctx.fillStyle = '#ff8fc0';
+    const pr = r * 0.32;
+    ctx.beginPath();
+    for (let k = 0; k < 5; k++) {
+      const a = k * ((Math.PI * 2) / 5) + time * 0.5;
+      ctx.moveTo(-r * 0.25 + Math.cos(a) * pr + pr * 0.5, -r * 0.2 + Math.sin(a) * pr);
+      ctx.arc(-r * 0.25 + Math.cos(a) * pr, -r * 0.2 + Math.sin(a) * pr, pr * 0.5, 0, Math.PI * 2);
+    }
+    ctx.fill();
+    ctx.fillStyle = '#ffd23f';
+    ctx.beginPath();
+    ctx.arc(-r * 0.25, -r * 0.2, pr * 0.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  /** Folhas de vitória-régia boiando no rio (o escudo virou ponte). */
+  private drawLilyPads(p: Platform, time: number): void {
+    const ctx = this.ctx;
+    const x0 = this.sx(p.x0);
+    const x1 = this.sx(p.x1);
+    if (x1 < this.viewL - 30 || x0 > this.viewR + 30) return;
+    const y = this.sy(0) + 3;
+    for (let x = x0 + 14; x <= x1 - 4; x += 30) {
+      const bob = Math.sin(time * 3 + x * 0.1) * 1.5;
+      ctx.save();
+      ctx.translate(x, y + bob);
+      ctx.scale(1, 0.35);
+      ctx.fillStyle = '#2f8f3a';
+      ctx.beginPath();
+      ctx.arc(0, 0, 17, 0.2, Math.PI * 2 - 0.2);
+      ctx.lineTo(0, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#a7e07a';
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.arc(0, 0, 16, 0.25, Math.PI * 2 - 0.25);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  /** Escudo ativo: bolha verde-clara em volta e a folha de vitória-régia nas costas. */
+  private drawShieldOn(x: number, y: number, time: number, reduced: boolean): void {
+    const ctx = this.ctx;
+    const pulse = reduced ? 0 : Math.sin(time * 4) * 1.5;
+    ctx.fillStyle = 'rgba(140, 230, 140, 0.16)';
+    ctx.strokeStyle = 'rgba(170, 245, 150, 0.75)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(x + 4, y - 18, 34 + pulse, 28 + pulse, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+    ctx.beginPath();
+    ctx.arc(x - 8, y - 32, 10, Math.PI * 1.05, Math.PI * 1.45);
+    ctx.stroke();
+    this.drawLilyLeaf(x - 10, y - 34, 11, time);
+  }
+
   /** Aura do ímã atrás da capivara (pisca nos 2 últimos segundos). */
   private drawMagnetAura(x: number, y: number, remaining: number, time: number, reduced: boolean): void {
     const ctx = this.ctx;
@@ -1056,6 +1157,7 @@ export class Renderer {
     if (magnetOn) this.drawMagnetAura(x, y, engine.magnet, time, fx.reducedMotion);
     const landing = r.landedAt < 0.14 ? 1 - r.landedAt / 0.14 : 0;
     if (magnetOn) this.drawMagnetBeams(engine, p.x, p.y, x, y, time, fx.reducedMotion);
+    if (engine.shield && !isDead(engine)) this.drawShieldOn(x, y, time, fx.reducedMotion);
     drawCapivara(ctx, x, y, {
       pose,
       // Com o ímã, uma passada completa por batida do forró (duas patadas por tempo).

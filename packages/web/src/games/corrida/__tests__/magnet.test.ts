@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAGNET, SIM } from '../game/config';
+import { ITEMS, MAGNET, SIM } from '../game/config';
 import { Engine } from '../game/Engine';
 import { Track } from '../game/Track';
 import { GameState, type GameEvent } from '../game/types';
@@ -62,7 +62,7 @@ describe('ímã de capim', () => {
     expect(e.meterFull).toBe(true);
   });
 
-  it('o gerador põe ímãs de vez em quando, nunca no começo e com intervalo mínimo', () => {
+  it('o gerador põe itens de vez em quando, nunca no começo e com intervalo mínimo', () => {
     let total = 0;
     for (let seed = 1; seed <= 20; seed++) {
       const t = new Track(createRng(seed));
@@ -73,12 +73,12 @@ describe('ímã de capim', () => {
         for (let i = before; i < t.level.powerups.length; i++) seen.push(t.history[t.history.length - 1].t);
       }
       total += seen.length;
-      for (const s of seen) expect(s).toBeGreaterThanOrEqual(MAGNET.firstAfter);
-      for (let i = 1; i < seen.length; i++) expect(seen[i] - seen[i - 1]).toBeGreaterThanOrEqual(MAGNET.minGap - 1e-6);
+      for (const s of seen) expect(s).toBeGreaterThanOrEqual(ITEMS.firstAfter);
+      for (let i = 1; i < seen.length; i++) expect(seen[i] - seen[i - 1]).toBeGreaterThanOrEqual(ITEMS.minGap - 1e-6);
     }
-    // ~150 s por partida: em média uns 3–5 ímãs.
-    expect(total / 20).toBeGreaterThan(1.5);
-    expect(total / 20).toBeLessThan(7);
+    // ~150 s por partida: em média uns 4–8 itens.
+    expect(total / 20).toBeGreaterThan(2);
+    expect(total / 20).toBeLessThan(10);
   });
 
   it('nova partida começa sem ímã', () => {

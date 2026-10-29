@@ -252,6 +252,20 @@ export function useCorrida() {
             vibrate(12);
           }
           break;
+        case 'shield':
+          if (e.on) {
+            sfx.shield(true);
+            fx.float(e.x + 30, e.y + 60, 'ESCUDO!', true, '#c8f58a');
+            fx.burst(e.x, e.y, 10, 110, ['#2f8f3a', '#a7e07a', '#ff8fc0'], 0.5, 2.6, false);
+            vibrate(10);
+          } else {
+            sfx.shield(false);
+            fx.float(e.x + 30, e.y + 70, e.saved === 'river' ? 'SALVA PELA VITÓRIA-RÉGIA!' : 'PROTEGIDA!', true, '#c8f58a');
+            fx.burst(e.x, e.y + 17, 18, 220, ['#2f8f3a', '#a7e07a', '#ffffff'], 0.7, 3, true);
+            fx.shake = 0.5;
+            vibrate([20, 30, 20]);
+          }
+          break;
         case 'canopy':
           completed(missions.canopy());
           fx.float(e.x + 40, e.y + 70, 'COPA DAS ÁRVORES!', true, '#c8f58a');

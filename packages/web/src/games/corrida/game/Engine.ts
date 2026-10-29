@@ -1,4 +1,4 @@
-import { CONTINUES, DASH, MAGNET, SCORING, SIM, SWARM } from './config';
+import { CONTINUES, DASH, ITEMS, MAGNET, SCORING, SHIELD, SIM, SWARM } from './config';
 import { speedAt, tierAt } from './Difficulty';
 import { createRunner, runnerSpeed, stepRunner, type Controls, type StepSink } from './Physics';
 import { CANOPY } from './patterns';
@@ -60,6 +60,8 @@ export class Engine {
   magnet = 0;
   /** Embalo do ímã (0..1): rampa da velocidade extra. */
   boost = 0;
+  /** Escudo de vitória-régia ativo (aguenta uma batida). */
+  shield = false;
   /** Pousada na copa das árvores (para avisar uma vez por subida). */
   private onCanopy = false;
   private pendingPress = false;
@@ -148,6 +150,7 @@ export class Engine {
     this.onCanopy = false;
     this.magnet = 0;
     this.boost = 0;
+    this.shield = false;
     this.track.update(0, 0, speedAt(0));
     this.setState(GameState.PLAYING);
   }
@@ -285,6 +288,7 @@ export class Engine {
     const tier = tierAt(this.elapsed);
     if (tier !== this.tier) this.tier = tier;
 
+    if (death && this.shield && this.useShield(death)) return;
     if (death) return this.die(death);
     if (this.swarm <= 0) return this.die('swarm');
     if (this.score.checkRecord()) this.emit({ type: 'newRecord', score: this.score.score });
@@ -296,12 +300,17 @@ export class Engine {
     const cx = r.x;
     const cy = r.y + 17;
     for (const u of lvl.powerups) {
-      if (u.x - MAGNET.pickup > cx + 20) break;
-      if (u.taken || Math.abs(u.x - cx) > MAGNET.pickup + 13 || Math.abs(u.y - cy) > MAGNET.pickup + 17) continue;
+      if (u.x - ITEMS.pickup > cx + 20) break;
+      if (u.taken || Math.abs(u.x - cx) > ITEMS.pickup + 13 || Math.abs(u.y - cy) > ITEMS.pickup + 17) continue;
       u.taken = true;
-      const was = this.magnet > 0;
-      this.magnet = MAGNET.duration;
-      if (!was) this.emit({ type: 'magnet', on: true, x: u.x, y: u.y });
+      if (u.kind === 'magnet') {
+        const was = this.magnet > 0;
+        this.magnet = MAGNET.duration;
+        if (!was) this.emit({ type: 'magnet', on: true, x: u.x, y: u.y });
+      } else if (u.kind === 'shield') {
+        if (!this.shield) this.emit({ type: 'shield', on: true, x: u.x, y: u.y });
+        this.shield = true;
+      }
     }
     if (this.magnet <= 0) return;
     this.magnet -= dt;
@@ -326,6 +335,42 @@ export class Engine {
       this.magnet = 0;
       this.emit({ type: 'magnet', on: false, x: r.x, y: r.y });
     }
+  }
+
+  /**
+   * O escudo aguenta a batida: na pedra/espinho, quebra o obstáculo (e o
+   * que encostar logo depois); no rio, folhas de vitória-régia aparecem
+   * debaixo da capivara até a outra margem. O escudo se gasta.
+   */
+  private useShield(cause: DeathCause): boolean {
+    if (cause === 'swarm') return false;
+    const r = this.runner;
+    this.shield = false;
+    if (cause === 'river') {
+      const lvl = this.track.level;
+      let end = r.x + 200;
+      for (const g of lvl.ground) {
+        if (g.x0 > r.x) {
+          end = g.x0 + 10;
+          break;
+        }
+      }
+      const pad = { x0: r.x - 40, x1: end, y: 0, kind: 'vitoria' as const };
+      let i = 0;
+      while (i < lvl.platforms.length && lvl.platforms[i].x0 < pad.x0) i++;
+      lvl.platforms.splice(i, 0, pad);
+      r.y = r.prevY = 0;
+      r.vy = 0;
+      r.grounded = true;
+      r.jumped = false;
+      r.airTime = 0;
+      r.fastFall = false;
+      r.gliding = false;
+    } else {
+      r.dashTail = Math.max(r.dashTail, SHIELD.grace);
+    }
+    this.emit({ type: 'shield', on: false, x: r.x, y: r.y, saved: cause });
+    return true;
   }
 
   private die(cause: DeathCause): void {

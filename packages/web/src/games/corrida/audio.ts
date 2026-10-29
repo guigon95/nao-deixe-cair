@@ -225,6 +225,18 @@ export class RunnerSfx extends SynthAudio {
     src.stop(t0 + dur + 0.02);
   }
 
+  /** Escudo: ao pegar, brilho subindo; ao salvar, "ploft" de folha + acorde. */
+  shield(on: boolean): void {
+    if (on) {
+      this.tone(523, 784, 0.18, 'triangle', 0.3);
+      this.tone(784, 1046, 0.22, 'sine', 0.22, 0.08);
+    } else {
+      this.noise(0.18, 0.14, 1600, 300, 'lowpass');
+      this.tone(392, 392, 0.1, 'triangle', 0.35, 0.05);
+      this.tone(587, 587, 0.18, 'triangle', 0.35, 0.12);
+    }
+  }
+
   /** Jacaré fechando a boca: "nhac" seco e grave. */
   chomp(): void {
     this.tone(180, 70, 0.09, 'square', 0.22, 0, 0.002);

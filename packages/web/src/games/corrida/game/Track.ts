@@ -2,7 +2,8 @@ import { difficultyAt, riskyFruitChance, speedAt } from './Difficulty';
 import { Level } from './Level';
 import { Builder, PATTERNS, pickPattern, type Pattern } from './patterns';
 import { createRng, randRange, type Rng } from '../../../shared/random';
-import { MAGNET } from './config';
+import { ITEMS } from './config';
+import type { ItemKind } from './types';
 
 /** Quanto gerar à frente da capivara (u): mais que uma tela larga. */
 export const LOOKAHEAD = 1500;
@@ -30,7 +31,7 @@ export class Track {
   private prev: string | null = null;
   /** Sorteios dos itens especiais (separado, para não mexer na sequência de padrões). */
   private itemRng: Rng = createRng(1);
-  private lastMagnet = -Infinity;
+  private lastItem = -Infinity;
   /** Força uma lista de padrões (testes); vazio = sorteio. */
   forced: string[] = [];
 
@@ -41,7 +42,7 @@ export class Track {
   reset(rng: Rng): void {
     this.rng = rng;
     this.itemRng = createRng(Math.floor(rng() * 0xffffffff));
-    this.lastMagnet = -Infinity;
+    this.lastItem = -Infinity;
     this.level.clear();
     this.history.length = 0;
     this.prev = null;
@@ -75,7 +76,7 @@ export class Track {
     const b = new Builder(this.level, this.genX, v, this.rng, riskyFruitChance(t));
     const firstFruit = this.level.fruits.length;
     const dur = pattern.build(b);
-    this.maybeMagnet(t, firstFruit);
+    this.maybeItem(t, firstFruit);
     this.history.push({ id: pattern.id, x: this.genX, t });
     if (this.history.length > 64) this.history.shift();
     // Chão do padrão, com os buracos.
@@ -92,18 +93,30 @@ export class Track {
     this.genX = end;
   }
 
-  /** De vez em quando, troca um capim deste padrão (fora dos arriscados) por um ímã. */
-  private maybeMagnet(t: number, firstFruit: number): void {
-    if (t < MAGNET.firstAfter || t - this.lastMagnet < MAGNET.minGap) return;
-    if (this.itemRng() >= MAGNET.chance) return;
+  /** De vez em quando, troca um capim deste padrão (fora dos arriscados) por um item especial. */
+  private maybeItem(t: number, firstFruit: number): void {
+    if (t < ITEMS.firstAfter || t - this.lastItem < ITEMS.minGap) return;
+    if (this.itemRng() >= ITEMS.chance) return;
     const fresh = this.level.fruits.slice(firstFruit).filter((f) => !f.risky);
     if (!fresh.length) return;
     const f = fresh[Math.floor(this.itemRng() * fresh.length)];
     this.level.fruits.splice(this.level.fruits.indexOf(f), 1);
-    this.level.powerups.push({ x: f.x, y: f.y, kind: 'magnet', taken: false });
+    this.level.powerups.push({ x: f.x, y: f.y, kind: pickKind(this.itemRng()), taken: false });
     this.level.powerups.sort((p, q) => p.x - q.x);
-    this.lastMagnet = t;
+    this.lastItem = t;
   }
+}
+
+/** Tipo de item pelo peso (`ITEMS.weights`). */
+export function pickKind(r: number): ItemKind {
+  const entries = Object.entries(ITEMS.weights) as Array<[ItemKind, number]>;
+  const total = entries.reduce((a, [, w]) => a + w, 0);
+  let x = r * total;
+  for (const [k, w] of entries) {
+    x -= w;
+    if (x <= 0) return k;
+  }
+  return entries[entries.length - 1][0];
 }
 
 export function byId(id: string): Pattern {

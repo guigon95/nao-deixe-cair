@@ -34,7 +34,7 @@ export interface Platform {
   x1: number;
   y: number;
   /** 'galho' (padrão) ou 'copa' (caminho alto pelas copas das árvores). */
-  kind?: 'galho' | 'copa';
+  kind?: 'galho' | 'copa' | 'vitoria';
 }
 
 /** Caixote: atravessar atrasa (o enxame chega perto); cair em cima quica. */
@@ -74,11 +74,14 @@ export interface Vine {
   len: number;
 }
 
-/** Item especial no percurso (por enquanto só o ímã de capim). */
+/** Itens especiais do percurso. */
+export type ItemKind = 'magnet' | 'shield';
+
+/** Item especial no percurso. */
 export interface PowerUp {
   x: number;
   y: number;
-  kind: 'magnet';
+  kind: ItemKind;
   taken: boolean;
 }
 
@@ -149,6 +152,7 @@ export type GameEvent =
   | { type: 'vine'; on: boolean; x: number; y: number }
   | { type: 'canopy'; x: number; y: number }
   | { type: 'magnet'; on: boolean; x: number; y: number }
+  | { type: 'shield'; on: boolean; x: number; y: number; saved?: DeathCause }
   | { type: 'fastFall' }
   | { type: 'death'; cause: DeathCause; x: number; y: number; score: number; best: number; isNewRecord: boolean; livesLeft: number }
   | { type: 'continue'; livesLeft: number }
