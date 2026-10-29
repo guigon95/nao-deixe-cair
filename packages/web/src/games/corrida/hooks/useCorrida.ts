@@ -33,6 +33,8 @@ export interface UiState {
   meterFull: boolean;
   /** Vidas que ainda dá para gastar continuando nesta partida. */
   livesLeft: number;
+  /** Sem vidas, mas com revive por anúncio disponível (tela de "última chance"). */
+  lastChance: boolean;
   /** Missões (cópia para a tela) e o nível da capivara. */
   missions: Mission[];
   missionLevel: number;
@@ -58,11 +60,23 @@ function isInteractive(target: EventTarget | null): boolean {
   return !!el?.closest?.('button, a, input, select, textarea, [data-ui]');
 }
 
+export interface CorridaOptions {
+  /** Revives por anúncio por partida (vem da camada de monetização; 0 = sem). Lido ao montar. */
+  adRevives?: number;
+  /**
+   * Pedido de nova partida pelo teclado (Enter no menu/fim). Quem usa anúncios
+   * passa por aqui para a transição poder ter intersticial; padrão: começa já.
+   */
+  onRestartRequest?: () => void;
+}
+
 /**
  * Liga a simulação ao React. O React só re-renderiza em mudanças de estado
  * (menu, pausa, fim, medidor cheio) — nunca a cada quadro.
  */
-export function useCorrida() {
+export function useCorrida(options: CorridaOptions = {}) {
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
   const surfaceRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const storage = useRef(browserStorage()).current;
@@ -85,6 +99,7 @@ export function useCorrida() {
     cause: null,
     meterFull: false,
     livesLeft: 0,
+    lastChance: false,
     missions: [],
     missionLevel: 1,
     toast: null,
@@ -99,7 +114,7 @@ export function useCorrida() {
     const params = new URLSearchParams(location.search);
     const debug = params.has('debug');
     const seedParam = params.get('seed');
-    const engine = new Engine({ storage, seed: seedParam ? Number(seedParam) : undefined });
+    const engine = new Engine({ storage, seed: seedParam ? Number(seedParam) : undefined, adRevives: optionsRef.current.adRevives ?? 0 });
     const missions = new Missions(storage);
     const snapshot = () => ({ missions: missions.slots.map((m) => ({ ...m })), missionLevel: missions.level });
     let runDone: string[] = [];
@@ -194,7 +209,7 @@ export function useCorrida() {
           }
           input.setEnabled(e.state === GameState.PLAYING || e.state === GameState.RESUMING);
           swipes.clear();
-          setUi((u) => ({ ...u, state: e.state, best: engine.score.best, liveRunId: engine.runId, meterFull: engine.meterFull, livesLeft: engine.livesLeft }));
+          setUi((u) => ({ ...u, state: e.state, best: engine.score.best, liveRunId: engine.runId, meterFull: engine.meterFull, livesLeft: engine.livesLeft, lastChance: engine.lastChance }));
           break;
         }
         case 'jump':
@@ -358,13 +373,14 @@ export function useCorrida() {
             cause: e.cause,
             meterFull: false,
             livesLeft: e.livesLeft,
+            lastChance: engine.lastChance,
           }));
           break;
         case 'continue':
           fx.clear();
           renderer.gators.reset();
           renderer.follow(engine, 0, true);
-          setUi((u) => ({ ...u, livesLeft: e.livesLeft, cause: null }));
+          setUi((u) => ({ ...u, livesLeft: e.livesLeft, lastChance: false, cause: null }));
           break;
       }
     });
@@ -492,7 +508,9 @@ export function useCorrida() {
       if (ev.code === 'Enter' && (engine.state === GameState.READY || engine.state === GameState.GAME_OVER)) {
         if ((ev.target as Element | null)?.closest?.('button, input, textarea, form, a')) return;
         sfx.unlock();
-        engine.start();
+        const request = optionsRef.current.onRestartRequest;
+        if (request) request();
+        else engine.start();
       }
     };
     window.addEventListener('keydown', onKey);
@@ -534,6 +552,16 @@ export function useCorrida() {
     sfxRef.current?.unlock();
     engineRef.current?.continueRun();
   }, []);
+  /** Revive pago: só chamar com a recompensa do anúncio já confirmada. */
+  const reviveWithReward = useCallback(() => {
+    sfxRef.current?.unlock();
+    return engineRef.current?.reviveWithReward() ?? false;
+  }, []);
+  /** Silencia o jogo enquanto um anúncio está na tela (volta no próximo toque). */
+  const suspendAudio = useCallback(() => {
+    engineRef.current?.pause();
+    sfxRef.current?.suspend();
+  }, []);
   const endRun = useCallback(() => engineRef.current?.endRun(), []);
   const dash = useCallback(() => {
     sfxRef.current?.unlock();
@@ -568,5 +596,5 @@ export function useCorrida() {
     [storage],
   );
 
-  return { surfaceRef, canvasRef, ui, settings, updateSettings, start, pause, resume, toMenu, continueRun, endRun, dash, playSound, storage, raiseBest };
+  return { surfaceRef, canvasRef, ui, settings, updateSettings, start, pause, resume, toMenu, continueRun, reviveWithReward, suspendAudio, endRun, dash, playSound, storage, raiseBest };
 }

@@ -53,6 +53,10 @@ python e2e/bolinha_ranking.py http://localhost:4173 e2e/screens # bolinha: ranki
 python e2e/aviao.py http://localhost:4173 e2e/screens           # acrobata: controle, loop, fim, ranking, layouts
 python e2e/corrida.py http://localhost:4173 e2e/screens         # disparada: toque/segurar/teclado/deslize, dash, fim, ranking, hub, piloto, layouts
 
+# anúncios da Disparada com o provedor SIMULADO (só em dev; nenhum anúncio real)
+VITE_ADS_PROVIDER=dev npx vite --port 5173
+python e2e/corrida_ads.py http://localhost:5173 e2e/screens     # 1ª derrota sem anúncio, última chance, revive, intersticial, layouts
+
 # modo online (API rodando em :4000 com um banco de teste vazio)
 API_PROXY_TARGET=http://localhost:4000 npx vite preview --port 4174
 python e2e/online.py http://localhost:4174 e2e/screens          # contas, sessão, ranking entre 2 aparelhos
@@ -302,6 +306,10 @@ Velocidade 290 → 480 u/s (aproximação exponencial, τ = 70 s); folga entre p
 
 `?debug&piloto` liga o piloto automático no navegador.
 
+### Anúncios (intersticial e revive)
+
+Desligados por padrão. Com `VITE_ADS_PROVIDER=google` e um publisher do AdSense aprovado no H5 Games Ads: intersticial entre partidas (nunca na 1ª derrota; padrão a cada 3 partidas e ≥ 120 s) e, quando as 3 vidas grátis acabam, a tela "Fim das vidas" oferece **uma** revivida por anúncio com recompensa. Camada isolada em `src/shared/monetization/`; configuração, arquitetura e pendências externas em [`docs/MONETIZACAO.md`](docs/MONETIZACAO.md).
+
 ## Bolinha
 
 ### Continuar de onde parou (3 vidas)
@@ -348,4 +356,6 @@ Parâmetros em `src/games/bolinha/game/config.ts` e `Difficulty.ts`. Detalhes do
 - O recorde pessoal mostrado no menu ainda é o deste aparelho; o melhor da conta aparece no ranking online.
 - Disparada: toda a calibragem (pulo, planar, folgas, enxame) foi feita com simulação e Chromium (desktop e emulação de celular), **não em aparelho físico**. Em pé, a faixa do jogo fica pequena (o aviso pede para deitar). Fora da 1ª versão: animais montáveis, cipós de balançar, loja e missões.
 - Dois testes do servidor (`empate: quem fez primeiro fica na frente` e `o melhor da conta na semana…`) já falhavam antes da Disparada no Postgres local deste ambiente; não foram alterados.
+- O e2e `aviao.py` tem uma falha (`segurar faz subir (como a bolinha)`) que já existia no `master` antes da monetização; nada da Acrobata foi alterado.
+- Anúncios: a integração com o Google foi testada só com mocks e com o provedor simulado; o fluxo real depende da aprovação no H5 Games Ads (veja `docs/MONETIZACAO.md`). A Bolinha ainda usa `shared/ads/rewarded.ts` (`NoAds`, que libera o continuar sem anúncio) — não foi alterada.
 - O anti-trapaça é básico (token + teto por tempo): quem editar o jogo no navegador ainda consegue enviar pontuações plausíveis.

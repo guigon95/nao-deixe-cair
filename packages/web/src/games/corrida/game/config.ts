@@ -222,8 +222,9 @@ export const SCORING = {
 
 /**
  * Vidas por partida para continuar de onde parou (mesma regra da Bolinha).
- * Hoje continuar é grátis; com anúncios ligados, cada continuação pede um
- * anúncio com recompensa (`shared/ads/rewarded.ts`).
+ * As vidas são grátis. Com anúncios ligados, quando elas acabam, a tela de
+ * "última chance" oferece revive(s) por anúncio com recompensa
+ * (`shared/monetization`, `VITE_ADS_REWARDED_REVIVES`).
  */
 export const CONTINUES = {
   lives: 3,

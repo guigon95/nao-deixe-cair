@@ -1,18 +1,38 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
+import type { OfferStatus } from '../../../shared/monetization';
 import { CONTINUES, STORAGE } from '../game/config';
 import { GameState } from '../game/types';
 import { missionText, type Mission } from '../game/Missions';
 import { CAUSE_TEXT, useCorrida } from '../hooks/useCorrida';
 import { usePlayer, useRanking } from '../../../shared/online/hooks';
 import { HubBack } from '../../../shared/ui/HubBack';
-import { rewardedAds } from '../../../shared/ads/rewarded';
 import { LoginPanel, RankingPanel, SaveScore, WeeklyCallout } from '../../../shared/ui/RankingUi';
+import { corridaAds, useCorridaAds } from './useAds';
 
 type Overlay = 'ranking' | 'login' | null;
 
 export function GameScreen() {
-  const { surfaceRef, canvasRef, ui, settings, updateSettings, start, pause, resume, toMenu, continueRun, endRun, dash, playSound, storage, raiseBest } =
-    useCorrida();
+  // Pedido de nova partida pelo teclado passa pelo intersticial (ref: o hook de anúncios vem depois).
+  const restartRequest = useRef<() => void>(() => {});
+  const {
+    surfaceRef,
+    canvasRef,
+    ui,
+    settings,
+    updateSettings,
+    start,
+    pause,
+    resume,
+    toMenu,
+    continueRun,
+    reviveWithReward,
+    suspendAudio,
+    endRun,
+    dash,
+    playSound,
+    storage,
+    raiseBest,
+  } = useCorrida({ adRevives: corridaAds.revivesPerRun, onRestartRequest: () => restartRequest.current() });
   const primaryRef = useRef<HTMLButtonElement | null>(null);
 
   const player = usePlayer(storage);
@@ -62,23 +82,48 @@ export function GameScreen() {
     playSound('click');
   };
 
-  const [watchingAd, setWatchingAd] = useState(false);
+  /** Continuar gastando uma vida (grátis, como sempre foi). */
+  const onContinue = () => {
+    playSound('click');
+    continueRun();
+  };
+
+  const ads = useCorridaAds({
+    state: ui.state,
+    liveRunId: ui.liveRunId,
+    lastChance: ui.lastChance,
+    sound: settings.sound,
+    start,
+    reviveWithReward,
+    suspendAudio,
+  });
+  const restartNow = ads.playAgain;
+  const playAgain = () => {
+    playSound('click');
+    void restartNow();
+  };
+  restartRequest.current = () => void ads.playAgain();
+
+  // "Jogar novamente" na última chance: encerra a partida de vez (o ranking e as
+  // missões registram o fim) e, no render seguinte, começa outra.
+  const [pendingRestart, setPendingRestart] = useState(false);
+  useEffect(() => {
+    if (!pendingRestart || ui.state !== GameState.GAME_OVER) return;
+    setPendingRestart(false);
+    void restartNow();
+  }, [pendingRestart, ui.state, restartNow]);
+
   const [adMessage, setAdMessage] = useState<string | null>(null);
   useEffect(() => {
-    if (ui.state !== GameState.CONTINUE) setAdMessage(null);
-  }, [ui.state]);
-  /** Continuar: (futuramente) assiste ao anúncio e, com a recompensa, volta de onde bateu. */
-  const onContinue = async () => {
-    if (watchingAd) return;
+    if (!ui.lastChance) setAdMessage(null);
+  }, [ui.lastChance]);
+  useEffect(() => {
+    if (ads.offerStatus === 'dismissed') setAdMessage('O anúncio foi fechado antes do fim, então a corrida não continua.');
+    else if (ads.offerStatus === 'error') setAdMessage('O anúncio não funcionou desta vez.');
+  }, [ads.offerStatus]);
+  const onWatchAd = () => {
     playSound('click');
-    setWatchingAd(true);
-    try {
-      const r = await rewardedAds.show('continue');
-      if (r === 'rewarded') continueRun();
-      else setAdMessage(r === 'dismissed' ? 'Assista ao anúncio até o fim para continuar.' : 'Anúncio indisponível agora. Tente de novo.');
-    } finally {
-      setWatchingAd(false);
-    }
+    void ads.watchAdToContinue();
   };
 
   // Aviso de missão cumprida: some sozinho depois de um tempinho.
@@ -130,7 +175,28 @@ export function GameScreen() {
           </p>
         )}
 
-        {ui.state === GameState.CONTINUE && (
+        {ui.state === GameState.CONTINUE && ui.lastChance && (
+          <LastChance
+            ui={ui}
+            primaryRef={primaryRef}
+            offerStatus={ads.offerStatus}
+            message={adMessage}
+            busy={pendingRestart || ads.restarting}
+            onPlayAgain={() => {
+              if (pendingRestart) return;
+              playSound('click');
+              setPendingRestart(true);
+              endRun();
+            }}
+            onWatchAd={onWatchAd}
+            onSeeResult={() => {
+              playSound('click');
+              endRun();
+            }}
+          />
+        )}
+
+        {ui.state === GameState.CONTINUE && !ui.lastChance && (
           <section className="panel continue" data-ui role="dialog" aria-modal="true" aria-labelledby="cont-title">
             <h2 id="cont-title" className="panel-title">
               Ops!
@@ -147,12 +213,11 @@ export function GameScreen() {
                 </span>
               ))}
             </p>
-            <button ref={primaryRef} className="btn btn-primary" onClick={onContinue} disabled={watchingAd}>
-              {watchingAd ? 'AGUARDE…' : rewardedAds.provider === 'none' ? 'CONTINUAR' : '▶ ASSISTIR E CONTINUAR'}
+            <button ref={primaryRef} className="btn btn-primary" onClick={onContinue}>
+              CONTINUAR
             </button>
             <p className="continue-hint">
-              {adMessage ??
-                `Continue daqui com ${ui.score} pontos. ${ui.livesLeft === 1 ? 'Usa sua última vida.' : `Usa 1 das ${ui.livesLeft} vidas.`}`}
+              {`Continue daqui com ${ui.score} pontos. ${ui.livesLeft === 1 ? 'Usa sua última vida.' : `Usa 1 das ${ui.livesLeft} vidas.`}`}
             </p>
             <button
               className="btn btn-link"
@@ -232,7 +297,7 @@ export function GameScreen() {
               <li className="keys">Teclado: Espaço/↑ · ↓ · → · P pausa</li>
             </ul>
             <MissionList missions={ui.missions} level={ui.missionLevel} />
-            <button ref={primaryRef} className="btn btn-primary" onClick={start}>
+            <button ref={primaryRef} className="btn btn-primary" onClick={playAgain} aria-busy={ads.restarting || undefined}>
               CORRER
             </button>
             {ui.best > 0 && (
@@ -341,7 +406,7 @@ export function GameScreen() {
               }}
               onShowRanking={openRanking}
             />
-            <button ref={primaryRef} className="btn btn-primary" onClick={start}>
+            <button ref={primaryRef} className="btn btn-primary" onClick={playAgain} aria-busy={ads.restarting || undefined}>
               CORRER DE NOVO
             </button>
             <button className="btn btn-link" onClick={toMenu}>
@@ -415,6 +480,80 @@ function MissionList({
           </li>
         ))}
       </ol>
+    </section>
+  );
+}
+
+/**
+ * Fim das vidas com revive por anúncio disponível. "Jogar novamente" é o
+ * principal; ver o anúncio é uma escolha secundária e explícita.
+ */
+function LastChance({
+  ui,
+  primaryRef,
+  offerStatus,
+  message,
+  busy,
+  onPlayAgain,
+  onWatchAd,
+  onSeeResult,
+}: {
+  ui: { score: number; best: number; meters: number; fruits: number; cause: keyof typeof CAUSE_TEXT | null };
+  primaryRef: RefObject<HTMLButtonElement | null>;
+  offerStatus: OfferStatus;
+  message: string | null;
+  busy: boolean;
+  onPlayAgain: () => void;
+  onWatchAd: () => void;
+  onSeeResult: () => void;
+}) {
+  const offering = offerStatus === 'loading' || offerStatus === 'ready' || offerStatus === 'showing';
+  const note =
+    message ??
+    (offerStatus === 'ready'
+      ? `Assista a um anúncio curto e continue daqui com ${ui.score} pontos (uma vez por corrida).`
+      : offerStatus === 'unavailable' || offerStatus === 'cancelled'
+        ? 'Nenhum anúncio disponível agora.'
+        : null);
+  return (
+    <section className="panel continue last-chance" data-ui role="dialog" aria-modal="true" aria-labelledby="lc-title">
+      <h2 id="lc-title" className="panel-title">
+        Fim das vidas
+      </h2>
+      {ui.cause && <p className="cause">{CAUSE_TEXT[ui.cause]}</p>}
+      <p className="final-score">
+        <span className="label">Pontos</span>
+        <span className="value">{ui.score}</span>
+      </p>
+      <p className="run-stats">
+        <span>
+          <strong>{ui.meters}</strong> m
+        </span>
+        <span>
+          Recorde <strong>{ui.best}</strong>
+        </span>
+      </p>
+      <button ref={primaryRef} className="btn btn-primary" onClick={onPlayAgain} disabled={busy}>
+        JOGAR NOVAMENTE
+      </button>
+      {offering && (
+        <button
+          className="btn btn-secondary btn-ad"
+          onClick={onWatchAd}
+          disabled={offerStatus !== 'ready'}
+          aria-busy={offerStatus !== 'ready' || undefined}
+        >
+          {offerStatus === 'loading' ? 'Preparando anúncio…' : offerStatus === 'showing' ? 'Anúncio em andamento…' : '▶ Assistir anúncio para continuar'}
+        </button>
+      )}
+      {note && (
+        <p className="continue-hint" role="status">
+          {note}
+        </p>
+      )}
+      <button className="btn btn-link" onClick={onSeeResult}>
+        Ver resultado
+      </button>
     </section>
   );
 }

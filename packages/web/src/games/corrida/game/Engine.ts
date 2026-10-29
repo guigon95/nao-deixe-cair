@@ -15,6 +15,12 @@ export interface EngineOptions {
   resumeDelay?: number;
   /** Vidas por partida para continuar (padrão CONTINUES.lives; 0 = sem continuar). */
   lives?: number;
+  /**
+   * Revives por anúncio com recompensa, depois que as vidas acabam (padrão 0 =
+   * sem revive; a camada de monetização decide). O motor não sabe nada de
+   * anúncios: só abre a "última chance" e revive quando mandarem.
+   */
+  adRevives?: number;
 }
 
 type Listener = (e: GameEvent) => void;
@@ -92,6 +98,9 @@ export class Engine {
   /** Vidas por partida e quantas ainda dá para gastar nesta. */
   readonly lives: number;
   livesLeft = 0;
+  /** Revives por anúncio por partida (0 = desligado) e quantos ainda restam nesta. */
+  adRevives: number;
+  adRevivesLeft = 0;
   private readonly ctl: Controls = { hold: false, pressed: false, drop: false };
   private readonly sink: StepSink;
 
@@ -100,6 +109,8 @@ export class Engine {
     this.resumeDelay = opts.resumeDelay ?? 1.2;
     this.lives = Math.max(0, Math.floor(opts.lives ?? CONTINUES.lives));
     this.livesLeft = this.lives;
+    this.adRevives = Math.max(0, Math.floor(opts.adRevives ?? 0));
+    this.adRevivesLeft = this.adRevives;
     this.score = new Score(opts.storage);
     const seed = opts.seed ?? randomSeed();
     this.track = new Track(createRng(seed));
@@ -163,6 +174,7 @@ export class Engine {
     if (this.state !== GameState.READY && this.state !== GameState.GAME_OVER && this.state !== GameState.PAUSED) return;
     this.runId++;
     this.livesLeft = this.lives;
+    this.adRevivesLeft = this.adRevives;
     const seed = this.fixedSeed !== undefined ? this.fixedSeed + this.runId - 1 : randomSeed();
     this.track.reset(createRng(seed));
     Object.assign(this.runner, createRunner(0));
@@ -649,8 +661,14 @@ export class Engine {
     // O recorde já fica salvo na batida (mesmo se fechar a aba na tela de continuar).
     const res = this.score.finish();
     this.setHolding(false);
-    this.setState(this.livesLeft > 0 ? GameState.CONTINUE : GameState.GAME_OVER);
-    this.emit({ type: 'death', cause, x: r.x, y: r.y, ...res, livesLeft: this.livesLeft });
+    // Sem vidas, mas com revive por anúncio disponível: "última chance" (mesma tela de continuar).
+    this.setState(this.livesLeft > 0 || this.adRevivesLeft > 0 ? GameState.CONTINUE : GameState.GAME_OVER);
+    this.emit({ type: 'death', cause, x: r.x, y: r.y, ...res, livesLeft: this.livesLeft, adRevivesLeft: this.adRevivesLeft });
+  }
+
+  /** Na tela de continuar sem vidas: só o revive por anúncio pode salvar a partida. */
+  get lastChance(): boolean {
+    return this.state === GameState.CONTINUE && this.livesLeft <= 0 && this.adRevivesLeft > 0;
   }
 
   /**
@@ -661,6 +679,23 @@ export class Engine {
   continueRun(): boolean {
     if (this.state !== GameState.CONTINUE || this.livesLeft <= 0) return false;
     this.livesLeft--;
+    this.restoreAfterDeath('life');
+    return true;
+  }
+
+  /**
+   * Revive pago com anúncio: só depois que as vidas acabaram e só quem já tem
+   * a recompensa confirmada pelo provedor deve chamar. Uma vez por revive
+   * disponível; chamadas repetidas devolvem false.
+   */
+  reviveWithReward(): boolean {
+    if (!this.lastChance) return false;
+    this.adRevivesLeft--;
+    this.restoreAfterDeath('ad');
+    return true;
+  }
+
+  private restoreAfterDeath(via: 'life' | 'ad'): void {
     const r = this.runner;
     // Mesmo x; chão contínuo embaixo (mesmo se caiu no rio) e trecho livre à frente.
     const x = r.x;
@@ -677,17 +712,17 @@ export class Engine {
     this.pendingPress = this.pendingDrop = this.pendingDash = false;
     this.alpha = 0;
     this.score.unfreeze();
-    this.emit({ type: 'continue', livesLeft: this.livesLeft });
+    this.emit({ type: 'continue', livesLeft: this.livesLeft, via });
     this.resumeCountdown = this.resumeDelay;
     if (this.resumeDelay <= 0) this.setState(GameState.PLAYING);
     else this.setState(GameState.RESUMING);
-    return true;
   }
 
   /** Desiste de continuar: a partida termina de vez com a pontuação atual. */
   endRun(): void {
     if (this.state !== GameState.CONTINUE) return;
     this.livesLeft = 0;
+    this.adRevivesLeft = 0;
     this.setState(GameState.GAME_OVER);
   }
 

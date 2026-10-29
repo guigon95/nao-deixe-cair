@@ -384,3 +384,12 @@
     animation: none;
   }
 }
+
+/* --- última chance (revive por anúncio) --- */
+.corrida .last-chance .btn-ad:disabled {
+  opacity: 0.65;
+  cursor: progress;
+}
+.corrida .last-chance .run-stats {
+  margin-top: -0.2em;
+}

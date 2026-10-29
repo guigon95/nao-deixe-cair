@@ -4,7 +4,7 @@ export const GameState = {
   PLAYING: 'PLAYING',
   PAUSED: 'PAUSED',
   RESUMING: 'RESUMING',
-  /** Bateu com vida sobrando: escolhe continuar (anúncio, no futuro) ou encerrar. */
+  /** Bateu com vida sobrando (ou, sem vidas, com revive por anúncio disponível): continuar ou encerrar. */
   CONTINUE: 'CONTINUE',
   GAME_OVER: 'GAME_OVER',
 } as const;
@@ -207,6 +207,6 @@ export type GameEvent =
   | { type: 'golden'; on: boolean; x: number; y: number }
   | { type: 'shield'; on: boolean; x: number; y: number; saved?: DeathCause }
   | { type: 'fastFall' }
-  | { type: 'death'; cause: DeathCause; x: number; y: number; score: number; best: number; isNewRecord: boolean; livesLeft: number }
-  | { type: 'continue'; livesLeft: number }
+  | { type: 'death'; cause: DeathCause; x: number; y: number; score: number; best: number; isNewRecord: boolean; livesLeft: number; adRevivesLeft: number }
+  | { type: 'continue'; livesLeft: number; via: 'life' | 'ad' }
   | { type: 'newRecord'; score: number };
