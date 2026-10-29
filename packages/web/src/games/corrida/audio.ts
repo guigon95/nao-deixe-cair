@@ -1,5 +1,27 @@
 import { SynthAudio } from '../../shared/audio/SynthAudio';
 
+/** Música do ímã: forró/baião acelerado, original (Ré mixolídio, I–I–IV–V). */
+const MUSIC = {
+  bpm: 172,
+  volume: 0.32,
+  /** Ré 4 (Hz): as notas da melodia são semitons a partir dele. */
+  d4: 293.66,
+  /** Fundamentais do baixo por compasso: Ré, Ré, Sol, Lá. */
+  bassRoots: [73.42, 73.42, 98.0, 110.0],
+} as const;
+
+/** Passos (de 16) em que o baixo toca: 3-3-2 dobrado. */
+const BAIAO_BASS = [0, 3, 6, 8, 11, 14];
+
+const _ = null;
+/** 4 compassos × 16 semicolcheias (semitons a partir do Ré 4; null = pausa). */
+const MELODY: ReadonlyArray<ReadonlyArray<number | null>> = [
+  [12, _, 7, _, 4, 7, 12, _, 10, _, 7, _, 4, _, 7, _],
+  [9, _, 7, _, 4, _, 2, _, 4, 7, 9, _, 7, _, _, _],
+  [5, _, 9, _, 12, _, 14, 12, 10, _, 9, _, 7, _, 5, _],
+  [7, _, 11, _, 14, _, 16, 14, 11, _, 9, _, 7, 9, 11, _],
+];
+
 /** Escala pentatônica (semitons) da sequência de capins. */
 const PENTA = [0, 2, 4, 7, 9, 12, 14, 16];
 
@@ -20,6 +42,7 @@ export class RunnerSfx extends SynthAudio {
   protected override stopContinuous(): void {
     this.buzz(0);
     this.rain(0);
+    this.musicStop();
   }
 
   /** Pulo: "boing" curtinho subindo. */
@@ -87,6 +110,117 @@ export class RunnerSfx extends SynthAudio {
       this.tone(660, 660, 0.08, 'sine', 0.15);
       this.tone(440, 392, 0.14, 'sine', 0.15, 0.08);
     }
+  }
+
+  // ───────────── música do ímã (forró acelerado, composição original) ─────────────
+
+  private music: { gain: GainNode; noise: AudioBuffer; next: number; step: number } | null = null;
+
+  /** Tocando a música do ímã agora? */
+  get musicPlaying(): boolean {
+    return !!this.music;
+  }
+
+  /**
+   * Chamar a cada quadro enquanto o ímã estiver ligado: agenda as notas dos
+   * próximos ~120 ms (agendamento à frente no relógio do áudio, sem timers).
+   * `remaining` = segundos de ímã que faltam: nos 2 últimos, o forró acelera.
+   */
+  musicTick(remaining: number): void {
+    if (!this.ready) return;
+    const ctx = this.ctx!;
+    try {
+      if (!this.music) {
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(MUSIC.volume, ctx.currentTime + 0.15);
+        gain.connect(this.master!);
+        const len = Math.ceil(ctx.sampleRate * 0.08);
+        const noise = ctx.createBuffer(1, len, ctx.sampleRate);
+        const data = noise.getChannelData(0);
+        for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+        this.music = { gain, noise, next: ctx.currentTime + 0.03, step: 0 };
+      }
+      const m = this.music;
+      const bpm = remaining < 2 ? MUSIC.bpm * 1.18 : MUSIC.bpm;
+      const stepDur = 60 / bpm / 4;
+      while (m.next < ctx.currentTime + 0.12) {
+        this.playStep(m.step, m.next, stepDur);
+        m.next += stepDur;
+        m.step = (m.step + 1) % 64;
+      }
+    } catch {
+      /* áudio nunca quebra o jogo */
+    }
+  }
+
+  musicStop(): void {
+    const m = this.music;
+    if (!m || !this.ctx) return;
+    this.music = null;
+    try {
+      const t = this.ctx.currentTime;
+      m.gain.gain.cancelScheduledValues(t);
+      m.gain.gain.setValueAtTime(Math.max(0.0001, m.gain.gain.value), t);
+      m.gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.25);
+      setTimeout(() => m.gain.disconnect(), 400);
+    } catch {
+      /* ignora */
+    }
+  }
+
+  /** Um passo (semicolcheia) do loop de 4 compassos: zabumba, triângulo, baixo e sanfona. */
+  private playStep(step: number, t: number, stepDur: number): void {
+    const bar = Math.floor(step / 16);
+    const s = step % 16;
+    // Zabumba: batida grave no 1 e no "e do 2" (pulsação do baião).
+    if (s === 0 || s === 6 || s === 8) this.mNote(s === 0 ? 95 : 80, t, 0.12, 'sine', 0.9, 45);
+    // Triângulo: todo passo, aberto nos contratempos.
+    const open = s % 4 === 2;
+    this.mTick(t, open ? 0.07 : 0.025, open ? 0.32 : 0.12);
+    // Baixo no ritmo 3-3-2 do baião.
+    const bi = BAIAO_BASS.indexOf(s);
+    if (bi >= 0) {
+      const root = MUSIC.bassRoots[bar];
+      this.mNote(root * (bi % 2 === 1 ? 1.5 : 1), t, stepDur * 1.6, 'triangle', 0.55);
+    }
+    // Melodia (sanfona: quadrada + serra, uma oitava junta, bem curtinha).
+    const n = MELODY[bar][s];
+    if (n !== null) {
+      const f = MUSIC.d4 * Math.pow(2, n / 12);
+      this.mNote(f, t, stepDur * 1.7, 'square', 0.22);
+      this.mNote(f * 2, t, stepDur * 1.2, 'sawtooth', 0.06);
+    }
+  }
+
+  private mNote(freq: number, t0: number, dur: number, type: OscillatorType, gain: number, endFreq = freq): void {
+    const ctx = this.ctx!;
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t0);
+    if (endFreq !== freq) osc.frequency.exponentialRampToValueAtTime(endFreq, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(gain, t0 + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    osc.connect(g).connect(this.music!.gain);
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.02);
+  }
+
+  private mTick(t0: number, dur: number, gain: number): void {
+    const ctx = this.ctx!;
+    const src = ctx.createBufferSource();
+    src.buffer = this.music!.noise;
+    const f = ctx.createBiquadFilter();
+    f.type = 'highpass';
+    f.frequency.value = 7000;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(gain, t0);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    src.connect(f).connect(g).connect(this.music!.gain);
+    src.start(t0);
+    src.stop(t0 + dur + 0.02);
   }
 
   /** Chegou à copa: farfalhar de folhas + duas notas subindo. */

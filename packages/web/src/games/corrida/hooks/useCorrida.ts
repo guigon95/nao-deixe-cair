@@ -12,7 +12,7 @@ import { COLORS, Renderer } from '../rendering/Renderer';
 import { InputController } from '../../../shared/input/InputController';
 import { effectiveDpr } from '../../../shared/layout/layout';
 import { GameLoop } from '../../../shared/loop/GameLoop';
-import { loadSettings, saveSettings, type Settings } from '../../../shared/settings/settings';
+import { loadSettings, saveSettings, systemPrefersReducedMotion, type Settings } from '../../../shared/settings/settings';
 import { browserStorage } from '../../../shared/storage/storage';
 
 export interface UiState {
@@ -47,6 +47,7 @@ export const CAUSE_TEXT: Record<DeathCause, string> = {
   swarm: 'Os marimbondos alcançaram',
 };
 
+const RAINBOW = ['#ff5a5a', '#ffb347', '#ffe95a', '#6be36b', '#5ac8ff', '#c77dff'];
 const DROP_KEYS = new Set(['ArrowDown', 'KeyS']);
 const DASH_KEYS = new Set(['ArrowRight', 'KeyD', 'ShiftLeft', 'ShiftRight']);
 
@@ -123,7 +124,8 @@ export function useCorrida() {
     engineRef.current = engine;
     fxRef.current = fx;
     sfxRef.current = sfx;
-    fx.reducedMotion = settingsRef.current.reducedMotion;
+    // Sem botão de "menos movimento" neste jogo: só respeita o ajuste de acessibilidade do aparelho.
+    fx.reducedMotion = systemPrefersReducedMotion();
     sfx.enabled = settingsRef.current.sound;
     setUi((u) => ({ ...u, best: engine.score.best }));
 
@@ -181,6 +183,7 @@ export function useCorrida() {
           if (e.state !== GameState.PLAYING) {
             sfx.buzz(0);
             sfx.rain(0);
+            sfx.musicStop();
           }
           input.setEnabled(e.state === GameState.PLAYING || e.state === GameState.RESUMING);
           swipes.clear();
@@ -296,6 +299,7 @@ export function useCorrida() {
 
     // `?debug&piloto` liga o piloto automático (capturas e testes de navegador).
     const pilot = debug && params.has('piloto') ? new Autopilot() : null;
+    let sparkle = 0;
     const loop = new GameLoop((dt) => {
       if (pilot && engine.state === GameState.PLAYING) {
         // O piloto decide a cada passo fixo: avança passo a passo.
@@ -314,7 +318,19 @@ export function useCorrida() {
         const r = engine.runner;
         if (r.grounded) fx.dust(r.x, r.y, engine.runSpeed, fdt);
         const near = engine.swarm < SWARM.warn * 1.3 ? 1 - engine.swarm / (SWARM.warn * 1.3) : 0;
-        sfx.buzz(near);
+        // Com o ímã: música acelerada e zumbido do enxame mais baixo por baixo dela.
+        if (engine.magnet > 0) {
+          sfx.musicTick(engine.magnet);
+          // Rastro de brilho colorido atrás da capivara (estilo "estrela" de jogo de plataforma).
+          sparkle -= fdt;
+          if (sparkle <= 0 && !fx.reducedMotion) {
+            sparkle = 0.04;
+            const r = engine.runner;
+            fx.burst(r.x - 14, r.y + 10 + Math.random() * 24, 2, 60, RAINBOW, 0.45, 3, false);
+          }
+        }
+        else sfx.musicStop();
+        sfx.buzz(sfx.musicPlaying ? near * 0.4 : near);
       }
       if (!frozen) {
         const active = st === GameState.PLAYING || st === GameState.GAME_OVER || st === GameState.CONTINUE;
@@ -449,7 +465,6 @@ export function useCorrida() {
         const next = { ...prev, ...patch };
         settingsRef.current = next;
         saveSettings(storage, next);
-        if (fxRef.current) fxRef.current.reducedMotion = next.reducedMotion;
         if (sfxRef.current) {
           sfxRef.current.enabled = next.sound;
           if (next.sound) {

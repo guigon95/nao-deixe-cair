@@ -364,20 +364,13 @@ function Toggles({
   settings,
   update,
 }: {
-  settings: { sound: boolean; reducedMotion: boolean };
-  update: (p: Partial<{ sound: boolean; reducedMotion: boolean }>) => void;
+  settings: { sound: boolean };
+  update: (p: Partial<{ sound: boolean }>) => void;
 }) {
   return (
     <div className="toggles">
       <button className="chip" aria-pressed={settings.sound} onClick={() => update({ sound: !settings.sound })}>
         {settings.sound ? 'Som: ligado' : 'Som: desligado'}
-      </button>
-      <button
-        className="chip"
-        aria-pressed={settings.reducedMotion}
-        onClick={() => update({ reducedMotion: !settings.reducedMotion })}
-      >
-        {settings.reducedMotion ? 'Menos movimento: sim' : 'Menos movimento: não'}
       </button>
     </div>
   );

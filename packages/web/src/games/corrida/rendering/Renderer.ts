@@ -63,6 +63,7 @@ export class Renderer {
   lift = 0;
   private skyCache = new Map<string, CanvasGradient>();
   private hazeCache: CanvasGradient | null = null;
+  private auraCache: CanvasGradient | null = null;
   private lastSeason: SeasonId = 'verao';
   /** Chuva (atualizada pelo hook a cada quadro). */
   readonly weather = new Weather();
@@ -735,6 +736,80 @@ export class Renderer {
     ctx.fillRect(x - 4.5, y + 2.5, 9, 3);
   }
 
+  /** Aura do ímã atrás da capivara (pisca nos 2 últimos segundos). */
+  private drawMagnetAura(x: number, y: number, remaining: number, time: number, reduced: boolean): void {
+    const ctx = this.ctx;
+    const ending = remaining < 2;
+    const blink = ending ? 0.35 + 0.65 * (Math.sin(time * 18) > 0 ? 1 : 0) : 1;
+    const cx = x + 4;
+    const cy = y - 18;
+    if (!this.auraCache) {
+      const g = ctx.createRadialGradient(0, 0, 6, 0, 0, 58);
+      g.addColorStop(0, 'rgba(255, 250, 190, 0.95)');
+      g.addColorStop(0.5, 'rgba(255, 190, 40, 0.5)');
+      g.addColorStop(1, 'rgba(255, 160, 40, 0)');
+      this.auraCache = g;
+    }
+    ctx.save();
+    ctx.globalAlpha = blink;
+    ctx.translate(cx, cy);
+    const pulse = reduced ? 1 : 1 + Math.sin(time * 10) * 0.07;
+    ctx.scale(pulse, pulse);
+    ctx.fillStyle = this.auraCache;
+    ctx.fillRect(-62, -62, 124, 124);
+    ctx.restore();
+    // Estrelinhas girando em volta, mudando de cor (arco-íris).
+    const spin = reduced ? 0 : time * 4;
+    ctx.save();
+    ctx.globalAlpha = blink;
+    for (let i = 0; i < 6; i++) {
+      const a = spin + (i * Math.PI * 2) / 6;
+      const sx = cx + Math.cos(a) * 36;
+      const sy = cy + Math.sin(a) * 26;
+      ctx.fillStyle = `hsl(${Math.round((time * 220 + i * 60) % 360)}, 95%, 65%)`;
+      star(ctx, sx, sy, 4.5, a * 2);
+    }
+    ctx.restore();
+  }
+
+  /** Ímã por cima da cabeça e raios elétricos até os capins sendo puxados. */
+  private drawMagnetBeams(engine: Engine, wx: number, wy: number, x: number, y: number, time: number, reduced: boolean): void {
+    const ctx = this.ctx;
+    const mx = x + 8;
+    const my = y - 62 + (reduced ? 0 : Math.sin(time * 6) * 3);
+    let n = 0;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    for (const f of engine.track.level.fruits) {
+      if (n >= 8) break;
+      if (f.taken) continue;
+      const dx = f.x - wx;
+      if (dx > MAGNET.reachAhead) break;
+      if (dx < -MAGNET.reachBehind || Math.abs(f.y - wy - 17) > MAGNET.reachUp) continue;
+      const fx2 = this.sx(f.x);
+      const fy = this.sy(f.y);
+      n++;
+      // Raio em zigue-zague (parado com "menos movimento").
+      ctx.beginPath();
+      ctx.moveTo(mx, my + 6);
+      const segs = 5;
+      for (let k = 1; k < segs; k++) {
+        const t = k / segs;
+        const jx = reduced ? 0 : (Math.random() - 0.5) * 10;
+        const jy = reduced ? 0 : (Math.random() - 0.5) * 10;
+        ctx.lineTo(mx + (fx2 - mx) * t + jx, my + 6 + (fy - my - 6) * t + jy);
+      }
+      ctx.lineTo(fx2, fy);
+      ctx.strokeStyle = 'rgba(120, 230, 255, 0.35)';
+      ctx.lineWidth = 5;
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(235, 255, 255, 0.9)';
+      ctx.lineWidth = 1.6;
+      ctx.stroke();
+    }
+    this.drawMagnet(mx, my, 0.8, time);
+  }
+
   /** Ímã de ferradura (vermelho com pontas prateadas), com brilho para chamar atenção. */
   private drawMagnet(x: number, y: number, scale: number, time: number): void {
     if (x < this.viewL - 20 || x > this.viewR + 20) return;
@@ -855,15 +930,12 @@ export class Renderer {
       ctx.ellipse(x + 4, this.sy(0) + 1, Math.max(6, 18 - h / 20), 3.5, 0, 0, Math.PI * 2);
       ctx.fill();
     }
-    // Ímã ligado: anel pulsante em volta (pisca nos 2 últimos segundos).
-    if (engine.magnet > 0 && !isDead(engine) && (engine.magnet > 2 || Math.sin(time * 20) > 0)) {
-      ctx.strokeStyle = `rgba(255, 90, 90, ${(0.45 + 0.25 * Math.sin(time * 9)).toFixed(3)})`;
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.arc(x + 4, y - 18, 30 + Math.sin(time * 9) * 2, 0, Math.PI * 2);
-      ctx.stroke();
-    }
+    // Ímã ligado: aura dourada, estrelinhas de arco-íris girando e o ímã por cima
+    // da cabeça soltando raios até cada capim que está puxando.
+    const magnetOn = engine.magnet > 0 && !isDead(engine);
+    if (magnetOn) this.drawMagnetAura(x, y, engine.magnet, time, fx.reducedMotion);
     const landing = r.landedAt < 0.14 ? 1 - r.landedAt / 0.14 : 0;
+    if (magnetOn) this.drawMagnetBeams(engine, p.x, p.y, x, y, time, fx.reducedMotion);
     drawCapivara(ctx, x, y, {
       pose,
       run: engine.state === GameState.READY ? time * 12 : (p.x / 28) % (Math.PI * 2),
@@ -1107,6 +1179,17 @@ export class Renderer {
       ctx.fillText(l2, W / 2, 132);
       ctx.globalAlpha = 1;
     }
+    // Ímã: moldura dourada pulsando nas bordas da tela.
+    if (engine.magnet > 0 && !isDead(engine)) {
+      const a = (fx.reducedMotion ? 0.25 : 0.22 + 0.12 * Math.sin(time * 8)) * (engine.magnet < 2 && Math.sin(time * 18) < 0 ? 0.3 : 1);
+      const L = this.viewL;
+      const T = this.viewT;
+      const Wv = this.viewR - this.viewL;
+      const Hv = this.viewB - this.viewT;
+      ctx.strokeStyle = `rgba(255, 200, 60, ${a.toFixed(3)})`;
+      ctx.lineWidth = 14;
+      ctx.strokeRect(L + 7, T + 7, Wv - 14, Hv - 14);
+    }
     if (fx.bannerLife > 0) {
       ctx.globalAlpha = Math.min(1, fx.bannerLife / 0.5);
       ctx.textAlign = 'center';
@@ -1119,6 +1202,23 @@ export class Renderer {
       ctx.globalAlpha = 1;
     }
   }
+}
+
+/** Estrelinha de 4 pontas. */
+function star(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, rot: number): void {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rot);
+  ctx.beginPath();
+  for (let i = 0; i < 8; i++) {
+    const rr = i % 2 === 0 ? r : r * 0.38;
+    const a = (i * Math.PI) / 4;
+    if (i === 0) ctx.moveTo(Math.cos(a) * rr, Math.sin(a) * rr);
+    else ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
 }
 
 /** Capivara caída (fim de partida ou tela de continuar). */
