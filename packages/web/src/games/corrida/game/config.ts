@@ -137,6 +137,21 @@ export const SCORING = {
   stomp: 10,
 } as const;
 
+/**
+ * Vidas por partida para continuar de onde parou (mesma regra da Bolinha).
+ * Hoje continuar é grátis; com anúncios ligados, cada continuação pede um
+ * anúncio com recompensa (`shared/ads/rewarded.ts`).
+ */
+export const CONTINUES = {
+  lives: 3,
+  /** Trecho livre à frente ao continuar (s de corrida): sem obstáculos nem rio. */
+  clearAhead: 1.8,
+  /** Trecho livre atrás (u): chão sob a capivara mesmo se caiu no rio. */
+  clearBehind: 200,
+  /** O enxame volta para esta distância (u). */
+  swarm: 240,
+} as const;
+
 /** Chão: abaixo disso, dentro de um buraco, a capivara caiu no rio do jacaré. */
 export const PIT_DEATH_Y = -14;
 

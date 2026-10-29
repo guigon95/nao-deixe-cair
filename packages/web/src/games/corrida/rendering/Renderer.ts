@@ -361,7 +361,7 @@ export class Renderer {
     if (ax < this.viewL - v.len || ax > this.viewR + 40) return;
     const ay = this.sy(v.ay);
     const r = engine.runner;
-    const held = r.swinging && r.swAx === v.ax && engine.state !== GameState.GAME_OVER;
+    const held = r.swinging && r.swAx === v.ax && !isDead(engine);
     let ex: number;
     let ey: number;
     if (held) {
@@ -609,7 +609,7 @@ export class Renderer {
     let y = this.sy(p.y);
     let pose: Pose;
     let tilt = 0;
-    if (engine.state === GameState.GAME_OVER) {
+    if (isDead(engine)) {
       pose = 'dead';
       const d = Math.min(engine.deadTime, 1.2);
       // Pulinho de derrota (cosmético).
@@ -648,7 +648,7 @@ export class Renderer {
       }
     }
     // Sombra no chão (ajuda a ler a altura do pulo).
-    if (engine.state !== GameState.GAME_OVER && engine.track.level.groundAt(p.x)) {
+    if (!isDead(engine) && engine.track.level.groundAt(p.x)) {
       const h = Math.max(0, p.y);
       ctx.fillStyle = `rgba(0,0,0,${Math.max(0.06, 0.25 - h / 900).toFixed(3)})`;
       ctx.beginPath();
@@ -817,7 +817,7 @@ export class Renderer {
     const ctx = this.ctx;
     const W = ARENA.width;
     // Perigo: enxame perto → borda esquerda avermelhada pulsando.
-    if (engine.swarm < SWARM.warn && engine.state !== GameState.GAME_OVER) {
+    if (engine.swarm < SWARM.warn && !isDead(engine)) {
       const k = 1 - engine.swarm / SWARM.warn;
       const g = ctx.createLinearGradient(this.viewL, 0, this.viewL + 120, 0);
       g.addColorStop(0, `rgba(255, 59, 92, ${(0.45 * k * (0.7 + 0.3 * Math.sin(time * 10))).toFixed(3)})`);
@@ -898,6 +898,11 @@ export class Renderer {
       ctx.globalAlpha = 1;
     }
   }
+}
+
+/** Capivara caída (fim de partida ou tela de continuar). */
+function isDead(engine: Engine): boolean {
+  return engine.state === GameState.GAME_OVER || engine.state === GameState.CONTINUE;
 }
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {

@@ -178,8 +178,26 @@ with sync_playwright() as p:
     page.wait_for_function("() => window.__NDC__.engine.state === 'PLAYING'", timeout=4000)
     check("retomada volta a jogar sem saltar posição", abs(st(page)["x"] - x) < 60)
 
-    # Sem tocar, a capivara bate e a partida acaba.
-    page.wait_for_function("() => window.__NDC__.engine.state === 'GAME_OVER'", timeout=45000)
+    # Vidas: corações ao lado da pausa durante a partida.
+    check("3 corações na partida", page.locator(".hud-lives .heart.is-full").count() == 3)
+
+    # Sem tocar, a capivara bate: com vida sobrando, aparece a tela de continuar.
+    page.wait_for_function("() => window.__NDC__.engine.state === 'CONTINUE'", timeout=45000)
+    page.wait_for_timeout(400)
+    sc = st(page)
+    check("bater com vidas mostra Continuar", page.locator(".continue").count() == 1 and page.locator("text=CONTINUAR").count() == 1, f"causa={sc['cause']}")
+    check("tela de continuar mostra pontos e 3 vidas", str(sc["score"]) in page.locator(".continue .final-score").inner_text() and page.locator(".continue .heart.is-full").count() == 3)
+    check("sem envio ao ranking ao bater com vidas", page.locator(".save-box").count() == 0)
+    page.screenshot(path=str(OUT / "corrida-05b-continuar.png"))
+    page.click("text=CONTINUAR")
+    page.wait_for_function("() => window.__NDC__.engine.state === 'PLAYING'", timeout=4000)
+    sc2 = st(page)
+    check("continuar volta de onde parou com os mesmos pontos", sc2["score"] >= sc["score"] and abs(sc2["x"] - sc["x"]) < 400 and sc2["runId"] == sc["runId"])
+    check("continuar gasta uma vida", page.locator(".hud-lives .heart.is-full").count() == 2)
+    page.wait_for_function("() => window.__NDC__.engine.state === 'CONTINUE'", timeout=45000)
+    page.wait_for_timeout(300)
+    page.click("text=Encerrar corrida")
+    page.wait_for_function("() => window.__NDC__.engine.state === 'GAME_OVER'", timeout=3000)
     page.wait_for_timeout(500)
     s5 = st(page)
     check("batida leva ao fim de jogo", s5["state"] == "GAME_OVER", f"causa={s5['cause']} pontos={s5['score']}")

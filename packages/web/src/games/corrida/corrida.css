@@ -102,6 +102,29 @@
   color: var(--text);
 }
 
+/* Vidas na partida: corações ao lado do botão de pausa. */
+.corrida .hud-lives {
+  position: absolute;
+  top: max(calc(var(--u) * 8), env(safe-area-inset-top));
+  left: calc(max(calc(var(--u) * 8), env(safe-area-inset-left)) + max(44px, calc(var(--u) * 40)) + 8px);
+  height: max(44px, calc(var(--u) * 40));
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 1.3em;
+  pointer-events: none;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+
+.corrida .hud-lives .heart {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.corrida .hud-lives .heart.is-full {
+  color: #ff5d73;
+}
+
 /* Botão do dash: grande, no canto de baixo à direita (polegar direito). */
 .dash-btn {
   position: absolute;
@@ -171,6 +194,13 @@
   }
   .corrida .menu .title {
     font-size: 2.2em;
+  }
+  .corrida .continue {
+    width: min(94%, 26em);
+    gap: 0.4em;
+  }
+  .corrida .continue .final-score .value {
+    font-size: 2.4em;
   }
   .corrida .gameover {
     display: grid;

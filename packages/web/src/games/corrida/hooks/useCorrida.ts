@@ -28,6 +28,8 @@ export interface UiState {
   fruits: number;
   cause: DeathCause | null;
   meterFull: boolean;
+  /** Vidas que ainda dá para gastar continuando nesta partida. */
+  livesLeft: number;
 }
 
 export const CAUSE_TEXT: Record<DeathCause, string> = {
@@ -71,6 +73,7 @@ export function useCorrida() {
     fruits: 0,
     cause: null,
     meterFull: false,
+    livesLeft: 0,
   });
 
   useEffect(() => {
@@ -140,7 +143,7 @@ export function useCorrida() {
           }
           input.setEnabled(e.state === GameState.PLAYING || e.state === GameState.RESUMING);
           swipes.clear();
-          setUi((u) => ({ ...u, state: e.state, best: engine.score.best, liveRunId: engine.runId, meterFull: engine.meterFull }));
+          setUi((u) => ({ ...u, state: e.state, best: engine.score.best, liveRunId: engine.runId, meterFull: engine.meterFull, livesLeft: engine.livesLeft }));
           break;
         }
         case 'jump':
@@ -219,7 +222,13 @@ export function useCorrida() {
             fruits: engine.score.fruits,
             cause: e.cause,
             meterFull: false,
+            livesLeft: e.livesLeft,
           }));
+          break;
+        case 'continue':
+          fx.clear();
+          renderer.follow(engine, 0, true);
+          setUi((u) => ({ ...u, livesLeft: e.livesLeft, cause: null }));
           break;
       }
     });
@@ -246,14 +255,14 @@ export function useCorrida() {
         sfx.buzz(near);
       }
       if (!frozen) {
-        const raining = (st === GameState.PLAYING || st === GameState.GAME_OVER) && isRainy(engine.score.meters, engine.runId);
+        const raining = (st === GameState.PLAYING || st === GameState.GAME_OVER || st === GameState.CONTINUE) && isRainy(engine.score.meters, engine.runId);
         renderer.weather.update(fdt, raining, fx.reducedMotion);
         if (renderer.weather.thunder) sfx.thunder();
         sfx.rain(st === GameState.PLAYING ? renderer.weather.rain : 0);
         fx.update(fdt);
         renderer.follow(engine, fdt);
       }
-      renderer.draw(engine, fx, { showHud: st !== GameState.READY && st !== GameState.GAME_OVER, time: performance.now() / 1000 });
+      renderer.draw(engine, fx, { showHud: st !== GameState.READY && st !== GameState.GAME_OVER && st !== GameState.CONTINUE, time: performance.now() / 1000 });
     });
 
     const resize = () => {
@@ -352,6 +361,11 @@ export function useCorrida() {
     engineRef.current?.resume();
   }, []);
   const toMenu = useCallback(() => engineRef.current?.toMenu(), []);
+  const continueRun = useCallback(() => {
+    sfxRef.current?.unlock();
+    engineRef.current?.continueRun();
+  }, []);
+  const endRun = useCallback(() => engineRef.current?.endRun(), []);
   const dash = useCallback(() => {
     sfxRef.current?.unlock();
     engineRef.current?.dash();
@@ -386,5 +400,5 @@ export function useCorrida() {
     [storage],
   );
 
-  return { surfaceRef, canvasRef, ui, settings, updateSettings, start, pause, resume, toMenu, dash, playSound, storage, raiseBest };
+  return { surfaceRef, canvasRef, ui, settings, updateSettings, start, pause, resume, toMenu, continueRun, endRun, dash, playSound, storage, raiseBest };
 }

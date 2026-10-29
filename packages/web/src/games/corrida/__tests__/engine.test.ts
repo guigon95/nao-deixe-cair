@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DASH, SIM, STORAGE, SWARM } from '../game/config';
+import { CONTINUES, DASH, SIM, STORAGE, SWARM } from '../game/config';
 import { speedAt, tierAt, restAt } from '../game/Difficulty';
 import { Engine } from '../game/Engine';
 import { SwipeDetector } from '../game/Gestures';
@@ -11,9 +11,9 @@ import { GameLoop, type FrameScheduler } from '../../../shared/loop/GameLoop';
 
 const DT = SIM.fixedDt;
 
-function engine(seed = 1) {
+function engine(seed = 1, lives = 0) {
   const storage = new MemoryStorage();
-  const e = new Engine({ storage, seed, resumeDelay: 0 });
+  const e = new Engine({ storage, seed, resumeDelay: 0, lives });
   const events: GameEvent[] = [];
   e.on((ev) => events.push(ev));
   return { e, storage, events };
@@ -193,3 +193,81 @@ describe('laço compartilhado', () => {
     expect(loop.activeLoops).toBe(0);
   });
 });
+
+describe('vidas e continuar', () => {
+  const runUntilStop = (e: Engine) => {
+    for (let i = 0; i < 120 * 60 && e.state === GameState.PLAYING; i++) e.step(DT);
+  };
+
+  it('com vida sobrando, bater leva à tela de continuar; sem vida, ao fim', () => {
+    const { e, events } = engine(1, 3);
+    e.start();
+    expect(e.livesLeft).toBe(CONTINUES.lives);
+    runUntilStop(e);
+    expect(e.state).toBe(GameState.CONTINUE);
+    const death = events.find((ev) => ev.type === 'death');
+    expect(death && death.type === 'death' && death.livesLeft).toBe(3);
+  });
+
+  it('continuar mantém pontos, tempo e medidor; limpa o caminho e afasta o enxame', () => {
+    const { e } = engine(2, 3);
+    e.start();
+    runUntilStop(e);
+    const before = { score: e.score.score, elapsed: e.elapsed, meter: e.meter, x: e.runner.x };
+    expect(e.continueRun()).toBe(true);
+    expect(e.state).toBe(GameState.PLAYING);
+    expect(e.livesLeft).toBe(2);
+    expect(e.score.score).toBe(before.score);
+    expect(e.elapsed).toBe(before.elapsed);
+    expect(e.meter).toBe(before.meter);
+    expect(e.runner.x).toBe(before.x);
+    expect(e.runner.grounded).toBe(true);
+    expect(e.swarm).toBeGreaterThanOrEqual(CONTINUES.swarm);
+    // Sem tocar, corre pelo trecho limpo sem bater.
+    const clear = e.speed * CONTINUES.clearAhead;
+    for (let i = 0; i < 120 * 30 && e.state === GameState.PLAYING && e.runner.x < before.x + clear - 40; i++) e.step(DT);
+    expect(e.state).toBe(GameState.PLAYING);
+    // E os pontos voltam a contar.
+    expect(e.score.score).toBeGreaterThan(before.score);
+  });
+
+  it('continuar depois de cair no rio põe chão embaixo e não deixa meio rio à frente', () => {
+    const { e } = engine(3, 3);
+    e.start();
+    e.track.level.ground.length = 0;
+    e.track.level.addGround(-800, 300);
+    e.track.level.addGround(1400, 9000);
+    e.track.level.rocks.length = e.track.level.thorns.length = e.track.level.crates.length = 0;
+    runUntilStop(e);
+    expect(e.deathCause).toBe('river');
+    e.continueRun();
+    expect(e.track.level.groundAt(e.runner.x)).toBe(true);
+    for (let i = 0; i < 120 * 6 && e.state === GameState.PLAYING; i++) e.step(DT);
+    expect(e.state).toBe(GameState.PLAYING);
+  });
+
+  it('3 vidas: na quarta batida a partida acaba de vez; um só envio por partida', () => {
+    const { e, events } = engine(4, 3);
+    e.start();
+    for (let k = 0; k < 3; k++) {
+      runUntilStop(e);
+      expect(e.state).toBe(GameState.CONTINUE);
+      e.continueRun();
+    }
+    runUntilStop(e);
+    expect(e.state).toBe(GameState.GAME_OVER);
+    expect(e.continueRun()).toBe(false);
+    expect(events.filter((ev) => ev.type === 'state' && ev.state === GameState.GAME_OVER)).toHaveLength(1);
+  });
+
+  it('encerrar na tela de continuar termina a partida; nova partida volta com 3 vidas', () => {
+    const { e } = engine(5, 3);
+    e.start();
+    runUntilStop(e);
+    e.endRun();
+    expect(e.state).toBe(GameState.GAME_OVER);
+    e.start();
+    expect(e.livesLeft).toBe(3);
+  });
+});
+

@@ -73,6 +73,11 @@ export class Score {
     return { score, best: this.best, isNewRecord };
   }
 
+  /** Continuou depois de bater: volta a contar pontos. */
+  unfreeze(): void {
+    this.frozen = false;
+  }
+
   /** Recorde vindo da conta (servidor): só sobe e fica salvo aqui também. */
   raiseBest(n: number): boolean {
     if (!(Number.isFinite(n) && n > this.best)) return false;

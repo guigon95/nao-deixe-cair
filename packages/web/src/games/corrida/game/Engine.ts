@@ -1,4 +1,4 @@
-import { DASH, SCORING, SIM, SWARM } from './config';
+import { CONTINUES, DASH, SCORING, SIM, SWARM } from './config';
 import { speedAt, tierAt } from './Difficulty';
 import { createRunner, runnerSpeed, stepRunner, type Controls, type StepSink } from './Physics';
 import { Score } from './Score';
@@ -12,13 +12,16 @@ export interface EngineOptions {
   /** Semente fixa (testes e `?seed=`). Sem ela, cada partida sorteia. */
   seed?: number;
   resumeDelay?: number;
+  /** Vidas por partida para continuar (padrão CONTINUES.lives; 0 = sem continuar). */
+  lives?: number;
 }
 
 type Listener = (e: GameEvent) => void;
 
 const TRANSITIONS: Record<GameState, readonly GameState[]> = {
   READY: [GameState.PLAYING],
-  PLAYING: [GameState.PAUSED, GameState.GAME_OVER, GameState.READY],
+  PLAYING: [GameState.PAUSED, GameState.CONTINUE, GameState.GAME_OVER, GameState.READY],
+  CONTINUE: [GameState.RESUMING, GameState.PLAYING, GameState.GAME_OVER],
   PAUSED: [GameState.RESUMING, GameState.PLAYING, GameState.READY],
   RESUMING: [GameState.PLAYING, GameState.PAUSED, GameState.READY],
   GAME_OVER: [GameState.PLAYING, GameState.READY],
@@ -61,12 +64,17 @@ export class Engine {
   private listeners = new Set<Listener>();
   private readonly fixedSeed?: number;
   private readonly resumeDelay: number;
+  /** Vidas por partida e quantas ainda dá para gastar nesta. */
+  readonly lives: number;
+  livesLeft = 0;
   private readonly ctl: Controls = { hold: false, pressed: false, drop: false };
   private readonly sink: StepSink;
 
   constructor(opts: EngineOptions) {
     this.fixedSeed = opts.seed;
     this.resumeDelay = opts.resumeDelay ?? 1.2;
+    this.lives = Math.max(0, Math.floor(opts.lives ?? CONTINUES.lives));
+    this.livesLeft = this.lives;
     this.score = new Score(opts.storage);
     const seed = opts.seed ?? randomSeed();
     this.track = new Track(createRng(seed));
@@ -108,6 +116,7 @@ export class Engine {
   start(): void {
     if (this.state !== GameState.READY && this.state !== GameState.GAME_OVER && this.state !== GameState.PAUSED) return;
     this.runId++;
+    this.livesLeft = this.lives;
     const seed = this.fixedSeed !== undefined ? this.fixedSeed + this.runId - 1 : randomSeed();
     this.track.reset(createRng(seed));
     Object.assign(this.runner, createRunner(0));
@@ -180,7 +189,7 @@ export class Engine {
   advance(frameDt: number): number {
     if (!(frameDt > 0)) return 0;
     const dt = Math.min(frameDt, SIM.maxFrameTime);
-    if (this.state === GameState.GAME_OVER) {
+    if (this.state === GameState.GAME_OVER || this.state === GameState.CONTINUE) {
       this.deadTime += dt;
       return 0;
     }
@@ -266,10 +275,45 @@ export class Engine {
     this.deathCause = cause;
     this.deadTime = 0;
     if (cause === 'swarm') this.swarm = 0;
+    // O recorde já fica salvo na batida (mesmo se fechar a aba na tela de continuar).
     const res = this.score.finish();
     this.setHolding(false);
+    this.setState(this.livesLeft > 0 ? GameState.CONTINUE : GameState.GAME_OVER);
+    this.emit({ type: 'death', cause, x: r.x, y: r.y, ...res, livesLeft: this.livesLeft });
+  }
+
+  /**
+   * Gasta uma vida e continua de onde bateu: mesma pontuação, mesmo tempo
+   * de partida (mesma velocidade), capim no medidor mantido, trecho à frente
+   * limpo (chão contínuo, sem obstáculos), enxame afastado e contagem curta.
+   */
+  continueRun(): boolean {
+    if (this.state !== GameState.CONTINUE || this.livesLeft <= 0) return false;
+    this.livesLeft--;
+    const r = this.runner;
+    // Mesmo x; chão contínuo embaixo (mesmo se caiu no rio) e trecho livre à frente.
+    const x = r.x;
+    this.track.level.clearZone(x - CONTINUES.clearBehind, x + this.speed * CONTINUES.clearAhead);
+    Object.assign(r, createRunner(x));
+    this.swarm = Math.max(this.swarm, CONTINUES.swarm);
+    this.deathCause = null;
+    this.deadTime = 0;
+    this.holding = false;
+    this.pendingPress = this.pendingDrop = this.pendingDash = false;
+    this.alpha = 0;
+    this.score.unfreeze();
+    this.emit({ type: 'continue', livesLeft: this.livesLeft });
+    this.resumeCountdown = this.resumeDelay;
+    if (this.resumeDelay <= 0) this.setState(GameState.PLAYING);
+    else this.setState(GameState.RESUMING);
+    return true;
+  }
+
+  /** Desiste de continuar: a partida termina de vez com a pontuação atual. */
+  endRun(): void {
+    if (this.state !== GameState.CONTINUE) return;
+    this.livesLeft = 0;
     this.setState(GameState.GAME_OVER);
-    this.emit({ type: 'death', cause, x: r.x, y: r.y, ...res });
   }
 
   /** Menu: a capivara corre sozinho pelo começo do percurso (sem obstáculos). */

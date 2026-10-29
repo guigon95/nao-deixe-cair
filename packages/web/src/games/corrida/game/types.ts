@@ -3,6 +3,8 @@ export const GameState = {
   PLAYING: 'PLAYING',
   PAUSED: 'PAUSED',
   RESUMING: 'RESUMING',
+  /** Bateu com vida sobrando: escolhe continuar (anúncio, no futuro) ou encerrar. */
+  CONTINUE: 'CONTINUE',
   GAME_OVER: 'GAME_OVER',
 } as const;
 export type GameState = (typeof GameState)[keyof typeof GameState];
@@ -136,5 +138,6 @@ export type GameEvent =
   | { type: 'dash'; on: boolean }
   | { type: 'vine'; on: boolean; x: number; y: number }
   | { type: 'fastFall' }
-  | { type: 'death'; cause: DeathCause; x: number; y: number; score: number; best: number; isNewRecord: boolean }
+  | { type: 'death'; cause: DeathCause; x: number; y: number; score: number; best: number; isNewRecord: boolean; livesLeft: number }
+  | { type: 'continue'; livesLeft: number }
   | { type: 'newRecord'; score: number };

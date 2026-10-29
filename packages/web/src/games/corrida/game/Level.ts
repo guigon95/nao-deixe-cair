@@ -34,6 +34,42 @@ export class Level {
     else this.ground.push({ x0, x1 });
   }
 
+  /**
+   * Deixa [a, b] seguro (continuar depois de bater): chão contínuo e sem
+   * pedras, espinhos, caixotes ou molas que comecem antes de `b`.
+   */
+  clearZone(a: number, b: number): void {
+    const keep = <T extends { x0: number; x1: number }>(list: T[]) => {
+      for (let i = list.length - 1; i >= 0; i--) if (list[i].x1 >= a && list[i].x0 <= b) list.splice(i, 1);
+    };
+    keep(this.rocks);
+    keep(this.thorns);
+    keep(this.crates);
+    keep(this.springs);
+    // Chão: junta os trechos que tocam [a, b] num só.
+    let lo = a;
+    let hi = b;
+    const rest: GroundSpan[] = [];
+    // Se `b` cai no meio de um rio, emenda até a outra margem (nunca sobra meio rio).
+    let next: GroundSpan | null = null;
+    let onGround = false;
+    for (const g of this.ground) {
+      if (g.x0 <= b && g.x1 >= b) onGround = true;
+      if (g.x0 > b && (!next || g.x0 < next.x0)) next = g;
+    }
+    for (const g of this.ground) {
+      if ((g.x1 < a || g.x0 > b) && !(g === next && !onGround)) rest.push(g);
+      else {
+        lo = Math.min(lo, g.x0);
+        hi = Math.max(hi, g.x1);
+      }
+    }
+    rest.push({ x0: lo, x1: hi });
+    rest.sort((p, q) => p.x0 - q.x0);
+    this.ground.length = 0;
+    this.ground.push(...rest);
+  }
+
   /** Remove tudo que terminou antes de `x`. */
   prune(x: number): void {
     dropBefore(this.ground, x, (g) => g.x1);

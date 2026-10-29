@@ -1,15 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
-import { STORAGE } from '../game/config';
+import { CONTINUES, STORAGE } from '../game/config';
 import { GameState } from '../game/types';
 import { CAUSE_TEXT, useCorrida } from '../hooks/useCorrida';
 import { usePlayer, useRanking } from '../../../shared/online/hooks';
 import { HubBack } from '../../../shared/ui/HubBack';
+import { rewardedAds } from '../../../shared/ads/rewarded';
 import { LoginPanel, RankingPanel, SaveScore, WeeklyCallout } from '../../../shared/ui/RankingUi';
 
 type Overlay = 'ranking' | 'login' | null;
 
 export function GameScreen() {
-  const { surfaceRef, canvasRef, ui, settings, updateSettings, start, pause, resume, toMenu, dash, playSound, storage, raiseBest } =
+  const { surfaceRef, canvasRef, ui, settings, updateSettings, start, pause, resume, toMenu, continueRun, endRun, dash, playSound, storage, raiseBest } =
     useCorrida();
   const primaryRef = useRef<HTMLButtonElement | null>(null);
 
@@ -38,7 +39,12 @@ export function GameScreen() {
   // Foco no botão principal: Enter/Espaço funcionam sem mouse.
   useEffect(() => {
     if (overlay) return;
-    if (ui.state === GameState.READY || ui.state === GameState.GAME_OVER || ui.state === GameState.PAUSED) {
+    if (
+      ui.state === GameState.READY ||
+      ui.state === GameState.GAME_OVER ||
+      ui.state === GameState.PAUSED ||
+      ui.state === GameState.CONTINUE
+    ) {
       primaryRef.current?.focus({ preventScroll: true });
     } else if (document.activeElement instanceof HTMLElement && document.activeElement.closest('[data-ui]')) {
       document.activeElement.blur();
@@ -55,6 +61,25 @@ export function GameScreen() {
     playSound('click');
   };
 
+  const [watchingAd, setWatchingAd] = useState(false);
+  const [adMessage, setAdMessage] = useState<string | null>(null);
+  useEffect(() => {
+    if (ui.state !== GameState.CONTINUE) setAdMessage(null);
+  }, [ui.state]);
+  /** Continuar: (futuramente) assiste ao anúncio e, com a recompensa, volta de onde bateu. */
+  const onContinue = async () => {
+    if (watchingAd) return;
+    playSound('click');
+    setWatchingAd(true);
+    try {
+      const r = await rewardedAds.show('continue');
+      if (r === 'rewarded') continueRun();
+      else setAdMessage(r === 'dismissed' ? 'Assista ao anúncio até o fim para continuar.' : 'Anúncio indisponível agora. Tente de novo.');
+    } finally {
+      setWatchingAd(false);
+    }
+  };
+
   const playing = ui.state === GameState.PLAYING || ui.state === GameState.RESUMING;
   const savedThisRun = rank.save.status === 'saved' ? rank.save.outcome?.result ?? null : null;
   const openRanking = () => {
@@ -68,7 +93,7 @@ export function GameScreen() {
       <canvas ref={canvasRef} className="game-canvas" aria-hidden="true" />
 
       <div className="arena-ui">
-        {!playing && !overlay && <HubBack />}
+        {!playing && !overlay && ui.state !== GameState.CONTINUE && <HubBack />}
 
         {playing && (
           <button className="icon-btn pause-btn" data-ui onClick={pause} aria-label="Pausar">
@@ -77,6 +102,52 @@ export function GameScreen() {
               <rect x="14" y="5" width="4" height="14" rx="1.2" fill="currentColor" />
             </svg>
           </button>
+        )}
+
+        {playing && (
+          <p className="hud-lives" aria-label={`${ui.livesLeft} de ${CONTINUES.lives} vidas`}>
+            {Array.from({ length: CONTINUES.lives }, (_, i) => (
+              <span key={i} className={i < ui.livesLeft ? 'heart is-full' : 'heart'} aria-hidden="true">
+                ♥
+              </span>
+            ))}
+          </p>
+        )}
+
+        {ui.state === GameState.CONTINUE && (
+          <section className="panel continue" data-ui role="dialog" aria-modal="true" aria-labelledby="cont-title">
+            <h2 id="cont-title" className="panel-title">
+              Ops!
+            </h2>
+            {ui.cause && <p className="cause">{CAUSE_TEXT[ui.cause]}</p>}
+            <p className="final-score">
+              <span className="label">Pontos</span>
+              <span className="value">{ui.score}</span>
+            </p>
+            <p className="lives" aria-label={`${ui.livesLeft} de ${CONTINUES.lives} vidas`}>
+              {Array.from({ length: CONTINUES.lives }, (_, i) => (
+                <span key={i} className={i < ui.livesLeft ? 'heart is-full' : 'heart'} aria-hidden="true">
+                  ♥
+                </span>
+              ))}
+            </p>
+            <button ref={primaryRef} className="btn btn-primary" onClick={onContinue} disabled={watchingAd}>
+              {watchingAd ? 'AGUARDE…' : rewardedAds.provider === 'none' ? 'CONTINUAR' : '▶ ASSISTIR E CONTINUAR'}
+            </button>
+            <p className="continue-hint">
+              {adMessage ??
+                `Continue daqui com ${ui.score} pontos. ${ui.livesLeft === 1 ? 'Usa sua última vida.' : `Usa 1 das ${ui.livesLeft} vidas.`}`}
+            </p>
+            <button
+              className="btn btn-link"
+              onClick={() => {
+                playSound('click');
+                endRun();
+              }}
+            >
+              Encerrar corrida
+            </button>
+          </section>
         )}
 
         {ui.state === GameState.PLAYING && ui.meterFull && (
