@@ -8,6 +8,7 @@ import { Autopilot } from '../game/testing/planner';
 import { GameState, type DeathCause } from '../game/types';
 import { Effects } from '../rendering/effects';
 import { rainAt } from '../rendering/weather';
+import { WATER_Y } from '../rendering/gators';
 import { COLORS, Renderer } from '../rendering/Renderer';
 import { InputController } from '../../../shared/input/InputController';
 import { effectiveDpr } from '../../../shared/layout/layout';
@@ -178,6 +179,7 @@ export function useCorrida() {
           if (fresh) {
             fx.clear();
             renderer.weather.reset();
+            renderer.gators.reset();
             renderer.follow(engine, 0, true);
             sfx.start();
           }
@@ -295,6 +297,7 @@ export function useCorrida() {
           break;
         case 'continue':
           fx.clear();
+          renderer.gators.reset();
           renderer.follow(engine, 0, true);
           setUi((u) => ({ ...u, livesLeft: e.livesLeft, cause: null }));
           break;
@@ -344,6 +347,19 @@ export function useCorrida() {
       if (!frozen) {
         const active = st === GameState.PLAYING || st === GameState.GAME_OVER || st === GameState.CONTINUE;
         renderer.weather.update(fdt, active ? rainAt(engine.score.meters, engine.runId) : 0, fx.reducedMotion);
+        // Bote do jacaré: respingo ao sair da água, "nhac" ao fechar a boca.
+        renderer.gators.update(engine, fdt);
+        for (const em of renderer.gators.events.emerge) {
+          fx.burst(em.x, WATER_Y + 2, 10, 160, ['#9fdcff', '#ffffff'], 0.55, 2.6, true);
+          sfx.splashSmall();
+        }
+        for (const sn of renderer.gators.events.snap) {
+          sfx.chomp();
+          if (sn.kind === 'bote') {
+            vibrate(10);
+            if (sn.gap < 40) fx.float(sn.x + 30, sn.y + 60, 'UFA!', false, '#c8f58a');
+          }
+        }
         // No inverno a "chuva" vira nevasca: sem trovão e com chiado bem mais baixo.
         if (renderer.weather.thunder && !renderer.winter) sfx.thunder();
         sfx.rain(st === GameState.PLAYING ? renderer.weather.rain * (renderer.winter ? 0.3 : 1) : 0);

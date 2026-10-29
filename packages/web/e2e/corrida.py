@@ -347,6 +347,33 @@ with sync_playwright() as p:
     check("ímã: sem erros", not errs, "; ".join(errs[:2]))
     c.close()
 
+    # Bote do jacaré: pulando um rio, ele salta da água e fecha a boca abaixo das patas.
+    c = browser.new_context(viewport={"width": 844, "height": 390})
+    pg = c.new_page()
+    errs = []
+    pg.on("pageerror", lambda e: errs.append(str(e)))
+    pg.goto(BASE + "/corrida/?debug&seed=5")
+    pg.wait_for_selector("text=CORRER")
+    pg.click("text=CORRER")
+    pg.wait_for_timeout(200)
+    pg.evaluate("""() => { const e = window.__NDC__.engine, r = e.runner, l = e.track.level;
+        l.rocks.length = l.thorns.length = l.crates.length = l.springs.length = 0;
+        l.ground.length = 0; l.addGround(-800, r.x + 300); l.addGround(r.x + 430, r.x + 20000); e.track.genX = r.x + 20000;
+        window.__rv = r.x + 300; window.__bote = 0;
+        const g = window.__NDC__.renderer.gators, up = g.update.bind(g);
+        g.update = (en, dt) => { up(en, dt); window.__bote += g.events.snap.length } }""")
+    for i in range(300):
+        s = pg.evaluate("() => { const e = window.__NDC__.engine; return { x: e.runner.x, g: e.runner.grounded, st: e.state } }")
+        if s["g"] and window_rv - 40 < s["x"] < window_rv if (window_rv := pg.evaluate("() => window.__rv")) else False:
+            pg.keyboard.down("Space"); pg.wait_for_timeout(260); pg.keyboard.up("Space")
+        if s["x"] > window_rv + 250 or s["st"] != "PLAYING":
+            break
+        pg.wait_for_timeout(10)
+    check("jacaré dá o bote quando a capivara pula o rio", pg.evaluate("() => window.__bote") >= 1)
+    check("o bote não derruba quem pulou certo", pg.evaluate("() => window.__NDC__.engine.state") == "PLAYING")
+    check("bote: sem erros", not errs, "; ".join(errs[:2]))
+    c.close()
+
     # Layouts.
     for (w, h, name, touch) in [
         (390, 844, "iphone-em-pe", True),

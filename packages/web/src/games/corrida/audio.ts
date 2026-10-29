@@ -225,6 +225,17 @@ export class RunnerSfx extends SynthAudio {
     src.stop(t0 + dur + 0.02);
   }
 
+  /** Jacaré fechando a boca: "nhac" seco e grave. */
+  chomp(): void {
+    this.tone(180, 70, 0.09, 'square', 0.22, 0, 0.002);
+    this.noise(0.06, 0.12, 1800, 400, 'lowpass');
+  }
+
+  /** Jacaré saindo da água: respingo curto. */
+  splashSmall(): void {
+    this.noise(0.22, 0.08, 2600, 500, 'lowpass');
+  }
+
   /** Chegou à copa: farfalhar de folhas + duas notas subindo. */
   canopy(): void {
     this.noise(0.25, 0.08, 2600, 900, 'bandpass');

@@ -7,6 +7,7 @@ import type { Effects } from './effects';
 import { dominantSeason, mix, paletteAt, SEASONS, type Palette, type SeasonId } from './palette';
 import { drawCapivara, type Pose } from './capivara';
 import { Weather } from './weather';
+import { boteShape, Gators, WATER_Y, type Gator } from './gators';
 
 /** Onde o chão (y = 0) aparece na arena, sem câmera subindo. */
 export const GROUND_Y = 288;
@@ -34,6 +35,8 @@ export const COLORS = {
   grassOutline: '#123d0c',
   straw: '#e08a1e',
   gator: '#4f7a33',
+  gatorDark: '#3e6328',
+  gatorBelly: '#c9c98a',
   wasp: '#ffcc33',
   danger: '#ff3b5c',
   text: '#ffffff',
@@ -69,6 +72,8 @@ export class Renderer {
   private lastSeason: SeasonId = 'verao';
   /** Chuva (atualizada pelo hook a cada quadro). */
   readonly weather = new Weather();
+  /** Botes do jacaré (atualizados pelo hook a cada quadro). */
+  readonly gators = new Gators();
   /** Trecho de inverno na tela agora (o som da chuva vira o da neve). */
   winter = false;
 
@@ -396,7 +401,7 @@ export class Renderer {
     const ctx = this.ctx;
     const g0 = this.sy(0);
     // Rio por baixo de tudo: aparece nos buracos.
-    const waterY = this.sy(-24);
+    const waterY = this.sy(WATER_Y);
     ctx.fillStyle = '#1c2a1f';
     ctx.fillRect(this.viewL, g0, this.viewR - this.viewL, this.viewB - g0);
     ctx.fillStyle = pal.water;
@@ -848,11 +853,16 @@ export class Renderer {
   private drawGators(engine: Engine, time: number): void {
     const ctx = this.ctx;
     const ground = engine.track.level.ground;
-    const waterY = this.sy(-24);
+    const waterY = this.sy(WATER_Y);
     for (let i = 0; i + 1 < ground.length; i++) {
       const a = this.sx(ground[i].x1);
       const b = this.sx(ground[i + 1].x0);
       if (b < this.viewL || a > this.viewR || b - a < 50) continue;
+      const bote = this.gators.find(ground[i].x1);
+      if (bote) {
+        this.drawBote(bote, waterY, time);
+        continue;
+      }
       const cx = (a + b) / 2 + Math.sin(time * 0.8 + i) * Math.min(14, (b - a) / 6);
       const bobY = waterY + Math.sin(time * 2.2 + i) * 1.2;
       ctx.save();
@@ -875,6 +885,114 @@ export class Renderer {
       ctx.fillRect(cx + 1.2, bobY - 3.6, 0.8, 2.2);
       ctx.restore();
     }
+  }
+
+  /**
+   * Bote: o jacaré sai da água de boca aberta, fecha no alto ("nhac") e
+   * volta. Só a parte acima da água aparece (recorte na linha d'água).
+   */
+  private drawBote(g: Gator, waterY: number, time: number): void {
+    const ctx = this.ctx;
+    const { rise, open } = boteShape(g);
+    const h = g.reach * rise;
+    const x = this.sx(g.x);
+    // A boca fica no topo do bote; o corpo vem de baixo d'água.
+    const mouthY = waterY - h;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x - 90, this.viewT - 10, 180, waterY + 2 - this.viewT + 10);
+    ctx.clip();
+    // Corpo grosso saindo da água (levemente inclinado para a frente).
+    const neckTop = mouthY + 30;
+    ctx.fillStyle = COLORS.gator;
+    ctx.beginPath();
+    ctx.moveTo(x - 20, waterY + 40);
+    ctx.quadraticCurveTo(x - 22, neckTop + 10, x - 13, neckTop);
+    ctx.lineTo(x + 15, neckTop);
+    ctx.quadraticCurveTo(x + 24, neckTop + 10, x + 22, waterY + 40);
+    ctx.closePath();
+    ctx.fill();
+    // Barriga clara com escamas.
+    ctx.fillStyle = COLORS.gatorBelly;
+    ctx.fillRect(x - 7, neckTop + 6, 14, Math.max(0, waterY - neckTop - 4));
+    ctx.strokeStyle = 'rgba(40, 60, 20, 0.45)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    for (let yy = neckTop + 12; yy < waterY; yy += 8) {
+      ctx.moveTo(x - 7, yy);
+      ctx.lineTo(x + 7, yy);
+    }
+    ctx.stroke();
+    // Escamas nas costas (cristas).
+    ctx.fillStyle = COLORS.gatorDark;
+    for (let yy = neckTop + 8; yy < waterY - 4; yy += 11) {
+      ctx.beginPath();
+      ctx.moveTo(x - 19, yy);
+      ctx.lineTo(x - 26, yy + 4);
+      ctx.lineTo(x - 19, yy + 8);
+      ctx.fill();
+    }
+    // Mandíbulas largas, abrindo para cima a partir do alto do pescoço.
+    const hingeX = x + 1;
+    const hingeY = neckTop + 2;
+    const len = 46;
+    for (const side of [-1, 1] as const) {
+      ctx.save();
+      ctx.translate(hingeX, hingeY);
+      ctx.rotate(-Math.PI / 2 + side * open * 0.85);
+      // Mandíbula: cunha larga e arredondada na ponta.
+      ctx.fillStyle = side < 0 ? COLORS.gator : COLORS.gatorDark;
+      ctx.beginPath();
+      ctx.moveTo(0, -13 * side);
+      ctx.quadraticCurveTo(len * 0.6, -11 * side, len, -5 * side);
+      ctx.quadraticCurveTo(len + 5, -1 * side, len - 1, 1.5 * side);
+      ctx.lineTo(0, 1.5 * side);
+      ctx.closePath();
+      ctx.fill();
+      // Narina na ponta da de cima.
+      if (side < 0) {
+        ctx.fillStyle = COLORS.gatorDark;
+        ctx.beginPath();
+        ctx.arc(len - 5, -6, 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // Boca rosada por dentro e dentes.
+      ctx.fillStyle = '#d96a7a';
+      ctx.fillRect(4, -1 * side - (side > 0 ? 0 : 0), len - 8, 2.4 * side);
+      ctx.fillStyle = '#fbfbef';
+      for (let k = 0; k < 7; k++) {
+        const tx = 6 + k * 5.6;
+        ctx.beginPath();
+        ctx.moveTo(tx, 1.5 * side);
+        ctx.lineTo(tx + 2.8, 1.5 * side);
+        ctx.lineTo(tx + 1.4, 6 * side);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+    // Olhos grandes em cima da cabeça.
+    ctx.fillStyle = COLORS.gator;
+    ctx.beginPath();
+    ctx.arc(x - 12, hingeY + 1, 7, 0, Math.PI * 2);
+    ctx.arc(x + 13, hingeY + 1, 7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#e8f27a';
+    ctx.beginPath();
+    ctx.arc(x - 12, hingeY, 3.6, 0, Math.PI * 2);
+    ctx.arc(x + 13, hingeY, 3.6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#16260f';
+    ctx.fillRect(x - 12.6, hingeY - 3, 1.3, 6);
+    ctx.fillRect(x + 12.4, hingeY - 3, 1.3, 6);
+    ctx.restore();
+    // Água agitada em volta.
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+    ctx.lineWidth = 2;
+    const ripple = 26 + Math.sin(time * 12) * 3 + rise * 10;
+    ctx.beginPath();
+    ctx.ellipse(x, waterY + 1, ripple, 4, 0, 0, Math.PI * 2);
+    ctx.stroke();
   }
 
   // ───────────────────────────── personagens
