@@ -56,7 +56,7 @@ with sync_playwright() as p:
     page.wait_for_selector(".hub-card")
     names = page.locator(".hub-name").all_inner_texts()
     check("hub lista os três jogos", len(names) == 3 and "Disparada" in names, ", ".join(names))
-    check("Disparada é o segundo jogo do hub", names[1:2] == ["Disparada"], ", ".join(names))
+    check("Disparada é o primeiro jogo do hub", names[:1] == ["Disparada"], ", ".join(names))
     page.screenshot(path=str(OUT / "corrida-00-hub.png"))
     page.locator('.hub-card[data-game="corrida"] a').click()
     page.wait_for_selector("text=CORRER")
