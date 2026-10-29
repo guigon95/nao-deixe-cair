@@ -1,4 +1,4 @@
-import { SIM } from '../config';
+import { MAGNET, SIM } from '../config';
 import { speedAt } from '../Difficulty';
 import { cloneRunner, stepRunner, type Controls, type StepSink } from '../Physics';
 import type { Level } from '../Level';
@@ -54,6 +54,12 @@ export interface PlanOptions {
   elapsed: number;
   /** Velocidade fixa (testes de padrão); sem ela usa a curva de dificuldade. */
   fixedSpeed?: number;
+  /**
+   * Embalo do ímã no começo do plano: rampa atual (0..1) e segundos de ímã
+   * que faltam. O planejador simula a rampa igual ao motor (sobe/desce em
+   * MAGNET.boostRamp) para os pulos baterem com a velocidade real.
+   */
+  boost?: { level: number; magnetLeft: number };
   /** Máximo de pulos encadeados. */
   maxJumps?: number;
   /** Limite de passos simulados (segurança). */
@@ -73,6 +79,9 @@ export function planRoute(level: Level, start: Runner, opts: PlanOptions): Jump[
     level,
     goalX: opts.goalX,
     fixed: opts.fixedSpeed,
+    t0: opts.elapsed,
+    b0: opts.boost?.level ?? 0,
+    mLeft: opts.boost?.magnetLeft ?? 0,
     budget: opts.budget ?? 2_000_000,
     seen: new Set<string>(),
     ctl: { hold: false, pressed: false, drop: false } as Controls,
@@ -86,6 +95,9 @@ interface Ctx {
   level: Level;
   goalX: number;
   fixed?: number;
+  t0: number;
+  b0: number;
+  mLeft: number;
   budget: number;
   seen: Set<string>;
   ctl: Controls;
@@ -94,7 +106,16 @@ interface Ctx {
 }
 
 function speed(ctx: Ctx, t: number) {
-  return ctx.fixed ?? speedAt(t);
+  return (ctx.fixed ?? speedAt(t)) * (1 + MAGNET.boost * boostAt(ctx, t));
+}
+
+/** Rampa do embalo no instante t (mesma regra do motor). */
+function boostAt(ctx: Ctx, t: number): number {
+  if (ctx.b0 <= 0 && ctx.mLeft <= 0) return 0;
+  const dt = t - ctx.t0;
+  if (dt < ctx.mLeft) return Math.min(1, ctx.b0 + dt / MAGNET.boostRamp);
+  const atEnd = Math.min(1, ctx.b0 + ctx.mLeft / MAGNET.boostRamp);
+  return Math.max(0, atEnd - (dt - ctx.mLeft) / MAGNET.boostRamp);
 }
 
 /**
@@ -224,14 +245,21 @@ export class Autopilot {
   ) {}
 
   private cooldown = 0;
+  private boost = { level: 0, magnetLeft: 0 };
 
-  /** Decide se o dedo deve estar pressionado no próximo passo. */
-  decide(r: Runner, level: Level, elapsed: number): boolean {
+  /**
+   * Decide se o dedo deve estar pressionado no próximo passo. `boost` = estado
+   * do embalo do ímã no motor (para planejar com a velocidade certa).
+   */
+  decide(r: Runner, level: Level, elapsed: number, boost?: { level: number; magnetLeft: number }): boolean {
+    // Pegou um ímã agora: a velocidade vai mudar, então replaneja.
+    const picked = !!boost && boost.magnetLeft > this.boost.magnetLeft + 0.05;
+    this.boost = boost ? { level: boost.level, magnetLeft: boost.magnetLeft } : { level: 0, magnetLeft: 0 };
     let j = this.plan?.[0];
     const executing = !!j && this.stepInPlan >= j.at && this.stepInPlan < j.at + j.hold;
     if (!executing) {
       const empty = !this.plan || this.plan.length === 0;
-      if (r.justLanded || (empty && --this.cooldown <= 0)) {
+      if (r.justLanded || picked || (empty && --this.cooldown <= 0)) {
         this.replan(r, level, elapsed);
         this.cooldown = 6;
         j = this.plan?.[0];
@@ -249,7 +277,7 @@ export class Autopilot {
 
   private replan(r: Runner, level: Level, elapsed: number) {
     this.stepInPlan = 0;
-    this.plan = planRoute(level, r, { goalX: r.x + this.lookahead, elapsed, maxJumps: 5, budget: 400_000, preferCenter: !!this.rng });
+    this.plan = planRoute(level, r, { goalX: r.x + this.lookahead, elapsed, maxJumps: 5, budget: 400_000, preferCenter: !!this.rng, boost: this.boost });
     if (!this.plan) {
       this.failures++;
       this.plan = [];

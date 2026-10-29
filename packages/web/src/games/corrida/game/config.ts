@@ -112,6 +112,9 @@ export const MAGNET = {
   minGap: 22,
   /** Chance por padrão, passado o intervalo. */
   chance: 0.35,
+  /** Embalo: velocidade a mais enquanto o ímã dura (+10%), com rampa de 0,5 s. */
+  boost: 0.1,
+  boostRamp: 0.5,
 } as const;
 
 /** Velocidade da corrida (u/s) em função do tempo de partida. */

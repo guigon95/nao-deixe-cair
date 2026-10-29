@@ -13,7 +13,7 @@ export function autoplay(seed: number, seconds: number) {
   e.start();
   const steps = Math.round(seconds / SIM.fixedDt);
   for (let i = 0; i < steps && e.state === GameState.PLAYING; i++) {
-    e.setHolding(pilot.decide(e.runner, e.track.level, e.elapsed));
+    e.setHolding(pilot.decide(e.runner, e.track.level, e.elapsed, { level: e.boost, magnetLeft: e.magnet }));
     e.step(SIM.fixedDt);
   }
   return { e, pilot };
@@ -43,7 +43,7 @@ describe('justiça do percurso gerado', () => {
         const p = new Autopilot(createRng(seed * 7), lag, 0.25);
         e.start();
         for (let i = 0; i < 150 * 120 && e.state === GameState.PLAYING; i++) {
-          e.setHolding(p.decide(e.runner, e.track.level, e.elapsed));
+          e.setHolding(p.decide(e.runner, e.track.level, e.elapsed, { level: e.boost, magnetLeft: e.magnet }));
           e.step(SIM.fixedDt);
         }
         times.push(e.elapsed);

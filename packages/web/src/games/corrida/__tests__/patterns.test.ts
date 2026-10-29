@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SPEED } from '../game/config';
+import { MAGNET, SPEED } from '../game/config';
 import { Level } from '../game/Level';
 import { createRunner, stepRunner } from '../game/Physics';
 import { byId } from '../game/Track';
@@ -7,7 +7,8 @@ import { airTime, Builder, CANOPY, HOLD_FULL, HOLD_TAP, jumpHeightAt, PATTERNS, 
 import { planRoute } from '../game/testing/planner';
 import { createRng } from '../../../shared/random';
 
-const SPEEDS = [SPEED.start, (SPEED.start + SPEED.max) / 2, SPEED.max];
+// Inclui a velocidade máxima com o embalo do ímã (+10%): todo padrão continua atravessável.
+const SPEEDS = [SPEED.start, (SPEED.start + SPEED.max) / 2, SPEED.max, SPEED.max * (1 + MAGNET.boost)];
 const X0 = 600;
 
 /** Monta só um padrão, com chão antes e depois (como o gerador faz). */

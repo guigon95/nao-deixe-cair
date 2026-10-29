@@ -58,6 +58,8 @@ export class Engine {
   tier = 0;
   /** Ímã de capim: segundos restantes (0 = desligado). */
   magnet = 0;
+  /** Embalo do ímã (0..1): rampa da velocidade extra. */
+  boost = 0;
   /** Pousada na copa das árvores (para avisar uma vez por subida). */
   private onCanopy = false;
   private pendingPress = false;
@@ -110,8 +112,13 @@ export class Engine {
   }
 
   /** Velocidade real da capivara (com caixote/dash). */
+  /** Multiplicador de velocidade do embalo do ímã (1 = normal). */
+  get speedFactor(): number {
+    return 1 + MAGNET.boost * this.boost;
+  }
+
   get runSpeed(): number {
-    return runnerSpeed(this.runner, this.speed);
+    return runnerSpeed(this.runner, this.speed * this.speedFactor);
   }
 
   get meterFull(): boolean {
@@ -140,6 +147,7 @@ export class Engine {
     this.holding = false;
     this.onCanopy = false;
     this.magnet = 0;
+    this.boost = 0;
     this.track.update(0, 0, speedAt(0));
     this.setState(GameState.PLAYING);
   }
@@ -232,8 +240,12 @@ export class Engine {
     const r = this.runner;
     this.totalSteps++;
     this.sinceFruit += dt;
-    // Velocidade do início do passo (o planejador usa a mesma convenção).
-    const base = this.speed;
+    // Velocidade do início do passo (o planejador usa a mesma convenção), com o
+    // embalo do ímã (+10%, sobe e desce em 0,5 s).
+    const target = this.magnet > 0 ? 1 : 0;
+    const k = dt / MAGNET.boostRamp;
+    this.boost = target > this.boost ? Math.min(1, this.boost + k) : Math.max(0, this.boost - k);
+    const base = this.speed * this.speedFactor;
     this.elapsed += dt;
 
     if (this.pendingDash && this.meterFull && r.dash <= 0) {

@@ -41,6 +41,8 @@ export const COLORS = {
 
 interface DrawOptions {
   showHud: boolean;
+  /** Com o ímã: batidas da música desde que ele ligou (as patas seguem o ritmo). */
+  beat?: number | null;
   /** Tempo real (s), para animações cosméticas. */
   time: number;
 }
@@ -155,7 +157,7 @@ export class Renderer {
     for (const f of lvl.fruits) if (!f.taken) this.drawFruit(f, opts.time);
     for (const u of lvl.powerups) if (!u.taken) this.drawMagnet(this.sx(u.x), this.sy(u.y) + Math.sin(opts.time * 3 + u.x) * 2, 1, opts.time);
     this.drawParticles(fx);
-    this.drawRunner(engine, fx, opts.time);
+    this.drawRunner(engine, fx, opts.time, opts.beat ?? null);
     this.drawSwarm(engine, opts.time);
     if (pal.fireflies > 0.05) this.drawFireflies(pal, opts.time);
     if (pal.winter > 0.05) this.drawSnow(pal.winter * (1 - this.weather.rain), opts.time, false);
@@ -877,7 +879,7 @@ export class Renderer {
 
   // ───────────────────────────── personagens
 
-  private drawRunner(engine: Engine, fx: Effects, time: number): void {
+  private drawRunner(engine: Engine, fx: Effects, time: number, beat: number | null): void {
     const r = engine.runner;
     const p = this.runnerPos(engine);
     const x = this.sx(p.x);
@@ -938,8 +940,11 @@ export class Renderer {
     if (magnetOn) this.drawMagnetBeams(engine, p.x, p.y, x, y, time, fx.reducedMotion);
     drawCapivara(ctx, x, y, {
       pose,
-      run: engine.state === GameState.READY ? time * 12 : (p.x / 28) % (Math.PI * 2),
-      squash: fx.reducedMotion ? 0 : Math.max(landing * 0.8, fx.pressPulse * 0.4),
+      // Com o ímã, uma passada completa por batida do forró (duas patadas por tempo).
+      run: engine.state === GameState.READY ? time * 12 : beat !== null ? (beat % 1) * Math.PI * 2 : (p.x / 28) % (Math.PI * 2),
+      squash: fx.reducedMotion
+        ? 0
+        : Math.max(landing * 0.8, fx.pressPulse * 0.4, beat !== null && r.grounded ? Math.max(0, 1 - (beat % 1) * 6) * 0.22 : 0),
       time,
       tilt,
     });

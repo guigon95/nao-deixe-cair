@@ -1,8 +1,10 @@
 import { SynthAudio } from '../../shared/audio/SynthAudio';
 
 /** Música do ímã: forró/baião acelerado, original (Ré mixolídio, I–I–IV–V). */
-const MUSIC = {
+export const MUSIC = {
   bpm: 172,
+  /** Nos 2 últimos segundos do ímã o forró acelera (a corrida acompanha). */
+  finalRush: 1.18,
   volume: 0.32,
   /** Ré 4 (Hz): as notas da melodia são semitons a partir dele. */
   d4: 293.66,
@@ -142,7 +144,7 @@ export class RunnerSfx extends SynthAudio {
         this.music = { gain, noise, next: ctx.currentTime + 0.03, step: 0 };
       }
       const m = this.music;
-      const bpm = remaining < 2 ? MUSIC.bpm * 1.18 : MUSIC.bpm;
+      const bpm = remaining < 2 ? MUSIC.bpm * MUSIC.finalRush : MUSIC.bpm;
       const stepDur = 60 / bpm / 4;
       while (m.next < ctx.currentTime + 0.12) {
         this.playStep(m.step, m.next, stepDur);

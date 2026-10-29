@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { RunnerSfx, vibrate } from '../audio';
+import { MUSIC, RunnerSfx, vibrate } from '../audio';
 import { ARENA, SWARM } from '../game/config';
 import { Engine } from '../game/Engine';
 import { Missions, missionText, type Mission } from '../game/Missions';
@@ -103,6 +103,8 @@ export function useCorrida() {
     let runDone: string[] = [];
     let toastId = 0;
     let lastRun = 0;
+    /** Batidas desde que a música do ímã (re)começou (as patas acompanham o forró); null = sem ímã. */
+    let beat: number | null = null;
     /** Missões cumpridas agora: aviso na tela, som e cópia nova para a interface. */
     const completed = (list: Mission[]) => {
       if (!list.length) return;
@@ -183,7 +185,9 @@ export function useCorrida() {
           if (e.state !== GameState.PLAYING) {
             sfx.buzz(0);
             sfx.rain(0);
+            // Música e patas param juntas e recomeçam juntas ao voltar a jogar.
             sfx.musicStop();
+            beat = null;
           }
           input.setEnabled(e.state === GameState.PLAYING || e.state === GameState.RESUMING);
           swipes.clear();
@@ -305,7 +309,7 @@ export function useCorrida() {
         // O piloto decide a cada passo fixo: avança passo a passo.
         let acc = Math.min(dt, 0.1);
         while (acc >= 1 / 120 && engine.state === GameState.PLAYING) {
-          engine.setHolding(pilot.decide(engine.runner, engine.track.level, engine.elapsed));
+          engine.setHolding(pilot.decide(engine.runner, engine.track.level, engine.elapsed, { level: engine.boost, magnetLeft: engine.magnet }));
           engine.advance(1 / 120);
           acc -= 1 / 120;
         }
@@ -321,6 +325,8 @@ export function useCorrida() {
         // Com o ímã: música acelerada e zumbido do enxame mais baixo por baixo dela.
         if (engine.magnet > 0) {
           sfx.musicTick(engine.magnet);
+          const bpm = engine.magnet < 2 ? MUSIC.bpm * MUSIC.finalRush : MUSIC.bpm;
+          beat = (beat ?? 0) + (fdt * bpm) / 60;
           // Rastro de brilho colorido atrás da capivara (estilo "estrela" de jogo de plataforma).
           sparkle -= fdt;
           if (sparkle <= 0 && !fx.reducedMotion) {
@@ -329,7 +335,10 @@ export function useCorrida() {
             fx.burst(r.x - 14, r.y + 10 + Math.random() * 24, 2, 60, RAINBOW, 0.45, 3, false);
           }
         }
-        else sfx.musicStop();
+        else {
+          sfx.musicStop();
+          beat = null;
+        }
         sfx.buzz(sfx.musicPlaying ? near * 0.4 : near);
       }
       if (!frozen) {
@@ -341,7 +350,7 @@ export function useCorrida() {
         fx.update(fdt);
         renderer.follow(engine, fdt);
       }
-      renderer.draw(engine, fx, { showHud: st !== GameState.READY && st !== GameState.GAME_OVER && st !== GameState.CONTINUE, time: performance.now() / 1000 });
+      renderer.draw(engine, fx, { beat: st === GameState.PLAYING ? beat : null, showHud: st !== GameState.READY && st !== GameState.GAME_OVER && st !== GameState.CONTINUE, time: performance.now() / 1000 });
     });
 
     const resize = () => {

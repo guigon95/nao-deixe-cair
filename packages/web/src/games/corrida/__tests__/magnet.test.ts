@@ -88,4 +88,23 @@ describe('ímã de capim', () => {
     e.start();
     expect(e.magnet).toBe(0);
   });
+
+  it('embalo: +10% de velocidade com o ímã, subindo e descendo suave, sem afastar o enxame', () => {
+    const { e, l } = freshEngine();
+    const v0 = e.runSpeed;
+    e.swarm = 200;
+    l.powerups.push({ x: e.runner.x + 40, y: 17, kind: 'magnet', taken: false });
+    for (let i = 0; i < 30; i++) e.step(DT);
+    expect(e.speedFactor).toBeGreaterThan(1);
+    expect(e.speedFactor).toBeLessThan(1 + MAGNET.boost);
+    for (let i = 0; i < 120; i++) e.step(DT);
+    expect(e.speedFactor).toBeCloseTo(1 + MAGNET.boost, 2);
+    expect(e.runSpeed / v0).toBeGreaterThan(1.09);
+    expect(e.runSpeed / v0).toBeLessThan(1.12);
+    // O enxame não fica para trás por causa do embalo (só o descanso normal o afasta).
+    expect(e.swarm).toBeLessThanOrEqual(200 + 40 * 1.5 + 1);
+    for (let i = 0; i < Math.ceil((MAGNET.duration + 1) / DT); i++) e.step(DT);
+    expect(e.speedFactor).toBe(1);
+  });
 });
+
