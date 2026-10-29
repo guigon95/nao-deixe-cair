@@ -14,9 +14,12 @@ export class RunnerSfx extends SynthAudio {
   private buzzLfo: OscillatorNode | null = null;
   private buzzAmp: GainNode | null = null;
   private lastFruit = -1;
+  private rainSrc: AudioBufferSourceNode | null = null;
+  private rainAmp: GainNode | null = null;
 
   protected override stopContinuous(): void {
     this.buzz(0);
+    this.rain(0);
   }
 
   /** Pulo: "boing" curtinho subindo. */
@@ -101,6 +104,46 @@ export class RunnerSfx extends SynthAudio {
   splash(): void {
     this.noise(0.4, 0.14, 3000, 400, 'lowpass');
     this.tone(500, 180, 0.2, 'sine', 0.2);
+  }
+
+  /** Chuva contínua: ruído filtrado em loop, volume pela intensidade (0..1). */
+  rain(level: number): void {
+    const ctx = this.ctx;
+    if (level <= 0.01) {
+      if (this.rainAmp && ctx) this.rainAmp.gain.setTargetAtTime(0, ctx.currentTime, 0.3);
+      return;
+    }
+    if (!this.ready || !ctx) return;
+    try {
+      if (!this.rainSrc) {
+        const len = ctx.sampleRate * 2;
+        const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+        this.rainSrc = ctx.createBufferSource();
+        this.rainSrc.buffer = buf;
+        this.rainSrc.loop = true;
+        const hp = ctx.createBiquadFilter();
+        hp.type = 'highpass';
+        hp.frequency.value = 900;
+        const lp = ctx.createBiquadFilter();
+        lp.type = 'lowpass';
+        lp.frequency.value = 5000;
+        this.rainAmp = ctx.createGain();
+        this.rainAmp.gain.value = 0;
+        this.rainSrc.connect(hp).connect(lp).connect(this.rainAmp).connect(this.master!);
+        this.rainSrc.start();
+      }
+      this.rainAmp!.gain.setTargetAtTime(0.07 * level, ctx.currentTime, 0.3);
+    } catch {
+      /* áudio nunca quebra o jogo */
+    }
+  }
+
+  /** Trovão distante: ronco grave e abafado (nada de estouro no alto-falante do celular). */
+  thunder(): void {
+    this.noise(1.6, 0.16, 300, 60, 'lowpass', 0.25);
+    this.tone(70, 40, 1.2, 'sine', 0.25, 0.25, 0.08);
   }
 
   /**

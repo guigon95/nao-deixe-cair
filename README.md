@@ -252,6 +252,8 @@ Toque curto = pulo baixo (~85 u, passa pedras pequenas); segurar = pulo cheio (~
 - **Flor-mola**: encostar lança bem alto. **Galhos** (presos por cipós) são caminhos altos com frutas; dá para descer deles com ↓.
 - **Enxame**: começa perto e vai ficando para trás (até 280 u) enquanto você corre; caixotes o aproximam, o dash afasta; se alcançar, acabou. Perto, a tela ganha borda vermelha e zumbido.
 - **Pontos** = metros + 5 por tufo de capim + 10 por quebra/pisão. 12 capins enchem o medidor do dash.
+- **Chuva**: de vez em quando (≈30 % dos trechos de 450 m, nunca nos primeiros 150 m) o céu fecha, chove, troveja ao longe e aparece "CHUVA!". É só visual e som — a física e os obstáculos não mudam. Agenda em `rendering/weather.ts`.
+- **Capim**: maço verde com contorno escuro, amarradinho de palha e disco creme atrás, para se destacar da mata em qualquer paleta e na chuva.
 - O cenário muda a cada 800 m (Mata → Entardecer → Noite na mata → Amanhecer); os obstáculos mantêm as cores em todos.
 
 ### Orientação

@@ -6,6 +6,7 @@ import { SwipeDetector } from '../game/Gestures';
 import { Autopilot } from '../game/testing/planner';
 import { GameState, type DeathCause } from '../game/types';
 import { Effects } from '../rendering/effects';
+import { isRainy } from '../rendering/weather';
 import { COLORS, Renderer } from '../rendering/Renderer';
 import { InputController } from '../../../shared/input/InputController';
 import { effectiveDpr } from '../../../shared/layout/layout';
@@ -128,11 +129,15 @@ export function useCorrida() {
           const fresh = e.state === GameState.PLAYING && e.previous !== GameState.RESUMING && e.previous !== GameState.PAUSED;
           if (fresh) {
             fx.clear();
+            renderer.weather.reset();
             renderer.follow(engine, 0, true);
             sfx.start();
           }
           if (e.state === GameState.PLAYING && e.previous === GameState.RESUMING) sfx.tick(true);
-          if (e.state !== GameState.PLAYING) sfx.buzz(0);
+          if (e.state !== GameState.PLAYING) {
+            sfx.buzz(0);
+            sfx.rain(0);
+          }
           input.setEnabled(e.state === GameState.PLAYING || e.state === GameState.RESUMING);
           swipes.clear();
           setUi((u) => ({ ...u, state: e.state, best: engine.score.best, liveRunId: engine.runId, meterFull: engine.meterFull }));
@@ -241,6 +246,10 @@ export function useCorrida() {
         sfx.buzz(near);
       }
       if (!frozen) {
+        const raining = (st === GameState.PLAYING || st === GameState.GAME_OVER) && isRainy(engine.score.meters, engine.runId);
+        renderer.weather.update(fdt, raining, fx.reducedMotion);
+        if (renderer.weather.thunder) sfx.thunder();
+        sfx.rain(st === GameState.PLAYING ? renderer.weather.rain : 0);
         fx.update(fdt);
         renderer.follow(engine, fdt);
       }

@@ -6,6 +6,7 @@ import { computeLayout, type Layout } from '../../../shared/layout/layout';
 import type { Effects } from './effects';
 import { biomeIndex, paletteAt, PALETTES, type Palette } from './palette';
 import { drawCapivara, type Pose } from './capivara';
+import { Weather } from './weather';
 
 /** Onde o chão (y = 0) aparece na arena, sem câmera subindo. */
 export const GROUND_Y = 288;
@@ -25,8 +26,10 @@ export const COLORS = {
   petal: '#ff6fae',
   vine: '#7cb342',
   vineDark: '#4e6b25',
-  grassBlade: '#b6f04a',
-  grassDark: '#5aa51f',
+  grassBlade: '#3fd23f',
+  grassDark: '#1f9a2a',
+  grassOutline: '#123d0c',
+  straw: '#e08a1e',
   gator: '#4f7a33',
   wasp: '#ffcc33',
   danger: '#ff3b5c',
@@ -58,6 +61,8 @@ export class Renderer {
   private skyCache = new Map<string, CanvasGradient>();
   private hazeCache: CanvasGradient | null = null;
   private lastBiome = 0;
+  /** Chuva (atualizada pelo hook a cada quadro). */
+  readonly weather = new Weather();
 
   constructor(private canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext('2d', { alpha: false });
@@ -122,8 +127,10 @@ export class Renderer {
     const biome = biomeIndex(meters);
     if (engine.state === GameState.PLAYING && biome !== this.lastBiome && meters > 0) fx.showBanner(PALETTES[biome].name);
     this.lastBiome = engine.state === GameState.PLAYING ? biome : 0;
+    if (engine.state === GameState.PLAYING && this.weather.started) fx.showBanner('CHUVA!');
 
     this.drawSky(pal, opts.time);
+    if (this.weather.rain > 0) this.drawStormClouds(opts.time);
     this.drawHills(pal);
     this.drawTrees(pal);
     this.drawGround(engine, pal, opts.time);
@@ -140,6 +147,7 @@ export class Renderer {
     this.drawRunner(engine, fx, opts.time);
     this.drawSwarm(engine, opts.time);
     if (pal.fireflies > 0.05) this.drawFireflies(pal, opts.time);
+    if (this.weather.rain > 0) this.drawRain(fx);
     this.drawFloaters(fx);
     if (opts.showHud) this.drawHud(engine, fx, opts.time);
     if (fx.flash > 0) {
@@ -510,28 +518,53 @@ export class Renderer {
     ctx.fill();
   }
 
-  /** Tufo de capim (o que a capivara come todo dia): verde-limão com halo claro para destacar da mata. */
+  /**
+   * Maço de capim (o que a capivara come todo dia). Precisa se destacar da
+   * mata verde em qualquer paleta: disco creme opaco com aro escuro, folhas
+   * com contorno verde-escuro e amarradinho de palha laranja na base.
+   */
   private drawFruit(f: Fruit, time: number): void {
     const ctx = this.ctx;
     const x = this.sx(f.x);
-    if (x < this.viewL - 10 || x > this.viewR + 10) return;
+    if (x < this.viewL - 12 || x > this.viewR + 12) return;
     const y = this.sy(f.y) + Math.sin(time * 4 + f.x * 0.05) * 1.5;
-    ctx.fillStyle = f.risky
-      ? `rgba(255, 230, 120, ${(0.35 + 0.2 * Math.sin(time * 6)).toFixed(3)})`
-      : 'rgba(255, 255, 220, 0.45)';
+    // Disco de fundo
+    if (f.risky) {
+      ctx.fillStyle = `rgba(255, 214, 90, ${(0.45 + 0.25 * Math.sin(time * 6)).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(x, y, 14, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = 'rgba(255, 248, 214, 0.88)';
+    ctx.strokeStyle = 'rgba(40, 60, 20, 0.55)';
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.arc(x, y, f.risky ? 11 : 9, 0, Math.PI * 2);
+    ctx.arc(x, y, 10.5, 0, Math.PI * 2);
     ctx.fill();
+    ctx.stroke();
     ctx.lineCap = 'round';
+    // Contorno escuro das folhas (por baixo) …
+    ctx.strokeStyle = COLORS.grassOutline;
+    ctx.lineWidth = 4.4;
+    ctx.beginPath();
+    for (const [dx, h, lean] of CAPIM) {
+      ctx.moveTo(x + dx * 0.8, y + 6);
+      ctx.quadraticCurveTo(x + dx + lean * 0.4, y + 6 - h * 0.6, x + dx + lean, y + 6 - h);
+    }
+    ctx.stroke();
+    // … e as folhas por cima, verdes vivas.
     for (let k = 0; k < CAPIM.length; k++) {
       const [dx, h, lean] = CAPIM[k];
       ctx.strokeStyle = k % 2 ? COLORS.grassDark : COLORS.grassBlade;
-      ctx.lineWidth = 2.6;
+      ctx.lineWidth = 2.4;
       ctx.beginPath();
-      ctx.moveTo(x + dx, y + 6);
+      ctx.moveTo(x + dx * 0.8, y + 6);
       ctx.quadraticCurveTo(x + dx + lean * 0.4, y + 6 - h * 0.6, x + dx + lean, y + 6 - h);
       ctx.stroke();
     }
+    // Amarradinho de palha.
+    ctx.fillStyle = COLORS.straw;
+    ctx.fillRect(x - 4.5, y + 2.5, 9, 3);
   }
 
   /** Jacaré de tocaia no rio: olhos e focinho na superfície, no meio de cada buraco. */
@@ -669,6 +702,71 @@ export class Renderer {
       ctx.fillStyle = '#1b1306';
       ctx.fillRect(x - 0.8, y - 2.6, 1.6, 5.2);
       ctx.fillRect(x + 2, y - 2, 1.2, 4);
+    }
+  }
+
+  /** Nuvens carregadas cobrindo o sol (aparecem com a chuva). */
+  private drawStormClouds(time: number): void {
+    const ctx = this.ctx;
+    const k = this.weather.rain;
+    ctx.fillStyle = `rgba(70, 82, 100, ${(0.5 * k).toFixed(3)})`;
+    ctx.fillRect(this.viewL, this.viewT, this.viewR - this.viewL, this.viewB - this.viewT);
+    const w = this.viewR - this.viewL;
+    // Faixa contínua no alto + duas camadas de nuvens achatadas que andam devagar.
+    ctx.fillStyle = `rgba(88, 98, 115, ${(0.85 * k).toFixed(3)})`;
+    ctx.fillRect(this.viewL, this.viewT, w, 22 - this.viewT);
+    for (let layer = 0; layer < 2; layer++) {
+      ctx.fillStyle = layer === 0 ? `rgba(104, 114, 132, ${(0.85 * k).toFixed(3)})` : `rgba(78, 88, 106, ${(0.9 * k).toFixed(3)})`;
+      ctx.beginPath();
+      for (let i = 0; i < 8; i++) {
+        const x = this.viewL + ((i * 113 + layer * 57 + this.camX * (0.04 + layer * 0.03) + time * (4 + layer * 3)) % (w + 220)) - 110;
+        const y = 22 + layer * 16 + hash(i * 3.7 + layer) * 22;
+        const r = 40 + hash(i * 5.1 + layer) * 30;
+        ctx.moveTo(x + r * 1.7, y);
+        ctx.ellipse(x, y, r * 1.7, r * 0.55, 0, 0, Math.PI * 2);
+      }
+      ctx.fill();
+    }
+  }
+
+  /** Gotas inclinadas, respingos no chão, leve escurecimento e relâmpago. */
+  private drawRain(fx: Effects): void {
+    const ctx = this.ctx;
+    const wx = this.weather;
+    const k = wx.rain;
+    const W = this.viewR - this.viewL;
+    const H = this.viewB - this.viewT;
+    ctx.fillStyle = `rgba(30, 40, 60, ${(0.18 * k).toFixed(3)})`;
+    ctx.fillRect(this.viewL, this.viewT, W, H);
+    const n = Math.round(wx.drops.length * k * (fx.reducedMotion ? 0.4 : 1));
+    ctx.strokeStyle = 'rgba(200, 220, 255, 0.55)';
+    ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+      const d = wx.drops[i];
+      const x = this.viewL + (d.x / 640) * W;
+      const y = this.viewT + (d.y / 360) * H;
+      ctx.moveTo(x, y);
+      ctx.lineTo(x - d.len * 0.28, y + d.len);
+    }
+    ctx.stroke();
+    // Respingos na linha do chão.
+    const g = this.sy(0);
+    ctx.strokeStyle = 'rgba(220, 235, 255, 0.6)';
+    ctx.beginPath();
+    for (let i = 0; i < n; i += 4) {
+      const d = wx.drops[i];
+      const x = this.viewL + (((d.x * 1.7 + i * 37) % 700) / 640) * W;
+      const p = (d.y % 60) / 60;
+      if (p > 0.35) continue;
+      const r = 2 + p * 9;
+      ctx.moveTo(x - r, g - p * 3);
+      ctx.quadraticCurveTo(x, g - 4 - p * 6, x + r, g - p * 3);
+    }
+    ctx.stroke();
+    if (wx.lightning > 0) {
+      ctx.fillStyle = `rgba(235, 240, 255, ${(wx.lightning * 0.45).toFixed(3)})`;
+      ctx.fillRect(this.viewL, this.viewT, W, H);
     }
   }
 
