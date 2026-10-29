@@ -128,9 +128,15 @@ export const ITEMS = {
   minGap: 14,
   /** Chance por padrão, passado o intervalo. */
   chance: 0.4,
-  weights: { magnet: 3, shield: 2 } as Record<ItemKind, number>,
+  weights: { magnet: 3, shield: 2, golden: 2 } as Record<ItemKind, number>,
   /** Raio para pegar um item. */
   pickup: 22,
+} as const;
+
+/** Capim dourado: dobra os pontos (metros, capins e bônus) por um tempo. */
+export const GOLDEN = {
+  duration: 10,
+  mult: 2,
 } as const;
 
 /** Escudo de vitória-régia: aguenta uma batida (pedra, espinho ou queda no rio). */

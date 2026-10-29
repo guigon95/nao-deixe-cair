@@ -9,6 +9,10 @@ export class Score {
   distance = 0;
   fruits = 0;
   bonus = 0;
+  /** Pontos extras do capim dourado. */
+  extra = 0;
+  /** Multiplicador atual (capim dourado = 2). */
+  mult = 1;
   best = 0;
   bestAtStart = 0;
   private startX = 0;
@@ -24,13 +28,15 @@ export class Score {
   }
 
   get score(): number {
-    return this.meters + this.fruits * SCORING.fruit + this.bonus;
+    return this.meters + this.fruits * SCORING.fruit + this.bonus + this.extra;
   }
 
   reset(startX: number): void {
     this.distance = 0;
     this.fruits = 0;
     this.bonus = 0;
+    this.extra = 0;
+    this.mult = 1;
     this.startX = startX;
     this.bestAtStart = this.best;
     this.recordAnnounced = false;
@@ -38,15 +44,22 @@ export class Score {
   }
 
   tick(x: number): void {
-    if (!this.frozen) this.distance = Math.max(this.distance, x - this.startX);
+    if (this.frozen) return;
+    const before = this.meters;
+    this.distance = Math.max(this.distance, x - this.startX);
+    if (this.mult > 1) this.extra += (this.meters - before) * (this.mult - 1);
   }
 
   addFruit(): void {
-    if (!this.frozen) this.fruits++;
+    if (this.frozen) return;
+    this.fruits++;
+    this.extra += SCORING.fruit * (this.mult - 1);
   }
 
   addBonus(n: number): void {
-    if (!this.frozen) this.bonus += n;
+    if (this.frozen) return;
+    this.bonus += n;
+    this.extra += n * (this.mult - 1);
   }
 
   /** Verdadeiro uma vez por partida, quando passa do recorde anterior. */

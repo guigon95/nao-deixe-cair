@@ -93,6 +93,6 @@ describe('escudo de vitória-régia', () => {
     expect(e.shield).toBe(false);
     const kinds = new Set<string>();
     for (let i = 0; i < 100; i++) kinds.add(pickKind(i / 100));
-    expect([...kinds].sort()).toEqual(['magnet', 'shield']);
+    expect([...kinds].sort()).toEqual(['golden', 'magnet', 'shield']);
   });
 });

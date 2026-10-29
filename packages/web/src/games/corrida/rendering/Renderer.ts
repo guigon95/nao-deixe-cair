@@ -1,4 +1,4 @@
-import { ARENA, BODY, DASH, MAGNET, SWARM } from '../game/config';
+import { ARENA, BODY, DASH, GOLDEN, MAGNET, SWARM } from '../game/config';
 import type { Engine } from '../game/Engine';
 import { SIZES } from '../game/patterns';
 import { GameState, type Crate, type Fruit, type ItemKind, type Platform, type Rock, type Spring, type Thorns, type Vine } from '../game/types';
@@ -754,6 +754,72 @@ export class Renderer {
     ctx.arc(x, y, 17, 0, Math.PI * 2);
     ctx.fill();
     if (kind === 'shield') this.drawLilyLeaf(x, y, 12, time);
+    else if (kind === 'golden') this.drawGoldenTuft(x, y + 2, 1.3, time);
+  }
+
+  /** Tufo de capim dourado (o do Jalapão), cintilando. */
+  private drawGoldenTuft(x: number, y: number, s: number, time: number): void {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(s, s);
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#7a4b00';
+    ctx.lineWidth = 4.6;
+    ctx.beginPath();
+    for (const [dx, h, lean] of CAPIM) {
+      ctx.moveTo(dx * 0.8, 7);
+      ctx.quadraticCurveTo(dx + lean * 0.4, 7 - h * 0.7, dx + lean, 7 - h * 1.1);
+    }
+    ctx.stroke();
+    for (let k = 0; k < CAPIM.length; k++) {
+      const [dx, h, lean] = CAPIM[k];
+      ctx.strokeStyle = k % 2 ? '#ffb000' : '#ffe066';
+      ctx.lineWidth = 2.6;
+      ctx.beginPath();
+      ctx.moveTo(dx * 0.8, 7);
+      ctx.quadraticCurveTo(dx + lean * 0.4, 7 - h * 0.7, dx + lean, 7 - h * 1.1);
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#c96a00';
+    ctx.fillRect(-5, 3.5, 10, 3.5);
+    // Cintilância.
+    for (let k = 0; k < 3; k++) {
+      const a = time * 3 + k * 2.1;
+      const tw = Math.max(0, Math.sin(a * 1.7));
+      if (tw < 0.2) continue;
+      this.drawSparkle(Math.cos(a) * 11, -6 + Math.sin(a * 1.3) * 8, 3.5 * tw, '#fffbe0');
+    }
+    ctx.restore();
+  }
+
+  /** Estrelinha de quatro pontas. */
+  private drawSparkle(x: number, y: number, r: number, color: string): void {
+    const ctx = this.ctx;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(x, y - r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.quadraticCurveTo(x, y, x, y + r);
+    ctx.quadraticCurveTo(x, y, x - r, y);
+    ctx.quadraticCurveTo(x, y, x, y - r);
+    ctx.fill();
+  }
+
+  /** Capim dourado ativo: brilhinhos dourados subindo da capivara. */
+  private drawGoldenOn(x: number, y: number, remaining: number, time: number, reduced: boolean): void {
+    const ctx = this.ctx;
+    const blink = remaining < 2 && Math.sin(time * 18) < 0 ? 0.35 : 1;
+    ctx.save();
+    ctx.globalAlpha = blink;
+    const n = reduced ? 3 : 7;
+    for (let k = 0; k < n; k++) {
+      const ph = (time * 0.9 + k / n) % 1;
+      const px = x + 4 + Math.sin(k * 2.4 + time * 2) * 22;
+      const py = y - 6 - ph * 46;
+      this.drawSparkle(px, py, 6 * (1 - ph) + 1.5, k % 2 ? '#ffd23f' : '#fff3a0');
+    }
+    ctx.restore();
   }
 
   /** Folha redonda de vitória-régia (borda levantada, recorte e flor rosa). */
@@ -1158,6 +1224,7 @@ export class Renderer {
     const landing = r.landedAt < 0.14 ? 1 - r.landedAt / 0.14 : 0;
     if (magnetOn) this.drawMagnetBeams(engine, p.x, p.y, x, y, time, fx.reducedMotion);
     if (engine.shield && !isDead(engine)) this.drawShieldOn(x, y, time, fx.reducedMotion);
+    if (engine.golden > 0 && !isDead(engine)) this.drawGoldenOn(x, y, engine.golden, time, fx.reducedMotion);
     drawCapivara(ctx, x, y, {
       pose,
       // Com o ímã, uma passada completa por batida do forró (duas patadas por tempo).
@@ -1339,8 +1406,33 @@ export class Renderer {
     ctx.strokeStyle = 'rgba(0,0,0,0.35)';
     const sc = String(engine.score.score);
     ctx.strokeText(sc, W / 2, 40);
-    ctx.fillStyle = COLORS.text;
+    const golden = engine.golden > 0;
+    ctx.fillStyle = golden ? '#ffd23f' : COLORS.text;
     ctx.fillText(sc, W / 2, 40);
+    // Capim dourado: selo "×2" ao lado dos pontos e o tempo que falta embaixo.
+    if (golden) {
+      const tw = ctx.measureText(sc).width;
+      const bx = W / 2 + tw / 2 + 8;
+      const blink = engine.golden < 2 && Math.sin(time * 18) < 0;
+      this.drawGoldenTuft(bx + 8, 30, 0.75, time);
+      ctx.font = '900 16px system-ui, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = 'rgba(90, 45, 0, 0.7)';
+      ctx.strokeText('×2', bx + 20, 38);
+      ctx.fillStyle = blink ? '#ffffff' : '#ffd23f';
+      ctx.fillText('×2', bx + 20, 38);
+      ctx.textAlign = 'center';
+      const k = Math.min(1, engine.golden / GOLDEN.duration);
+      ctx.fillStyle = 'rgba(15, 20, 40, 0.45)';
+      roundRect(ctx, W / 2 - 40, 63, 80, 6, 3);
+      ctx.fill();
+      ctx.fillStyle = blink ? '#ffffff' : '#ffc21a';
+      roundRect(ctx, W / 2 - 40, 63, Math.max(6, 80 * k), 6, 3);
+      ctx.fill();
+      ctx.font = '900 30px system-ui, sans-serif';
+      ctx.fillStyle = COLORS.text;
+    }
     ctx.font = '700 12px system-ui, sans-serif';
     ctx.lineWidth = 3;
     const m = `${engine.score.meters} m`;

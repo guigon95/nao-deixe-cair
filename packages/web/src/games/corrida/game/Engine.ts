@@ -1,4 +1,4 @@
-import { CONTINUES, DASH, ITEMS, MAGNET, SCORING, SHIELD, SIM, SWARM } from './config';
+import { CONTINUES, DASH, GOLDEN, ITEMS, MAGNET, SCORING, SHIELD, SIM, SWARM } from './config';
 import { speedAt, tierAt } from './Difficulty';
 import { createRunner, runnerSpeed, stepRunner, type Controls, type StepSink } from './Physics';
 import { CANOPY } from './patterns';
@@ -62,6 +62,8 @@ export class Engine {
   boost = 0;
   /** Escudo de vitória-régia ativo (aguenta uma batida). */
   shield = false;
+  /** Tempo restante do capim dourado (s). */
+  golden = 0;
   /** Pousada na copa das árvores (para avisar uma vez por subida). */
   private onCanopy = false;
   private pendingPress = false;
@@ -151,6 +153,7 @@ export class Engine {
     this.magnet = 0;
     this.boost = 0;
     this.shield = false;
+    this.golden = 0;
     this.track.update(0, 0, speedAt(0));
     this.setState(GameState.PLAYING);
   }
@@ -310,6 +313,18 @@ export class Engine {
       } else if (u.kind === 'shield') {
         if (!this.shield) this.emit({ type: 'shield', on: true, x: u.x, y: u.y });
         this.shield = true;
+      } else if (u.kind === 'golden') {
+        if (this.golden <= 0) this.emit({ type: 'golden', on: true, x: u.x, y: u.y });
+        this.golden = GOLDEN.duration;
+        this.score.mult = GOLDEN.mult;
+      }
+    }
+    if (this.golden > 0) {
+      this.golden -= dt;
+      if (this.golden <= 0) {
+        this.golden = 0;
+        this.score.mult = 1;
+        this.emit({ type: 'golden', on: false, x: r.x, y: r.y });
       }
     }
     if (this.magnet <= 0) return;

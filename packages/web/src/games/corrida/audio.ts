@@ -237,6 +237,13 @@ export class RunnerSfx extends SynthAudio {
     }
   }
 
+  /** Capim dourado: arpejo brilhante subindo (ao pegar) ou descendo (acabou). */
+  golden(on: boolean): void {
+    const notes = on ? [784, 988, 1175, 1568] : [1175, 988, 784];
+    notes.forEach((f, i) => this.tone(f, f, 0.12, 'triangle', 0.24, i * 0.06));
+    if (on) this.tone(2093, 2093, 0.3, 'sine', 0.12, 0.26);
+  }
+
   /** Jacaré fechando a boca: "nhac" seco e grave. */
   chomp(): void {
     this.tone(180, 70, 0.09, 'square', 0.22, 0, 0.002);

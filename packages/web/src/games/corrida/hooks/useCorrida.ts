@@ -215,7 +215,7 @@ export function useCorrida() {
         case 'fruit':
           completed(missions.capim());
           sfx.fruit(e.streak);
-          fx.burst(e.x, e.y, 5, 70, ['#b6f04a', '#ffffff'], 0.35, 2, false);
+          fx.burst(e.x, e.y, 5, 70, engine.golden > 0 ? ['#ffd23f', '#fff3a0'] : ['#b6f04a', '#ffffff'], 0.35, 2, false);
           if (e.meterFull) {
             sfx.meterFull();
             fx.meterGlow = 1;
@@ -230,13 +230,13 @@ export function useCorrida() {
             fx.shake = 0.4;
             fx.float(e.x, e.y + 40, 'ATRASOU!', false, '#ff9a9a');
             vibrate(20);
-          } else fx.float(e.x, e.y + 40, '+10', false, '#fff2a8');
+          } else fx.float(e.x, e.y + 40, engine.golden > 0 ? '+20' : '+10', false, '#fff2a8');
           break;
         case 'smash':
           completed(missions.smash());
           sfx.smash();
           fx.burst(e.x, e.y, 16, 220, [COLORS.rock, COLORS.rockDark, COLORS.rockLight], 0.7, 3.5, true);
-          fx.float(e.x, e.y + 50, '+10', false, '#fff2a8');
+          fx.float(e.x, e.y + 50, engine.golden > 0 ? '+20' : '+10', false, '#fff2a8');
           break;
         case 'spring':
           completed(missions.spring());
@@ -249,6 +249,14 @@ export function useCorrida() {
             completed(missions.magnet());
             fx.float(e.x + 30, e.y + 60, 'ÍMÃ DE CAPIM!', true, '#ff9a9a');
             fx.burst(e.x, e.y, 10, 120, ['#e8322f', '#ffffff', '#ffd23f'], 0.5, 2.5, false);
+            vibrate(12);
+          }
+          break;
+        case 'golden':
+          sfx.golden(e.on);
+          if (e.on) {
+            fx.float(e.x + 110, e.y + 60, 'CAPIM DOURADO! ×2', true, '#ffd23f');
+            fx.burst(e.x, e.y, 16, 150, ['#ffd23f', '#ffb000', '#fff3a0'], 0.6, 2.6, false);
             vibrate(12);
           }
           break;
