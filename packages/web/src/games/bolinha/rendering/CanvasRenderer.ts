@@ -7,7 +7,26 @@ import { computeLayout, type Layout } from '../../../shared/layout/layout';
 import { drawCoin, drawSkin, drawTrailDot } from './skins';
 import { COINS } from '../game/config';
 import type { SkinId, TrailId } from '../game/cosmetics';
-import { blendPalette, daylightOf, drawCanopy, drawJungle, drawSnow, drawSnowBands, sceneryAt, weightOf, type Palette } from './scenery';
+import {
+  blendPalette,
+  dayAt,
+  daylightOf,
+  drawAutumn,
+  drawAutumnBands,
+  drawCanopy,
+  drawFireflies,
+  drawJungle,
+  drawNightShade,
+  drawSky,
+  drawSnow,
+  drawSnowBands,
+  drawSpring,
+  drawSpringBands,
+  sceneryAt,
+  weightOf,
+  type Palette,
+} from './scenery';
+import { Weather } from './weather';
 
 export const COLORS = {
   page: '#070b1c',
@@ -43,6 +62,8 @@ export class CanvasRenderer {
   /** Paleta do quadro atual (mistura dos cenários) e chave dos gradientes em cache. */
   private palette: Palette = blendPalette(sceneryAt(0));
   private gradientKey = '';
+  /** Chuva (estado visual, atualizado pelo loop do jogo). */
+  readonly weather = new Weather();
   /** Visual escolhido na loja. */
   look: { skin: SkinId; trail: TrailId } = { skin: 'classica', trail: 'padrao' };
 
@@ -89,23 +110,44 @@ export class CanvasRenderer {
     ctx.beginPath();
     roundRect(ctx, 0, 0, ARENA.width, ARENA.height, 18);
     ctx.clip();
-    // Cenário: mistura gradual conforme a pontuação (noite → selva → ...).
-    const scene = sceneryAt(engine.score.score);
-    this.usePalette(blendPalette(scene));
-    const jungle = weightOf(scene, 'selva');
-    const snow = weightOf(scene, 'neve');
-    const daylight = daylightOf(scene);
+    // Cenário: estação + hora do dia + chuva, misturados aos poucos pela pontuação.
+    const score = engine.score.score;
+    const scene = sceneryAt(score);
+    const day = dayAt(score);
+    this.usePalette(blendPalette(scene, day));
+    const summer = weightOf(scene, 'verao');
+    const autumn = weightOf(scene, 'outono');
+    const winter = weightOf(scene, 'inverno');
+    const spring = weightOf(scene, 'primavera');
+    const daylight = daylightOf(day);
+    const motion = !fx.reducedMotion;
+    const wx = this.weather;
     ctx.fillStyle = this.arenaGradient ?? this.palette.skyBottom;
     ctx.fillRect(0, 0, ARENA.width, ARENA.height);
 
-    this.drawStars(fx, weightOf(scene, 'noite'));
-    drawJungle(ctx, jungle, fx.scroll, fx.clock, !fx.reducedMotion);
-    drawSnow(ctx, snow, fx.scroll, fx.clock, !fx.reducedMotion);
+    this.drawStars(fx, day.night * (1 - wx.rain));
+    drawSky(ctx, day);
+    wx.drawClouds(ctx, fx.clock);
+    drawJungle(ctx, summer, fx.scroll, fx.clock, motion);
+    drawAutumn(ctx, autumn, fx.scroll, fx.clock, motion);
+    drawSnow(ctx, winter, fx.scroll, fx.clock, motion, wx.rain);
+    drawSpring(ctx, spring, fx.scroll, fx.clock, motion, daylight);
+    drawNightShade(ctx, day);
+    drawFireflies(ctx, day.night * (summer + spring) * (1 - wx.rain), fx.clock, motion);
     this.drawBands();
-    drawCanopy(ctx, jungle, fx.scroll);
-    drawSnowBands(ctx, snow, fx.scroll);
-    this.drawBarriers(engine, jungle);
+    drawCanopy(ctx, summer, fx.scroll);
+    drawAutumnBands(ctx, autumn, fx.scroll);
+    drawSnowBands(ctx, winter, fx.scroll);
+    drawSpringBands(ctx, spring, fx.scroll);
+    this.drawBarriers(engine, Math.max(summer, autumn, spring));
     this.drawCoins(engine);
+    // chuva por cima das barreiras e atrás da bolinha (no inverno a "chuva" é nevasca)
+    if (winter < 1) {
+      ctx.save();
+      ctx.globalAlpha = 1 - winter;
+      wx.drawRain(ctx, fx.reducedMotion);
+      ctx.restore();
+    }
     this.drawTrail(engine, fx);
     this.drawParticles(fx);
     if (engine.state !== GameState.GAME_OVER || fx.flash > 0.6) this.drawBall(engine, fx, daylight);

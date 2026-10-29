@@ -7,6 +7,9 @@ export class Sfx extends SynthAudio {
   private lastPress = -1;
   private thrustGain: GainNode | null = null;
   private thrustFilter: BiquadFilterNode | null = null;
+  private rainSrc: AudioBufferSourceNode | null = null;
+  private rainAmp: GainNode | null = null;
+  private rainFilter: BiquadFilterNode | null = null;
   /** Som do toque/propulsor combina com o rastro escolhido na loja. */
   style: TrailId = 'padrao';
   /** Próximo instante de um detalhe enquanto segura (bolha, faísca, brilho). */
@@ -14,6 +17,52 @@ export class Sfx extends SynthAudio {
 
   protected override stopContinuous(): void {
     this.thrust(false);
+    this.rain(0);
+  }
+
+  /**
+   * Chuva contínua (ruído filtrado) no volume da intensidade 0..1. Na
+   * nevasca, mais grave (vento) e mais baixo.
+   */
+  rain(level: number, wind = false): void {
+    const ctx = this.ctx;
+    if (level <= 0.01) {
+      if (this.rainAmp && ctx) this.rainAmp.gain.setTargetAtTime(0, ctx.currentTime, 0.3);
+      return;
+    }
+    if (!this.ready || !ctx) return;
+    try {
+      if (!this.rainSrc) {
+        const len = ctx.sampleRate * 2;
+        const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+        this.rainSrc = ctx.createBufferSource();
+        this.rainSrc.buffer = buf;
+        this.rainSrc.loop = true;
+        const hp = ctx.createBiquadFilter();
+        hp.type = 'highpass';
+        hp.frequency.value = 500;
+        this.rainFilter = ctx.createBiquadFilter();
+        this.rainFilter.type = 'lowpass';
+        this.rainFilter.frequency.value = 5000;
+        this.rainAmp = ctx.createGain();
+        this.rainAmp.gain.value = 0;
+        this.rainSrc.connect(hp).connect(this.rainFilter).connect(this.rainAmp).connect(this.master!);
+        this.rainSrc.start();
+      }
+      const t = ctx.currentTime;
+      this.rainFilter!.frequency.setTargetAtTime(wind ? 1200 : 5000, t, 0.4);
+      this.rainAmp!.gain.setTargetAtTime((wind ? 0.05 : 0.065) * level, t, 0.3);
+    } catch {
+      /* ignora */
+    }
+  }
+
+  /** Trovão distante, grave e abafado (nunca um estouro). */
+  thunder(): void {
+    this.noise(1.6, 0.14, 300, 60, 'lowpass', 0.25);
+    this.tone(70, 40, 1.2, 'sine', 0.22, 0.25, 0.08);
   }
 
   /**

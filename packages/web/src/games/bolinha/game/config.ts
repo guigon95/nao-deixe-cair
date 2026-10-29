@@ -101,17 +101,40 @@ export const COINS = {
 } as const;
 
 /**
- * Cenários por pontuação. Cada um começa a aparecer em `at` pontos e leva
- * `over` pontos para tomar a tela inteira (transição gradual). Para um novo
- * cenário (ex.: neve), acrescente aqui e crie a paleta/decoração em
- * rendering/scenery.ts. Puramente visual: não muda a física nem as barreiras.
+ * Cenário que varia enquanto a bolinha avança (como na Disparada), em três
+ * camadas independentes — por isso as combinações mudam a cada volta:
+ * - estações do ano em ciclo (verão → outono → inverno → primavera → …);
+ * - hora do dia em ciclo (dia → entardecer → noite → amanhecer → …);
+ * - chuva de vez em quando (sorteada por partida; no inverno vira nevasca).
+ * Tudo medido em pontos e puramente visual: não muda física nem barreiras.
  */
-export type SceneId = 'noite' | 'selva' | 'neve';
-export const SCENERY: readonly { id: SceneId; at: number; over: number }[] = [
-  { id: 'noite', at: 0, over: 0 },
-  { id: 'selva', at: 60, over: 40 },
-  { id: 'neve', at: 180, over: 50 },
-];
+export type SeasonId = 'verao' | 'outono' | 'inverno' | 'primavera';
+export const SEASONS = {
+  order: ['verao', 'outono', 'inverno', 'primavera'] as const satisfies readonly SeasonId[],
+  /** Pontos de cada estação. */
+  length: 90,
+  /** Pontos da transição para a próxima (dentro do fim da estação). */
+  blend: 30,
+} as const;
+
+export const DAY_CYCLE = {
+  /** Pontos de um dia completo (dia → entardecer → noite → amanhecer). */
+  length: 240,
+} as const;
+
+export const RAIN = {
+  /** Pontos de cada trecho de clima. */
+  segment: 60,
+  /** Chance de um trecho ter chuva. */
+  chance: 0.3,
+  /** Começo sempre seco (pontos). */
+  dryStart: 40,
+  /** Tempo para a chuva chegar/ir embora (s). */
+  fade: 2.5,
+} as const;
+
+/** Compatibilidade: id de cenário = estação. */
+export type SceneId = SeasonId;
 
 export const STORAGE_KEYS = {
   best: gameKey('bolinha', 'best'),

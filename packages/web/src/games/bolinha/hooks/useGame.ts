@@ -10,7 +10,8 @@ import { Sfx } from '../audio';
 import { loadSettings, saveSettings, type Settings } from '../../../shared/settings/settings';
 import { CanvasRenderer, COLORS } from '../rendering/CanvasRenderer';
 import { Effects } from '../rendering/effects';
-import { SCENE_NAMES, sceneryAt, weightOf } from '../rendering/scenery';
+import { dayAt, SCENE_NAMES, sceneryAt, weightOf } from '../rendering/scenery';
+import { isRainy } from '../rendering/weather';
 import { Wallet, type WalletState } from '../game/Wallet';
 import { TRAILS } from '../game/cosmetics';
 import { effectiveDpr } from '../../../shared/layout/layout';
@@ -107,8 +108,9 @@ export function useGame() {
     let lastCoinAt = -10;
     /** Segundos até o próximo grito de macaco (só na selva, de vez em quando). */
     let monkeyIn = 6 + Math.random() * 6;
-    /** Último cenário anunciado nesta partida ("SELVA!" quando ela começa a chegar). */
+    /** Última estação/hora anunciadas nesta partida ("OUTONO", "ANOITECENDO…"). */
     let sceneShown = sceneryAt(0).to;
+    let dayShown = dayAt(0).label;
     const unsubscribe = engine.on((e) => {
       switch (e.type) {
         case 'state':
@@ -123,6 +125,8 @@ export function useGame() {
           if (e.state === GameState.PLAYING && e.previous !== GameState.RESUMING && e.previous !== GameState.PAUSED) {
             fx.clear();
             sceneShown = sceneryAt(0).to;
+            dayShown = dayAt(0).label;
+            renderer.weather.reset();
             coinStreak = 0;
             monkeyIn = 6 + Math.random() * 6;
           }
@@ -172,8 +176,9 @@ export function useGame() {
       if (st === GameState.PLAYING) {
         const mix = sceneryAt(engine.score.score);
         const scene = mix.to;
-        // Macaquinho gritando de vez em quando (baixinho), só com a selva já bem visível.
-        if (weightOf(mix, 'selva') > 0.6) {
+        const day = dayAt(engine.score.score);
+        // Macaquinho gritando de vez em quando (baixinho): verão, de dia, sem chuva.
+        if (weightOf(mix, 'verao') > 0.6 && day.night < 0.3 && renderer.weather.rain < 0.3) {
           monkeyIn -= fdt;
           if (monkeyIn <= 0) {
             sfx.monkey();
@@ -183,6 +188,12 @@ export function useGame() {
         if (scene !== sceneShown) {
           sceneShown = scene;
           fx.float(ARENA.width / 2, ARENA.height * 0.36, SCENE_NAMES[scene], true);
+        } else if (day.label !== dayShown && (day.label === 'entardecer' || day.label === 'amanhecer')) {
+          fx.float(ARENA.width / 2, ARENA.height * 0.36, day.label === 'entardecer' ? 'ANOITECENDO…' : 'AMANHECENDO', true);
+        }
+        dayShown = day.label;
+        if (renderer.weather.started) {
+          fx.float(ARENA.width / 2, ARENA.height * 0.44, weightOf(mix, 'inverno') > 0.5 ? 'NEVASCA!' : 'CHUVA!', true);
         }
         fx.recordTrail(engine.ball.y, fdt);
         if (engine.holding) fx.thrust(engine.ball.x, engine.ball.y, engine.ball.radius, fdt);
@@ -194,6 +205,13 @@ export function useGame() {
           sfx.tick();
         }
       }
+      // Clima: chove em alguns trechos (sorteados por partida); só no jogo.
+      const raining = (st === GameState.PLAYING || st === GameState.CONTINUE || st === GameState.PAUSED || st === GameState.RESUMING) &&
+        isRainy(engine.score.score, engine.runId);
+      if (!frozen) renderer.weather.update(fdt, raining, fx.reducedMotion);
+      if (renderer.weather.thunder) sfx.thunder();
+      const winterNow = weightOf(sceneryAt(engine.score.score), 'inverno');
+      sfx.rain(st === GameState.PLAYING ? renderer.weather.rain * (1 - winterNow * 0.6) : 0, winterNow > 0.5);
       const scroll = st === GameState.PLAYING ? difficultyAt(engine.elapsed).speed : 40;
       if (!frozen) fx.update(fdt, scroll);
       renderer.draw(engine, fx, { showHud: st !== GameState.READY, time: 0 });

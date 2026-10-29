@@ -309,13 +309,19 @@ Velocidade 290 → 480 u/s (aproximação exponencial, τ = 70 s); folga entre p
 - O **recorde** do menu e do HUD também segue a conta: ao entrar, vale o melhor entre o do aparelho e o da conta no ranking.
 - Catálogo e preços: `game/cosmetics.ts` (front) e `packages/server/src/lib/shop.ts` (servidor); um teste garante que são iguais. Desenhos em `rendering/skins.ts`; regras das moedas em `COINS` (`game/config.ts`).
 
-### Cenários (noite → selva → neve)
+### Cenário que varia (estações, hora do dia e chuva)
 
-- Neve: a partir de **180 pontos** (toma a tela em 230): montanhas nevadas, pinheiros, pinguins, flocos caindo, pingentes de gelo; barreiras viram blocos de gelo.
-- Na selva, de vez em quando (a cada 14–30 s) um macaquinho dá um "uh-uh-ah!" curto e baixinho.
-- O cenário muda com a pontuação, aos poucos: a partir de **60 pontos** a selva começa a aparecer e em **100 pontos** já tomou a tela (céu claro com sol, morros, palmeiras, cipós com macaquinhos balançando, copa de folhas, barreiras viram troncos). Aparece "BEM-VINDO À SELVA!" quando ela começa a chegar.
-- É só visual: a decoração fica atrás das barreiras, com pouco contraste, e não colide com nada. Com **Menos movimento**, cipós e macacos ficam parados.
-- Agenda em `SCENERY` (`game/config.ts`); paletas e desenhos em `rendering/scenery.ts`. Para um cenário novo: uma entrada em `SCENERY`, uma paleta em `PALETTES`, um nome em `SCENE_NAMES` e uma função de decoração.
+Como na Disparada, o cenário muda o tempo todo enquanto a bolinha avança, em três camadas que andam em ritmos diferentes (as combinações variam a cada volta):
+
+- **Estações em ciclo** — verão → outono → inverno → primavera → verão… (90 pontos cada; a troca acontece aos poucos nos últimos 30):
+  - **Verão:** selva com palmeiras, cipós e macaquinhos (que gritam baixinho de vez em quando, de dia); barreiras de tronco.
+  - **Outono:** árvores de copa laranja, folhas caindo, folhas secas no chão.
+  - **Inverno:** montanhas nevadas, pinheiros, pinguins, flocos e pingentes; barreiras de gelo.
+  - **Primavera:** cerejeiras, pétalas caindo, flores e borboletas.
+- **Hora do dia em ciclo** (240 pontos por dia): dia → **entardecer** (sol desce e fica alaranjado, "ANOITECENDO…") → **noite** (lua, estrelas, vaga-lumes no verão e na primavera) → **amanhecer**. À noite a decoração escurece, mas as barreiras continuam fáceis de ver.
+- **Chuva às vezes:** cerca de 30 % dos trechos de 60 pontos, sorteados por partida (começo sempre seco). Nuvens carregadas, gotas, relâmpago e trovão distantes e baixinhos, e som de chuva. No inverno vira **nevasca**.
+- Tudo é só visual: física, barreiras e moedas não mudam. Com **Menos movimento**, nada balança ou cai e não há relâmpago.
+- Ajustes em `SEASONS`, `DAY_CYCLE` e `RAIN` (`game/config.ts`); paletas e desenhos em `rendering/scenery.ts`; chuva em `rendering/weather.ts`.
 
 Parâmetros em `src/games/bolinha/game/config.ts` e `Difficulty.ts`. Detalhes do jogo, do ranking e do som estão nos comentários do código e nos testes (`src/games/bolinha/__tests__`).
 
