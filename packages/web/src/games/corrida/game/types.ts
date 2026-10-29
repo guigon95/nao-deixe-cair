@@ -37,6 +37,24 @@ export interface Platform {
   kind?: 'galho' | 'copa' | 'vitoria';
 }
 
+/**
+ * Toca da capivara: caminho por baixo da terra. Entra-se por um buraco
+ * escondido sob folhas [x0, holeEnd] e sai-se pelo buraco [exitStart, x1],
+ * que lança a capivara de volta para a superfície.
+ */
+export interface Burrow {
+  x0: number;
+  holeEnd: number;
+  exitStart: number;
+  x1: number;
+  /** Altura do chão da toca (negativa). */
+  floor: number;
+  /** Altura do teto (embaixo da grama). */
+  roof: number;
+  /** A capivara já caiu por aqui (as folhas que tampavam rasgaram). */
+  opened: boolean;
+}
+
 /** Caixote: atravessar atrasa (o enxame chega perto); cair em cima quica. */
 export interface Crate {
   x0: number;
@@ -153,6 +171,7 @@ export type GameEvent =
   | { type: 'canopy'; x: number; y: number }
   | { type: 'magnet'; on: boolean; x: number; y: number }
   | { type: 'acai'; x: number; y: number }
+  | { type: 'burrow'; on: boolean; x: number; y: number }
   | { type: 'golden'; on: boolean; x: number; y: number }
   | { type: 'shield'; on: boolean; x: number; y: number; saved?: DeathCause }
   | { type: 'fastFall' }

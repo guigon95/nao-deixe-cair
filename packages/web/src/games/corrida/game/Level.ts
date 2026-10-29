@@ -1,4 +1,4 @@
-import type { Crate, Fruit, GroundSpan, Platform, PowerUp, Rock, Spring, Thorns, Vine } from './types';
+import type { Burrow, Crate, Fruit, GroundSpan, Platform, PowerUp, Rock, Spring, Thorns, Vine } from './types';
 
 /**
  * Conteúdo do percurso já gerado: listas em ordem crescente de x. O gerador
@@ -15,6 +15,7 @@ export class Level {
   fruits: Fruit[] = [];
   vines: Vine[] = [];
   powerups: PowerUp[] = [];
+  burrows: Burrow[] = [];
 
   clear(): void {
     this.ground.length = 0;
@@ -26,6 +27,7 @@ export class Level {
     this.fruits.length = 0;
     this.vines.length = 0;
     this.powerups.length = 0;
+    this.burrows.length = 0;
   }
 
   /** Acrescenta chão; emenda com o trecho anterior se encostar. */
@@ -48,6 +50,15 @@ export class Level {
     keep(this.thorns);
     keep(this.crates);
     keep(this.springs);
+    // Toca no trecho: some (os buracos dela viram chão até o fim dela).
+    for (let i = this.burrows.length - 1; i >= 0; i--) {
+      const u = this.burrows[i];
+      if (u.x1 >= a && u.x0 <= b) {
+        a = Math.min(a, u.x0);
+        b = Math.max(b, u.x1);
+        this.burrows.splice(i, 1);
+      }
+    }
     // Chão: junta os trechos que tocam [a, b] num só.
     let lo = a;
     let hi = b;
@@ -83,6 +94,7 @@ export class Level {
     dropBefore(this.fruits, x, (f) => f.x + 20);
     dropBefore(this.vines, x, (v) => v.ax + v.len);
     dropBefore(this.powerups, x, (u) => u.x + 30);
+    dropBefore(this.burrows, x, (u) => u.x1);
   }
 
   /** Existe chão sob [a, b]? (Usado pelos testes e pelo desenho.) */
@@ -92,6 +104,15 @@ export class Level {
       if (x <= g.x1) return true;
     }
     return false;
+  }
+
+  /** Toca sob x (incluindo os buracos), ou null. */
+  burrowAt(x: number): Burrow | null {
+    for (const u of this.burrows) {
+      if (u.x0 > x) return null;
+      if (x <= u.x1) return u;
+    }
+    return null;
   }
 
   /** Quantidade total de objetos guardados (teste de vazamento). */
@@ -105,7 +126,8 @@ export class Level {
       this.springs.length +
       this.fruits.length +
       this.vines.length +
-      this.powerups.length
+      this.powerups.length +
+      this.burrows.length
     );
   }
 }

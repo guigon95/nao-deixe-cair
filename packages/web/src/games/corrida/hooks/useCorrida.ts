@@ -260,6 +260,16 @@ export function useCorrida() {
           fx.burst(e.x, e.y, 16, 150, ['#5b1a6e', '#8e3fb0', '#d9a6ff', '#fff3a0'], 0.6, 2.8, false);
           vibrate(12);
           break;
+        case 'burrow':
+          sfx.burrow(e.on);
+          if (e.on) {
+            completed(missions.burrow());
+            fx.float(e.x + 110, e.y + 40, 'TOCA SECRETA!', true, '#ffd9a0');
+            fx.burst(e.x, 0, 14, 140, ['#b5762c', '#8a5a22', '#c99a3a', '#6f8a2c'], 0.6, 3, true);
+          } else {
+            fx.burst(e.x, 0, 12, 160, ['#8a5a32', '#6b4426', '#c9a06a'], 0.5, 2.8, true);
+          }
+          break;
         case 'golden':
           sfx.golden(e.on);
           if (e.on) {

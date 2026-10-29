@@ -244,6 +244,17 @@ export class RunnerSfx extends SynthAudio {
     this.meterFull();
   }
 
+  /** Toca: entrar (folhas rasgando + tombo abafado) ou sair (pulo de mola de terra). */
+  burrow(on: boolean): void {
+    if (on) {
+      this.noise(0.2, 0.12, 2400, 600, 'bandpass');
+      this.tone(160, 70, 0.16, 'sine', 0.35, 0.12);
+    } else {
+      this.noise(0.12, 0.08, 900, 300, 'lowpass');
+      this.tone(330, 990, 0.18, 'triangle', 0.3);
+    }
+  }
+
   /** Capim dourado: arpejo brilhante subindo (ao pegar) ou descendo (acabou). */
   golden(on: boolean): void {
     const notes = on ? [784, 988, 1175, 1568] : [1175, 988, 784];

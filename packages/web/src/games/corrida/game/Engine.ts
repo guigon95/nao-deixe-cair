@@ -1,4 +1,4 @@
-import { CONTINUES, DASH, GOLDEN, ITEMS, MAGNET, SCORING, SHIELD, SIM, SWARM } from './config';
+import { CONTINUES, DASH, GOLDEN, ITEMS, MAGNET, SCORING, SHIELD, SIM, SWARM, TOCA } from './config';
 import { speedAt, tierAt } from './Difficulty';
 import { createRunner, runnerSpeed, stepRunner, type Controls, type StepSink } from './Physics';
 import { CANOPY } from './patterns';
@@ -62,6 +62,8 @@ export class Engine {
   boost = 0;
   /** Escudo de vitória-régia ativo (aguenta uma batida). */
   shield = false;
+  /** Dentro da toca (por baixo da terra). */
+  inBurrow = false;
   /** Tempo restante do capim dourado (s). */
   golden = 0;
   /** Pousada na copa das árvores (para avisar uma vez por subida). */
@@ -154,6 +156,7 @@ export class Engine {
     this.boost = 0;
     this.shield = false;
     this.golden = 0;
+    this.inBurrow = false;
     this.track.update(0, 0, speedAt(0));
     this.setState(GameState.PLAYING);
   }
@@ -286,6 +289,17 @@ export class Engine {
     else this.swarm = SWARM.rest;
 
     this.stepItems(r, dt);
+    // Caiu no buraco escondido: a toca aparece e, um pouco mais fundo, entrou.
+    if (!this.inBurrow && r.y < 0 && r.vy <= 0) {
+      const b = this.track.level.burrowAt(r.x);
+      if (b) {
+        b.opened = true;
+        if (r.y < TOCA.below) {
+          this.inBurrow = true;
+          this.emit({ type: 'burrow', on: true, x: r.x, y: r.y });
+        }
+      }
+    }
     this.score.tick(r.x);
     this.track.update(r.x, this.elapsed, base);
     const tier = tierAt(this.elapsed);
@@ -417,6 +431,7 @@ export class Engine {
     const x = r.x;
     this.track.level.clearZone(x - CONTINUES.clearBehind, x + this.speed * CONTINUES.clearAhead);
     Object.assign(r, createRunner(x));
+    this.inBurrow = false;
     this.swarm = Math.max(this.swarm, CONTINUES.swarm);
     this.deathCause = null;
     this.deadTime = 0;
@@ -491,6 +506,10 @@ export class Engine {
       },
       grab: (_v, r) => this.emit({ type: 'vine', on: true, x: r.x, y: r.y }),
       letGo: (r) => this.emit({ type: 'vine', on: false, x: r.x, y: r.y }),
+      burrowOut: (r) => {
+        this.inBurrow = false;
+        this.emit({ type: 'burrow', on: false, x: r.x, y: r.y });
+      },
     };
   }
 }

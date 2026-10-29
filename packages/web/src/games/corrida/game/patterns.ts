@@ -1,4 +1,4 @@
-import { JUMP } from './config';
+import { JUMP, TOCA } from './config';
 import type { Level } from './Level';
 import type { Rng } from '../../../shared/random';
 
@@ -88,6 +88,16 @@ export class Builder {
   spring(t: number): void {
     const x = this.X(t);
     this.level.springs.push({ x0: x, x1: x + SIZES.spring.w, top: SIZES.spring.h, usedAt: -9 });
+  }
+
+  /**
+   * Toca: buraco escondido de t0 a t1 (cai quem passa correndo), túnel por
+   * baixo da terra e buraco de saída de t2 a t3, que lança de volta para cima.
+   */
+  burrow(t0: number, t1: number, t2: number, t3: number): void {
+    this.pit(t0, t1 - t0);
+    this.pit(t2, t3 - t2);
+    this.level.burrows.push({ x0: this.X(t0), holeEnd: this.X(t1), exitStart: this.X(t2), x1: this.X(t3), floor: TOCA.floor, roof: TOCA.roof, opened: false });
   }
 
   /** Cipó pendurado em x(t), preso na altura `ay`, com comprimento `len`. */
@@ -407,6 +417,28 @@ export const PATTERNS: readonly Pattern[] = [
       b.crate(2.9);
       b.row(1.8, 2.3, 0, 3);
       return 4.45;
+    },
+  },
+  {
+    // Toca da capivara: um buraco escondido sob folhas. Quem passa correndo cai
+    // na toca — um túnel seguro e cheio de capim (alguns pedem um pulinho, o
+    // teto é baixo) — e o buraco de saída lança de volta para a superfície.
+    // Quem pula o buraco segue por cima, com pedras e espinhos.
+    id: 'toca',
+    tier: 2,
+    weight: 2,
+    build(b) {
+      b.burrow(0, 0.34, 3.3, 3.72);
+      // Embaixo: fileiras no chão e uma no alto (pulinho).
+      b.row(0.55, 1.25, TOCA.floor, 6);
+      b.row(1.5, 1.95, TOCA.floor + 34, 4);
+      b.row(2.2, 3.15, TOCA.floor, 7);
+      // Por cima: pedra, espinhos e pedra grande, com pouco capim.
+      b.rock(0.95);
+      b.thorns(1.75, 0.28);
+      b.rock(2.6, true);
+      b.row(2.0, 2.3, 0, 2);
+      return 3.72 + 0.35;
     },
   },
   {

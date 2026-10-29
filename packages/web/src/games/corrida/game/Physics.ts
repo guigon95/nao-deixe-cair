@@ -1,4 +1,4 @@
-import { BODY, DASH, JUMP, PIT_DEATH_Y, SWARM, VINE, type JumpParams } from './config';
+import { BODY, DASH, JUMP, PIT_DEATH_Y, SWARM, TOCA, VINE, type JumpParams } from './config';
 import type { Level } from './Level';
 import type { Crate, DeathCause, Fruit, Rock, Runner, Spring, Thorns, Vine } from './types';
 
@@ -25,6 +25,8 @@ export interface StepSink {
   fruit(f: Fruit, r: Runner): void;
   grab(v: Vine, r: Runner): void;
   letGo(r: Runner): void;
+  /** Saiu da toca (lançada pelo buraco de saída). */
+  burrowOut?(r: Runner): void;
 }
 
 export const NULL_SINK: StepSink = {
@@ -211,6 +213,9 @@ export function stepRunner(
     }
   }
 
+  // ── toca: teto baixo e saída que lança de volta à superfície ──
+  if (r.y < 0 && level.burrows.length) burrowStep(r, level, sink);
+
   // ── cipó: encostou no ar → agarra ──
   if (!r.grounded && r.dash <= 0 && r.vineCooldown <= 0) {
     const cy = r.y + BODY_CENTER;
@@ -224,6 +229,36 @@ export function stepRunner(
   }
 
   return collide(r, level, sink);
+}
+
+/** Dentro da toca: o teto segura o pulo; no buraco de saída, lança para cima. */
+function burrowStep(r: Runner, level: Level, sink: StepSink): void {
+  for (const b of level.burrows) {
+    if (b.x0 > r.x + FOOT) break;
+    if (b.x1 + FOOT < r.x) continue;
+    if (r.x > b.holeEnd && r.x < b.exitStart && r.y + BODY.height > b.roof) {
+      r.y = b.roof - BODY.height;
+      if (r.vy > 0) r.vy = 0;
+    }
+    if (r.x >= b.exitStart + TOCA.launchAfter && r.y < TOCA.below && (r.vy <= 0 || r.dash > 0)) {
+      if (r.dash > 0) {
+        r.dash = 0;
+        r.dashTail = DASH.tail;
+      }
+      r.vy = TOCA.exitVelocity;
+      r.grounded = false;
+      r.jumped = true;
+      r.cut = true;
+      r.airTime = 0;
+      r.glideTime = 0;
+      r.gliding = false;
+      r.fastFall = false;
+      r.dropThrough = 0;
+      r.buffer = 0;
+      sink.burrowOut?.(r);
+    }
+    return;
+  }
 }
 
 /** Centro do corpo acima dos pés (onde as patas seguram o cipó). */
@@ -320,7 +355,7 @@ function collide(r: Runner, level: Level, sink: StepSink): DeathCause | null {
   for (const t of level.thorns) {
     if (t.x0 > right - 3) break;
     if (t.broken || t.x1 < left + 3) continue;
-    if (bottom >= t.top - 2) continue;
+    if (bottom >= t.top - 2 || top <= 0) continue;
     if (dash) {
       sink.smash(t, r);
       continue;
@@ -339,7 +374,7 @@ function collide(r: Runner, level: Level, sink: StepSink): DeathCause | null {
   if (r.vy <= 0) {
     for (const s of level.springs) {
       if (s.x0 > right - 4) break;
-      if (s.x1 < left + 4 || bottom > s.top) continue;
+      if (s.x1 < left + 4 || bottom > s.top || top <= 0) continue;
       launchSpring(r, s, sink);
       break;
     }
@@ -353,7 +388,7 @@ function collide(r: Runner, level: Level, sink: StepSink): DeathCause | null {
     sink.fruit(f, r);
   }
 
-  if (!r.grounded && !r.swinging && r.y < PIT_DEATH_Y) return 'river';
+  if (!r.grounded && !r.swinging && r.y < PIT_DEATH_Y && !level.burrowAt(r.x)) return 'river';
   return null;
 }
 
@@ -393,6 +428,12 @@ function supportAt(level: Level, r: Runner, y: number): boolean {
       if (p.x1 >= a && Math.abs(p.y - y) < 0.5) return true;
     }
   }
+  if (y < 0) {
+    for (const u of level.burrows) {
+      if (u.x0 > b) break;
+      if (u.x1 >= a && Math.abs(u.floor - y) < 0.5) return true;
+    }
+  }
   return false;
 }
 
@@ -420,6 +461,10 @@ function findLanding(level: Level, r: Runner, sink: StepSink): number | null {
       if (p.x0 > b) break;
       if (p.x1 >= a) best = pick(best, p.y, from, to);
     }
+  }
+  for (const u of level.burrows) {
+    if (u.x0 > b) break;
+    if (u.x1 >= a) best = pick(best, u.floor, from, to);
   }
   // Quicar: caixote (pisão) e flor-mola, se estiverem acima do apoio encontrado.
   const hb = r.x - BODY.halfWidth + 2;

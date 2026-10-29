@@ -204,6 +204,20 @@ export const CONTINUES = {
   swarm: 240,
 } as const;
 
+/** Toca: caminho por baixo da terra. */
+export const TOCA = {
+  /** Chão e teto da toca (abaixo da superfície). */
+  floor: -96,
+  roof: -16,
+  /** Abaixo disto a capivara está "na toca" (câmera desce, eventos). */
+  below: -20,
+  /** Na saída: anda isto dentro do buraco e é lançada para cima (u/s). */
+  launchAfter: 12,
+  exitVelocity: 1050,
+  /** Quanto a câmera desce para mostrar a toca. */
+  camera: -62,
+} as const;
+
 /** Chão: abaixo disso, dentro de um buraco, a capivara caiu no rio do jacaré. */
 export const PIT_DEATH_Y = -14;
 

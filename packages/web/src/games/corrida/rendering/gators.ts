@@ -82,7 +82,7 @@ export class Gators {
     // Passando por cima de um rio (no ar, fora do cipó): bote por baixo.
     if (playing && !r.grounded && !r.swinging) {
       const g = gapAt(ground, r.x);
-      if (g && g.x1 - g.x0 >= BOTE.minGap && !this.used.has(g.x0)) {
+      if (g && g.x1 - g.x0 >= BOTE.minGap && !this.used.has(g.x0) && !engine.track.level.burrowAt(g.x0 + 1)) {
         this.used.add(g.x0);
         const v = engine.runSpeed;
         const x = Math.min(g.x1 - 14, Math.max(g.x0 + 14, r.x + v * BOTE.lead));

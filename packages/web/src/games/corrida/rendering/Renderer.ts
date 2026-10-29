@@ -1,7 +1,7 @@
-import { ARENA, BODY, DASH, GOLDEN, MAGNET, SWARM } from '../game/config';
+import { ARENA, BODY, DASH, GOLDEN, MAGNET, SWARM, TOCA } from '../game/config';
 import type { Engine } from '../game/Engine';
 import { SIZES } from '../game/patterns';
-import { GameState, type Crate, type Fruit, type ItemKind, type Platform, type Rock, type Spring, type Thorns, type Vine } from '../game/types';
+import { GameState, type Burrow, type Crate, type Fruit, type ItemKind, type Platform, type Rock, type Spring, type Thorns, type Vine } from '../game/types';
 import { computeLayout, type Layout } from '../../../shared/layout/layout';
 import type { Effects } from './effects';
 import { dominantSeason, mix, paletteAt, SEASONS, type Palette, type SeasonId } from './palette';
@@ -55,6 +55,9 @@ interface DrawOptions {
  * esticar; as sobras (celular em pé, telas muito largas) mostram mais céu,
  * mais terra ou mais percurso — nunca tarja preta.
  */
+/** Folhas secas que tampam a entrada da toca. */
+const LEAF_COLORS = ['#b5762c', '#8a5a22', '#c99a3a', '#6f8a2c'];
+
 /** Grãos de granola por cima do açaí (posições fixas). */
 const ACAI_GRANOLA: ReadonlyArray<readonly [number, number]> = [
   [-7, -3],
@@ -121,7 +124,8 @@ export class Renderer {
     this.camX = p.x - BODY.screenX;
     // Sobe a câmera só quando a capivara vai alto (copa das árvores, mola). Pulos
     // normais (até ~160) não mexem a câmera; na copa (200) ela sobe ~55.
-    const target = Math.min(85, Math.max(0, p.y - 165) * 1.6);
+    // Na toca, desce para mostrar o túnel por baixo da terra.
+    const target = p.y < TOCA.below ? TOCA.camera : Math.min(85, Math.max(0, p.y - 165) * 1.6);
     this.lift = snap ? target : this.lift + (target - this.lift) * Math.min(1, dt * 8);
   }
 
@@ -169,8 +173,10 @@ export class Renderer {
     for (const c of lvl.crates) if (!c.broken) this.drawCrate(c);
     for (const r of lvl.rocks) if (!r.broken) this.drawRock(r);
     for (const t of lvl.thorns) if (!t.broken) this.drawThorns(t);
-    for (const f of lvl.fruits) if (!f.taken) this.drawFruit(f, opts.time);
-    for (const u of lvl.powerups) if (!u.taken) this.drawItem(u.kind, this.sx(u.x), this.sy(u.y) + Math.sin(opts.time * 3 + u.x) * 2, opts.time);
+    // O que fica dentro de uma toca ainda escondida não aparece.
+    const hidden = (x: number, y: number) => y < 0 && lvl.burrowAt(x)?.opened === false;
+    for (const f of lvl.fruits) if (!f.taken && !hidden(f.x, f.y)) this.drawFruit(f, opts.time);
+    for (const u of lvl.powerups) if (!u.taken && !hidden(u.x, u.y)) this.drawItem(u.kind, this.sx(u.x), this.sy(u.y) + Math.sin(opts.time * 3 + u.x) * 2, opts.time);
     this.drawParticles(fx);
     this.drawRunner(engine, fx, opts.time, opts.beat ?? null);
     this.drawSwarm(engine, opts.time);
@@ -460,6 +466,148 @@ export class Renderer {
         ctx.fillStyle = pal.dirtDark;
         ctx.fillRect(x0, g0, 4, this.viewB - g0);
       }
+    }
+    for (const b of engine.track.level.burrows) this.drawBurrow(b, pal, time);
+  }
+
+  /**
+   * Toca: corte da terra mostrando o túnel (teto com raízes, chão batido),
+   * o buraco de entrada tampado por folhas secas (escondido até alguém cair)
+   * e o buraco de saída aberto, com um montinho de terra.
+   */
+  private drawBurrow(b: Burrow, pal: Palette, time: number): void {
+    const ctx = this.ctx;
+    const x0 = this.sx(b.x0);
+    const x1 = this.sx(b.x1);
+    if (x1 < this.viewL - 30 || x0 > this.viewR + 30) return;
+    const g0 = this.sy(0);
+    const roof = this.sy(b.roof);
+    const floor = this.sy(b.floor);
+    const hx = this.sx(b.holeEnd);
+    const ex = this.sx(b.exitStart);
+    const cave = mix('#2a1a10', pal.dirtDark, 0.25);
+    if (!b.opened) {
+      // Ainda escondida: parece chão comum com folhas secas por cima; só o
+      // buraco de saída aparece (escuro, sem mostrar o túnel).
+      const c0 = x0 - 5;
+      const cw = hx - x0 + 10;
+      ctx.fillStyle = pal.dirt;
+      ctx.fillRect(c0, g0, cw, this.viewB - g0);
+      ctx.fillStyle = pal.dirtDark;
+      ctx.fillRect(c0, g0 + 12, cw, 3);
+      ctx.fillStyle = pal.grass;
+      ctx.fillRect(c0, g0 - 2, cw, 12);
+      ctx.fillStyle = pal.grassEdge;
+      ctx.fillRect(c0, g0 - 3, cw, 3);
+      this.drawLeafCover(x0, hx, g0, false, b.x0);
+      ctx.fillStyle = pal.dirt;
+      ctx.fillRect(ex - 1, g0, x1 - ex + 2, this.viewB - g0);
+      ctx.fillStyle = cave;
+      ctx.beginPath();
+      ctx.moveTo(ex, g0);
+      ctx.lineTo(x1, g0);
+      ctx.quadraticCurveTo(x1 - 4, g0 + 40, (ex + x1) / 2, g0 + 46);
+      ctx.quadraticCurveTo(ex + 4, g0 + 40, ex, g0);
+      ctx.fill();
+      this.drawExitMound(x1, g0, pal);
+      return;
+    }
+    // Terra embaixo do chão da toca (cobre o rio que fica por baixo de tudo).
+    ctx.fillStyle = pal.dirt;
+    ctx.fillRect(x0 - 2, floor, x1 - x0 + 4, this.viewB - floor);
+    ctx.fillStyle = pal.dirtDark;
+    ctx.fillRect(x0 - 2, floor + 14, x1 - x0 + 4, 3);
+    // Interior: dos buracos desce desde a superfície; no túnel, do teto.
+    ctx.fillStyle = cave;
+    ctx.fillRect(x0, g0, hx - x0, floor - g0);
+    ctx.fillRect(hx - 1, roof, ex - hx + 2, floor - roof);
+    ctx.fillRect(ex, g0, x1 - ex, floor - g0);
+    // Luz entrando pelos buracos.
+    ctx.fillStyle = 'rgba(255, 236, 180, 0.10)';
+    ctx.fillRect(x0, g0, hx - x0, floor - g0);
+    ctx.fillRect(ex, g0, x1 - ex, floor - g0);
+    // Paredes curvas nas pontas e chão batido.
+    ctx.fillStyle = pal.dirtDark;
+    ctx.fillRect(x0, g0, 4, floor - g0);
+    ctx.fillRect(x1 - 4, g0, 4, floor - g0);
+    ctx.fillStyle = mix(pal.dirt, '#000000', 0.18);
+    ctx.fillRect(x0, floor - 4, x1 - x0, 6);
+    // Teto: borda escura e raízes penduradas (balançam de leve).
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+    ctx.fillRect(hx, roof, ex - hx, 4);
+    ctx.strokeStyle = mix(COLORS.branch, '#000000', 0.15);
+    ctx.lineWidth = 1.6;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    const step = 38;
+    const from = Math.ceil((b.holeEnd + 10) / step);
+    const to = Math.floor((b.exitStart - 10) / step);
+    for (let i = from; i <= to; i++) {
+      const wx = i * step + hash(i * 2.7) * 14;
+      const x = this.sx(wx);
+      if (x < this.viewL - 10 || x > this.viewR + 10) continue;
+      const len = 8 + hash(i * 5.1) * 18;
+      const sway = Math.sin(time * 1.5 + i) * 2;
+      ctx.moveTo(x, roof);
+      ctx.quadraticCurveTo(x + 3, roof + len * 0.5, x + sway, roof + len);
+    }
+    ctx.stroke();
+    // Pedrinhas no chão da toca.
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+    for (let i = from; i <= to; i++) {
+      const x = this.sx(i * step + 19 + hash(i * 3.9) * 10);
+      ctx.fillRect(x, floor - 7, 4, 3);
+    }
+    // Entrada: folhas secas tampando (até alguém cair) ou rasgadas nas bordas.
+    this.drawLeafCover(x0, hx, g0, b.opened, b.x0);
+    this.drawExitMound(x1, g0, pal);
+  }
+
+  /** Montinho de terra do lado de fora da saída da toca. */
+  private drawExitMound(x1: number, g0: number, pal: Palette): void {
+    const ctx = this.ctx;
+    ctx.fillStyle = pal.dirt;
+    ctx.beginPath();
+    ctx.ellipse(x1 + 10, g0 - 1, 16, 7, 0, Math.PI, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = pal.dirtDark;
+    ctx.beginPath();
+    ctx.ellipse(x1 + 12, g0 - 3, 4, 1.6, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  /** Folhas secas e capim tampando o buraco escondido da toca. */
+  private drawLeafCover(a: number, b: number, g0: number, opened: boolean, seed: number): void {
+    const ctx = this.ctx;
+    const w = b - a;
+    const n = Math.max(4, Math.round(w / 9));
+    for (let i = 0; i < n; i++) {
+      const u = (i + 0.5) / n;
+      // Aberto: só sobram folhas nas beiradas.
+      if (opened && u > 0.2 && u < 0.8) continue;
+      const h = hash(seed * 0.013 + i * 1.37);
+      const x = a + u * w + (h - 0.5) * 6;
+      const y = g0 - 1 + Math.sin(u * Math.PI) * (opened ? 0 : 3) + (h - 0.5) * 3;
+      ctx.fillStyle = LEAF_COLORS[i % LEAF_COLORS.length];
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate((h - 0.5) * 1.6);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 7, 3.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+    if (!opened) {
+      // Fiapos de capim por cima para disfarçar.
+      ctx.strokeStyle = 'rgba(120, 160, 60, 0.9)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (let i = 0; i < n; i += 2) {
+        const x = a + ((i + 0.3) / n) * w;
+        ctx.moveTo(x, g0 + 1);
+        ctx.lineTo(x + 3, g0 - 6);
+      }
+      ctx.stroke();
     }
   }
 
@@ -1097,6 +1245,7 @@ export class Renderer {
       const a = this.sx(ground[i].x1);
       const b = this.sx(ground[i + 1].x0);
       if (b < this.viewL || a > this.viewR || b - a < 50) continue;
+      if (engine.track.level.burrowAt(ground[i].x1 + 1)) continue; // buraco da toca: sem jacaré
       const bote = this.gators.find(ground[i].x1);
       if (bote) {
         this.drawBote(bote, waterY, time);
@@ -1282,11 +1431,13 @@ export class Renderer {
       }
     }
     // Sombra no chão (ajuda a ler a altura do pulo).
-    if (!isDead(engine) && engine.track.level.groundAt(p.x)) {
-      const h = Math.max(0, p.y);
+    const under = p.y < 0 ? engine.track.level.burrowAt(p.x) : null;
+    if (!isDead(engine) && (under || engine.track.level.groundAt(p.x))) {
+      const base = under ? under.floor : 0;
+      const h = Math.max(0, p.y - base);
       ctx.fillStyle = `rgba(0,0,0,${Math.max(0.06, 0.25 - h / 900).toFixed(3)})`;
       ctx.beginPath();
-      ctx.ellipse(x + 4, this.sy(0) + 1, Math.max(6, 18 - h / 20), 3.5, 0, 0, Math.PI * 2);
+      ctx.ellipse(x + 4, this.sy(base) + 1, Math.max(6, 18 - h / 20), 3.5, 0, 0, Math.PI * 2);
       ctx.fill();
     }
     // Ímã ligado: aura dourada, estrelinhas de arco-íris girando e o ímã por cima
