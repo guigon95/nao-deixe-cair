@@ -133,6 +133,20 @@ export const ITEMS = {
   pickup: 22,
 } as const;
 
+/** Caixotes com prêmio dentro (sorteio separado, não muda o percurso). */
+export const CRATE_LOOT = {
+  /** Chance de ter capim (3 a 5) e de ter um item especial. */
+  capim: 0.45,
+  item: 0.1,
+  capimMin: 3,
+  capimMax: 5,
+  /** Pulinho para fora antes de voar até a capivara (s) e velocidade do voo. */
+  pop: 0.28,
+  fly: 900,
+  /** Distância em que a capivara "pega" o prêmio. */
+  reach: 22,
+} as const;
+
 /** Capim dourado: dobra os pontos (metros, capins e bônus) por um tempo. */
 export const GOLDEN = {
   duration: 10,

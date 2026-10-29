@@ -328,6 +328,13 @@ export class RunnerSfx extends SynthAudio {
     }
   }
 
+  /** Caixote premiado abrindo: "plim" de surpresa (mais brilhante se for item). */
+  loot(item: boolean): void {
+    const base = item ? 880 : 660;
+    this.tone(base, base * 1.5, 0.12, 'triangle', 0.3);
+    this.tone(base * 1.5, base * 2, 0.16, 'sine', 0.22, 0.08);
+  }
+
   /** Capim dourado: arpejo brilhante subindo (ao pegar) ou descendo (acabou). */
   golden(on: boolean): void {
     const notes = on ? [784, 988, 1175, 1568] : [1175, 988, 784];

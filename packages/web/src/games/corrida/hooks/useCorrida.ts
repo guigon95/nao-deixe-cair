@@ -252,6 +252,11 @@ export function useCorrida() {
             vibrate(12);
           }
           break;
+        case 'loot':
+          sfx.loot(e.kind !== 'capim');
+          fx.float(e.x + 20, e.y + 50, e.kind === 'capim' ? `+${e.n} CAPINS!` : 'PRÊMIO!', true, e.kind === 'capim' ? '#c8f58a' : '#ffd23f');
+          if (e.kind !== 'capim') fx.burst(e.x, e.y, 14, 160, ['#ffd23f', '#fff3a0', '#ffffff'], 0.5, 2.6, false);
+          break;
         case 'acai':
           sfx.acai();
           fx.meterGlow = 1;

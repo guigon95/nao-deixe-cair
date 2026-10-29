@@ -63,6 +63,22 @@ export interface Crate {
   broken: boolean;
   /** Tempo desde a quebra (efeito). */
   brokenAt: number;
+  /** O que tem dentro (sai voando até a capivara quando quebra). */
+  loot?: CrateLoot;
+}
+
+export type CrateLoot = { kind: 'capim'; n: number } | { kind: 'item'; item: ItemKind };
+
+/** Prêmio saindo de um caixote: pula para fora e voa até a capivara. */
+export interface Loot {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  /** Tempo desde que saiu (s). */
+  t: number;
+  /** 'capim' ou um item especial. */
+  kind: 'capim' | ItemKind;
 }
 
 /** Moita de espinhos: encostar encerra a partida (menos no dash). */
@@ -171,6 +187,7 @@ export type GameEvent =
   | { type: 'canopy'; x: number; y: number }
   | { type: 'magnet'; on: boolean; x: number; y: number }
   | { type: 'acai'; x: number; y: number }
+  | { type: 'loot'; x: number; y: number; kind: 'capim' | ItemKind; n: number }
   | { type: 'burrow'; on: boolean; x: number; y: number }
   | { type: 'golden'; on: boolean; x: number; y: number }
   | { type: 'shield'; on: boolean; x: number; y: number; saved?: DeathCause }

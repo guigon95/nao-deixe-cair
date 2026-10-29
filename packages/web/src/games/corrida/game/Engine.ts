@@ -1,10 +1,10 @@
-import { CONTINUES, DASH, GOLDEN, ITEMS, MAGNET, SCORING, SHIELD, SIM, SWARM, TOCA } from './config';
+import { CONTINUES, CRATE_LOOT, DASH, GOLDEN, ITEMS, MAGNET, SCORING, SHIELD, SIM, SWARM, TOCA } from './config';
 import { speedAt, tierAt } from './Difficulty';
 import { createRunner, runnerSpeed, stepRunner, type Controls, type StepSink } from './Physics';
 import { CANOPY } from './patterns';
 import { Score } from './Score';
 import { Track } from './Track';
-import { GameState, type Crate, type DeathCause, type Fruit, type GameEvent, type Rock, type Runner, type Spring, type Thorns } from './types';
+import { GameState, type Crate, type DeathCause, type Fruit, type GameEvent, type ItemKind, type Loot, type Rock, type Runner, type Spring, type Thorns } from './types';
 import { createRng, randomSeed } from '../../../shared/random';
 import type { Storage } from '../../../shared/storage/storage';
 
@@ -64,6 +64,8 @@ export class Engine {
   shield = false;
   /** Dentro da toca (por baixo da terra). */
   inBurrow = false;
+  /** Prêmios saindo dos caixotes, voando até a capivara. */
+  readonly loot: Loot[] = [];
   /** Tempo restante do capim dourado (s). */
   golden = 0;
   /** Pousada na copa das árvores (para avisar uma vez por subida). */
@@ -157,6 +159,7 @@ export class Engine {
     this.shield = false;
     this.golden = 0;
     this.inBurrow = false;
+    this.loot.length = 0;
     this.track.update(0, 0, speedAt(0));
     this.setState(GameState.PLAYING);
   }
@@ -311,6 +314,70 @@ export class Engine {
     if (this.score.checkRecord()) this.emit({ type: 'newRecord', score: this.score.score });
   }
 
+  /** Efeito de um item especial pego (no percurso ou saído de um caixote). */
+  private applyItem(kind: ItemKind, x: number, y: number): void {
+    if (kind === 'magnet') {
+      const was = this.magnet > 0;
+      this.magnet = MAGNET.duration;
+      if (!was) this.emit({ type: 'magnet', on: true, x, y });
+    } else if (kind === 'shield') {
+      if (!this.shield) this.emit({ type: 'shield', on: true, x, y });
+      this.shield = true;
+    } else if (kind === 'acai') {
+      // Açaí: enche o medidor da Disparada de uma vez.
+      this.meter = DASH.meterMax;
+      this.emit({ type: 'acai', x, y });
+    } else if (kind === 'golden') {
+      if (this.golden <= 0) this.emit({ type: 'golden', on: true, x, y });
+      this.golden = GOLDEN.duration;
+      this.score.mult = GOLDEN.mult;
+    }
+  }
+
+  /** Abre um caixote quebrado: o que tinha dentro pula para fora. */
+  private spill(c: Crate): void {
+    const loot = c.loot;
+    if (!loot) return;
+    c.loot = undefined;
+    const cx = (c.x0 + c.x1) / 2;
+    const n = loot.kind === 'capim' ? loot.n : 1;
+    for (let i = 0; i < n; i++) {
+      const k = n === 1 ? 0 : i / (n - 1) - 0.5;
+      this.loot.push({ x: cx, y: c.top * 0.6, vx: 60 + k * 260, vy: 520 + Math.abs(k) * -120, t: 0, kind: loot.kind === 'capim' ? 'capim' : loot.item });
+    }
+    this.emit({ type: 'loot', x: cx, y: c.top, kind: loot.kind === 'capim' ? 'capim' : loot.item, n });
+  }
+
+  /** Prêmios dos caixotes: pulinho para fora e depois voam até a capivara. */
+  private stepLoot(r: Runner, dt: number): void {
+    if (!this.loot.length) return;
+    const tx = r.x;
+    const ty = r.y + 17;
+    const vRun = runnerSpeed(r, this.speed * this.speedFactor);
+    for (let i = this.loot.length - 1; i >= 0; i--) {
+      const l = this.loot[i];
+      l.t += dt;
+      if (l.t < CRATE_LOOT.pop) {
+        l.vy -= 1800 * dt;
+        l.x += (l.vx + vRun * 0.6) * dt;
+        l.y += l.vy * dt;
+      } else {
+        const dx = tx - l.x;
+        const dy = ty - l.y;
+        const d = Math.hypot(dx, dy);
+        const step = (CRATE_LOOT.fly + vRun) * dt;
+        if (d <= Math.max(CRATE_LOOT.reach, step)) {
+          this.loot.splice(i, 1);
+          if (l.kind === 'capim') this.sink.fruit({ x: tx, y: ty, taken: false, risky: false }, r);
+          else this.applyItem(l.kind, tx, ty);
+          continue;
+        }
+        l.x += (dx / d) * step;
+        l.y += (dy / d) * step;
+      }
+    }
+  }
+
   /** Pega ímãs e, com o ímã ligado, puxa os capins próximos até a capivara. */
   private stepItems(r: Runner, dt: number): void {
     const lvl = this.track.level;
@@ -320,23 +387,9 @@ export class Engine {
       if (u.x - ITEMS.pickup > cx + 20) break;
       if (u.taken || Math.abs(u.x - cx) > ITEMS.pickup + 13 || Math.abs(u.y - cy) > ITEMS.pickup + 17) continue;
       u.taken = true;
-      if (u.kind === 'magnet') {
-        const was = this.magnet > 0;
-        this.magnet = MAGNET.duration;
-        if (!was) this.emit({ type: 'magnet', on: true, x: u.x, y: u.y });
-      } else if (u.kind === 'shield') {
-        if (!this.shield) this.emit({ type: 'shield', on: true, x: u.x, y: u.y });
-        this.shield = true;
-      } else if (u.kind === 'acai') {
-        // Açaí: enche o medidor da Disparada de uma vez.
-        this.meter = DASH.meterMax;
-        this.emit({ type: 'acai', x: u.x, y: u.y });
-      } else if (u.kind === 'golden') {
-        if (this.golden <= 0) this.emit({ type: 'golden', on: true, x: u.x, y: u.y });
-        this.golden = GOLDEN.duration;
-        this.score.mult = GOLDEN.mult;
-      }
+      this.applyItem(u.kind, u.x, u.y);
     }
+    this.stepLoot(r, dt);
     if (this.golden > 0) {
       this.golden -= dt;
       if (this.golden <= 0) {
@@ -478,6 +531,7 @@ export class Engine {
         if (c.broken) return;
         c.broken = true;
         c.brokenAt = this.elapsed;
+        this.spill(c);
         const dashing = r.dash > 0 || r.dashTail > 0;
         if (stomp) this.score.addBonus(SCORING.stomp);
         else if (dashing) this.score.addBonus(SCORING.smash);

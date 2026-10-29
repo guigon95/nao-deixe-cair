@@ -171,13 +171,18 @@ export class Renderer {
     for (const p of lvl.platforms) if (p.kind !== 'copa' && p.kind !== 'vitoria') this.drawPlatform(p, pal);
     for (const v of lvl.vines) this.drawVine(v, engine, opts.time);
     for (const sp of lvl.springs) this.drawSpring(sp, engine.elapsed);
-    for (const c of lvl.crates) if (!c.broken) this.drawCrate(c);
+    for (const c of lvl.crates) if (!c.broken) this.drawCrate(c, opts.time);
     for (const r of lvl.rocks) if (!r.broken) this.drawRock(r);
     for (const t of lvl.thorns) if (!t.broken) this.drawThorns(t);
     // O que fica dentro de uma toca ainda escondida não aparece.
     const hidden = (x: number, y: number) => y < 0 && lvl.burrowAt(x)?.opened === false;
     for (const f of lvl.fruits) if (!f.taken && !hidden(f.x, f.y)) this.drawFruit(f, opts.time);
     for (const u of lvl.powerups) if (!u.taken && !hidden(u.x, u.y)) this.drawItem(u.kind, this.sx(u.x), this.sy(u.y) + Math.sin(opts.time * 3 + u.x) * 2, opts.time);
+    // Prêmios saindo dos caixotes (por cima do cenário, antes da capivara).
+    for (const l of engine.loot) {
+      if (l.kind === 'capim') this.drawFruit({ x: l.x, y: l.y, taken: false, risky: false }, opts.time);
+      else this.drawItem(l.kind, this.sx(l.x), this.sy(l.y), opts.time);
+    }
     this.drawParticles(fx);
     this.drawRunner(engine, fx, opts.time, opts.beat ?? null);
     this.drawSwarm(engine, opts.time);
@@ -775,13 +780,34 @@ export class Renderer {
     }
   }
 
-  private drawCrate(c: Crate): void {
+  private drawCrate(c: Crate, time: number): void {
     const ctx = this.ctx;
     const x0 = this.sx(c.x0);
     if (x0 > this.viewR + 10 || x0 + SIZES.crate.w < this.viewL - 10) return;
     const top = this.sy(c.top);
     const w = c.x1 - c.x0;
     const h = this.sy(0) - top;
+    // Caixote com capim: tufos escapando pela tampa (desenhados atrás).
+    if (c.loot?.kind === 'capim') {
+      ctx.lineCap = 'round';
+      for (let k = 0; k < 5; k++) {
+        const bx = x0 + 6 + k * ((w - 12) / 4);
+        const hgt = 7 + ((k * 37) % 5) + Math.sin(time * 3 + k) * 1.2;
+        const lean = (k - 2) * 1.6;
+        ctx.strokeStyle = COLORS.grassOutline;
+        ctx.lineWidth = 3.6;
+        ctx.beginPath();
+        ctx.moveTo(bx, top + 3);
+        ctx.lineTo(bx + lean, top - hgt);
+        ctx.stroke();
+        ctx.strokeStyle = k % 2 ? COLORS.grassDark : COLORS.grassBlade;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(bx, top + 3);
+        ctx.lineTo(bx + lean, top - hgt);
+        ctx.stroke();
+      }
+    }
     ctx.fillStyle = COLORS.crate;
     ctx.fillRect(x0, top, w, h);
     ctx.strokeStyle = COLORS.crateDark;
@@ -794,6 +820,27 @@ export class Renderer {
     ctx.moveTo(x0 + w - 3, top + 3);
     ctx.lineTo(x0 + 3, top + h - 3);
     ctx.stroke();
+    // Capim aparecendo pelas frestas.
+    if (c.loot?.kind === 'capim') {
+      ctx.fillStyle = COLORS.grassBlade;
+      ctx.fillRect(x0 + 5, top + h * 0.5 - 1, 5, 3);
+      ctx.fillRect(x0 + w - 10, top + h * 0.35, 5, 3);
+    }
+    // Caixote premiado: cinta dourada e brilho piscando.
+    if (c.loot?.kind === 'item') {
+      const pulse = 0.5 + 0.5 * Math.sin(time * 5);
+      ctx.fillStyle = '#ffc21a';
+      ctx.fillRect(x0 + 2, top + h / 2 - 3, w - 4, 6);
+      ctx.strokeStyle = '#8a5a00';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x0 + 2, top + h / 2 - 3, w - 4, 6);
+      ctx.fillStyle = `rgba(255, 230, 120, ${(0.25 + 0.35 * pulse).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(x0 + w / 2, top + h / 2, 9 + pulse * 3, 0, Math.PI * 2);
+      ctx.fill();
+      this.drawSparkle(x0 + w / 2, top + h / 2, 7 + pulse * 3, '#fffbe0');
+      this.drawSparkle(x0 + w - 6, top + 5, 2 + 3 * Math.max(0, Math.sin(time * 4 + 1)), '#ffffff');
+    }
   }
 
   private drawThorns(t: Thorns): void {

@@ -2,7 +2,7 @@ import { difficultyAt, riskyFruitChance, speedAt } from './Difficulty';
 import { Level } from './Level';
 import { Builder, PATTERNS, pickPattern, type Pattern } from './patterns';
 import { createRng, randRange, type Rng } from '../../../shared/random';
-import { ITEMS } from './config';
+import { CRATE_LOOT, ITEMS } from './config';
 import type { ItemKind } from './types';
 
 /** Quanto gerar à frente da capivara (u): mais que uma tela larga. */
@@ -31,6 +31,7 @@ export class Track {
   private prev: string | null = null;
   /** Sorteios dos itens especiais (separado, para não mexer na sequência de padrões). */
   private itemRng: Rng = createRng(1);
+  private crateRng: Rng = createRng(2);
   private lastItem = -Infinity;
   /** Força uma lista de padrões (testes); vazio = sorteio. */
   forced: string[] = [];
@@ -41,7 +42,10 @@ export class Track {
 
   reset(rng: Rng): void {
     this.rng = rng;
-    this.itemRng = createRng(Math.floor(rng() * 0xffffffff));
+    const itemSeed = Math.floor(rng() * 0xffffffff);
+    this.itemRng = createRng(itemSeed);
+    // Sorteio próprio dos caixotes: não mexe no percurso nem nos itens.
+    this.crateRng = createRng((itemSeed ^ 0x9e3779b9) >>> 0);
     this.lastItem = -Infinity;
     this.level.clear();
     this.history.length = 0;
@@ -75,8 +79,10 @@ export class Track {
     const v = d.speed;
     const b = new Builder(this.level, this.genX, v, this.rng, riskyFruitChance(t));
     const firstFruit = this.level.fruits.length;
+    const firstCrate = this.level.crates.length;
     const dur = pattern.build(b);
     this.maybeItem(t, firstFruit);
+    this.fillCrates(t, firstCrate);
     this.history.push({ id: pattern.id, x: this.genX, t });
     if (this.history.length > 64) this.history.shift();
     // Chão do padrão, com os buracos.
@@ -91,6 +97,19 @@ export class Track {
     // Mantém as listas em ordem (capins de arcos podem sair um pouco fora de ordem).
     this.level.fruits.sort((p, q) => p.x - q.x);
     this.genX = end;
+  }
+
+  /** Sorteia o que vai dentro dos caixotes novos: capim, um item especial ou nada. */
+  private fillCrates(t: number, first: number): void {
+    for (let i = first; i < this.level.crates.length; i++) {
+      const r = this.crateRng();
+      const n = this.crateRng();
+      if (r < CRATE_LOOT.capim) {
+        this.level.crates[i].loot = { kind: 'capim', n: CRATE_LOOT.capimMin + Math.floor(n * (CRATE_LOOT.capimMax - CRATE_LOOT.capimMin + 1)) };
+      } else if (r < CRATE_LOOT.capim + CRATE_LOOT.item && t >= ITEMS.firstAfter) {
+        this.level.crates[i].loot = { kind: 'item', item: pickKind(n) };
+      }
+    }
   }
 
   /** De vez em quando, troca um capim deste padrão (fora dos arriscados) por um item especial. */
