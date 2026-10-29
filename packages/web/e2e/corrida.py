@@ -374,6 +374,27 @@ with sync_playwright() as p:
     check("bote: sem erros", not errs, "; ".join(errs[:2]))
     c.close()
 
+    # Itens especiais aparecem desenhados (não só o círculo de fundo).
+    c = browser.new_context(viewport={"width": 844, "height": 390})
+    pg = c.new_page()
+    pg.goto(BASE + "/corrida/?debug&seed=5")
+    pg.wait_for_selector("text=CORRER")
+    pg.click("text=CORRER")
+    pg.wait_for_timeout(150)
+    pg.evaluate("""() => { const e = window.__NDC__.engine, r = e.runner, l = e.track.level;
+        l.rocks.length = l.thorns.length = l.crates.length = l.springs.length = 0; l.fruits.length = 0; l.powerups.length = 0;
+        l.ground.length = 0; l.addGround(-800, r.x + 20000); e.track.genX = r.x + 20000;
+        l.powerups.push({ x: r.x + 420, y: 17, kind: 'golden', taken: false }); }""")
+    pg.wait_for_timeout(120)
+    gold = pg.evaluate("""() => { const R = window.__NDC__.renderer, e = window.__NDC__.engine, u = e.track.level.powerups[0];
+        const cv = document.querySelector('canvas'), ctx = cv.getContext('2d'), k = R.layout.scale * R.dpr;
+        const cx = (R.layout.offsetX + R.sx(u.x) * R.layout.scale) * R.dpr, cy = (R.layout.offsetY + R.sy(u.y) * R.layout.scale) * R.dpr;
+        const s = Math.round(16 * k), d = ctx.getImageData(Math.round(cx - s), Math.round(cy - s), 2 * s, 2 * s).data;
+        let n = 0; for (let i = 0; i < d.length; i += 4) if (d[i] > 200 && d[i + 1] > 140 && d[i + 2] < 90) n++;
+        return n; }""")
+    check("capim dourado aparece desenhado (tufo dourado)", gold > 40, f"{gold} px dourados")
+    c.close()
+
     # Toca: buraco escondido sob folhas, túnel com capim e saída que lança de volta.
     c = browser.new_context(viewport={"width": 844, "height": 390})
     pg = c.new_page()

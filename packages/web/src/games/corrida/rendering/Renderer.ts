@@ -80,6 +80,7 @@ export class Renderer {
   lift = 0;
   private skyCache = new Map<string, CanvasGradient>();
   private hazeCache: CanvasGradient | null = null;
+  private shieldAuraCache: CanvasGradient | null = null;
   private auraCache: CanvasGradient | null = null;
   private lastSeason: SeasonId = 'verao';
   /** Chuva (atualizada pelo hook a cada quadro). */
@@ -906,12 +907,37 @@ export class Renderer {
     if (x < this.viewL - 20 || x > this.viewR + 20) return;
     if (kind === 'magnet') return this.drawMagnet(x, y, 1, time);
     const ctx = this.ctx;
+    if (kind === 'golden') {
+      // Fundo âmbar escuro com aro dourado pulsando: o dourado se destaca do verde.
+      const pulse = 0.5 + 0.5 * Math.sin(time * 6);
+      ctx.fillStyle = 'rgba(110, 60, 0, 0.55)';
+      ctx.strokeStyle = `rgba(255, 210, 63, ${(0.55 + 0.45 * pulse).toFixed(3)})`;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(x, y, 17 + pulse * 1.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      this.drawGoldenTuft(x, y + 3, 1.3, time);
+      return;
+    }
+    if (kind === 'shield') {
+      // Aro verde pulsando (como o ímã chama atenção) e o símbolo do escudo.
+      const pulse = 0.5 + 0.5 * Math.sin(time * 6);
+      ctx.fillStyle = `rgba(160, 240, 140, ${(0.25 + 0.2 * pulse).toFixed(3)})`;
+      ctx.strokeStyle = `rgba(200, 255, 170, ${(0.5 + 0.5 * pulse).toFixed(3)})`;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(x, y, 17 + pulse * 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      this.drawShieldEmblem(x, y + 1, 1, time);
+      return;
+    }
     ctx.fillStyle = `rgba(255, 255, 210, ${(0.4 + 0.2 * Math.sin(time * 6)).toFixed(3)})`;
     ctx.beginPath();
     ctx.arc(x, y, 17, 0, Math.PI * 2);
     ctx.fill();
-    if (kind === 'shield') this.drawLilyLeaf(x, y, 12, time);
-    else if (kind === 'acai') this.drawAcai(x, y + 2, 1, time);
+    if (kind === 'acai') this.drawAcai(x, y + 2, 1, time);
   }
 
   /** Tigela (cuia) de açaí com granola, rodela de banana e colherzinha. */
@@ -1112,22 +1138,86 @@ export class Renderer {
     }
   }
 
-  /** Escudo ativo: bolha verde-clara em volta e a folha de vitória-régia nas costas. */
+  /** Símbolo do escudo: brasão verde com borda clara e a vitória-régia no meio. */
+  private drawShieldEmblem(x: number, y: number, s: number, time: number): void {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(s, s);
+    const path = () => {
+      ctx.beginPath();
+      ctx.moveTo(0, -13);
+      ctx.quadraticCurveTo(6, -10, 12, -11);
+      ctx.quadraticCurveTo(13, 4, 0, 14);
+      ctx.quadraticCurveTo(-13, 4, -12, -11);
+      ctx.quadraticCurveTo(-6, -10, 0, -13);
+      ctx.closePath();
+    };
+    path();
+    ctx.fillStyle = '#1f6e2c';
+    ctx.fill();
+    ctx.lineWidth = 2.6;
+    ctx.strokeStyle = '#eafcd6';
+    ctx.stroke();
+    // Metade de cima mais clara (brilho).
+    ctx.save();
+    path();
+    ctx.clip();
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.16)';
+    ctx.fillRect(-14, -14, 14, 30);
+    ctx.restore();
+    ctx.restore();
+    this.drawLilyLeaf(x, y - 1 * s, 6.5 * s, time);
+  }
+
+  /**
+   * Escudo ativo (como o ímã): aura verde pulsando, bolha em volta, anel de
+   * folhinhas girando e o símbolo do escudo flutuando sobre a cabeça.
+   */
   private drawShieldOn(x: number, y: number, time: number, reduced: boolean): void {
     const ctx = this.ctx;
-    const pulse = reduced ? 0 : Math.sin(time * 4) * 1.5;
-    ctx.fillStyle = 'rgba(140, 230, 140, 0.16)';
-    ctx.strokeStyle = 'rgba(170, 245, 150, 0.75)';
-    ctx.lineWidth = 2;
+    const cx = x + 4;
+    const cy = y - 18;
+    if (!this.shieldAuraCache) {
+      const g = ctx.createRadialGradient(0, 0, 8, 0, 0, 56);
+      g.addColorStop(0, 'rgba(220, 255, 200, 0.55)');
+      g.addColorStop(0.6, 'rgba(120, 230, 120, 0.28)');
+      g.addColorStop(1, 'rgba(120, 230, 120, 0)');
+      this.shieldAuraCache = g;
+    }
+    const pulse = reduced ? 1 : 1 + Math.sin(time * 6) * 0.08;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(pulse, pulse);
+    ctx.fillStyle = this.shieldAuraCache;
+    ctx.fillRect(-60, -60, 120, 120);
+    ctx.restore();
+    // Bolha.
+    const b = reduced ? 0 : Math.sin(time * 6) * 2;
+    ctx.strokeStyle = 'rgba(190, 255, 160, 0.85)';
+    ctx.lineWidth = 2.2;
     ctx.beginPath();
-    ctx.ellipse(x + 4, y - 18, 34 + pulse, 28 + pulse, 0, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.ellipse(cx, cy, 34 + b, 28 + b, 0, 0, Math.PI * 2);
     ctx.stroke();
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
     ctx.beginPath();
     ctx.arc(x - 8, y - 32, 10, Math.PI * 1.05, Math.PI * 1.45);
     ctx.stroke();
-    this.drawLilyLeaf(x - 10, y - 34, 11, time);
+    // Folhinhas girando em volta.
+    const spin = reduced ? 0 : time * 2.5;
+    for (let i = 0; i < 5; i++) {
+      const a = spin + (i * Math.PI * 2) / 5;
+      ctx.save();
+      ctx.translate(cx + Math.cos(a) * 36, cy + Math.sin(a) * 29);
+      ctx.rotate(a + Math.PI / 2);
+      ctx.fillStyle = i % 2 ? '#7fd36a' : '#b6f08a';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 4.5, 2.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+    // Símbolo do escudo sobre a cabeça.
+    this.drawShieldEmblem(x + 8, y - 70 + (reduced ? 0 : Math.sin(time * 5) * 3), 1.15 * pulse, time);
   }
 
   /** Aura do ímã atrás da capivara (pisca nos 2 últimos segundos). */
@@ -1689,6 +1779,11 @@ export class Renderer {
       ctx.fillStyle = engine.magnet > 2 || Math.sin(time * 20) > 0 ? '#ff5a5a' : '#ffffff';
       roundRect(ctx, bx + 12, by - 4, Math.max(8, 90 * k), 8, 4);
       ctx.fill();
+    }
+    // Escudo ligado: o símbolo pulsando no canto (do lado do medidor).
+    if (engine.shield && !isDead(engine)) {
+      const p = 1 + Math.sin(time * 6) * 0.08;
+      this.drawShieldEmblem(mx - 26, my, 0.72 * p, time);
     }
     if (full) {
       const pulse = 0.6 + 0.4 * Math.sin(time * 8);
