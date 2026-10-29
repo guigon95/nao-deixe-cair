@@ -16,18 +16,18 @@ export interface GameInfo {
 /** Catálogo do hub. Para adicionar um jogo: uma entrada aqui + uma pasta + um HTML no vite.config. */
 export const GAMES: readonly GameInfo[] = [
   {
-    id: 'bolinha',
-    name: 'Bolinha',
-    tagline: 'Segure para subir, solte para cair. Passe pelos vãos.',
-    href: 'bolinha/',
-    accent: '#ffd23f',
-  },
-  {
     id: 'corrida',
     name: 'Disparada',
     tagline: 'A capivara corre comendo capim. Pule o jacaré e fuja dos marimbondos.',
     href: 'corrida/',
     accent: '#ffb347',
+  },
+  {
+    id: 'bolinha',
+    name: 'Bolinha',
+    tagline: 'Segure para subir, solte para cair. Passe pelos vãos.',
+    href: 'bolinha/',
+    accent: '#ffd23f',
   },
   {
     id: 'aviao',
