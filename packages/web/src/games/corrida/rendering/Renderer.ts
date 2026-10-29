@@ -1,4 +1,4 @@
-import { ARENA, BODY, DASH, SWARM } from '../game/config';
+import { ARENA, BODY, DASH, MAGNET, SWARM } from '../game/config';
 import type { Engine } from '../game/Engine';
 import { SIZES } from '../game/patterns';
 import { GameState, type Crate, type Fruit, type Platform, type Rock, type Spring, type Thorns, type Vine } from '../game/types';
@@ -26,6 +26,7 @@ export const COLORS = {
   petal: '#ff6fae',
   vine: '#7cb342',
   vineDark: '#4e6b25',
+  magnet: '#e8322f',
   ipeRoxo: '#c45bd6',
   ipeAmarelo: '#ffd23a',
   grassBlade: '#3fd23f',
@@ -151,6 +152,7 @@ export class Renderer {
     for (const r of lvl.rocks) if (!r.broken) this.drawRock(r);
     for (const t of lvl.thorns) if (!t.broken) this.drawThorns(t);
     for (const f of lvl.fruits) if (!f.taken) this.drawFruit(f, opts.time);
+    for (const u of lvl.powerups) if (!u.taken) this.drawMagnet(this.sx(u.x), this.sy(u.y) + Math.sin(opts.time * 3 + u.x) * 2, 1, opts.time);
     this.drawParticles(fx);
     this.drawRunner(engine, fx, opts.time);
     this.drawSwarm(engine, opts.time);
@@ -733,6 +735,38 @@ export class Renderer {
     ctx.fillRect(x - 4.5, y + 2.5, 9, 3);
   }
 
+  /** Ímã de ferradura (vermelho com pontas prateadas), com brilho para chamar atenção. */
+  private drawMagnet(x: number, y: number, scale: number, time: number): void {
+    if (x < this.viewL - 20 || x > this.viewR + 20) return;
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(scale, scale);
+    if (scale >= 1) {
+      ctx.fillStyle = `rgba(255, 230, 120, ${(0.35 + 0.2 * Math.sin(time * 6)).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(0, 0, 16, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.rotate(-0.35);
+    ctx.lineCap = 'butt';
+    ctx.strokeStyle = '#7a1414';
+    ctx.lineWidth = 9;
+    ctx.beginPath();
+    ctx.arc(0, -1, 8, Math.PI, 0, true);
+    ctx.lineTo(8, 8);
+    ctx.moveTo(-8, -1);
+    ctx.lineTo(-8, 8);
+    ctx.stroke();
+    ctx.strokeStyle = COLORS.magnet;
+    ctx.lineWidth = 6;
+    ctx.stroke();
+    ctx.fillStyle = '#e8eef5';
+    ctx.fillRect(-11, 5, 6, 5);
+    ctx.fillRect(5, 5, 6, 5);
+    ctx.restore();
+  }
+
   /** Jacaré de tocaia no rio: olhos e focinho na superfície, no meio de cada buraco. */
   private drawGators(engine: Engine, time: number): void {
     const ctx = this.ctx;
@@ -820,6 +854,14 @@ export class Renderer {
       ctx.beginPath();
       ctx.ellipse(x + 4, this.sy(0) + 1, Math.max(6, 18 - h / 20), 3.5, 0, 0, Math.PI * 2);
       ctx.fill();
+    }
+    // Ímã ligado: anel pulsante em volta (pisca nos 2 últimos segundos).
+    if (engine.magnet > 0 && !isDead(engine) && (engine.magnet > 2 || Math.sin(time * 20) > 0)) {
+      ctx.strokeStyle = `rgba(255, 90, 90, ${(0.45 + 0.25 * Math.sin(time * 9)).toFixed(3)})`;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(x + 4, y - 18, 30 + Math.sin(time * 9) * 2, 0, Math.PI * 2);
+      ctx.stroke();
     }
     const landing = r.landedAt < 0.14 ? 1 - r.landedAt / 0.14 : 0;
     drawCapivara(ctx, x, y, {
@@ -1021,6 +1063,19 @@ export class Renderer {
       ctx.fillStyle = on ? (full ? '#ffb347' : COLORS.grassBlade) : 'rgba(255,255,255,0.22)';
       ctx.beginPath();
       ctx.arc(mx + i * 11, my, on ? 4.2 : 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // Ímã: ícone e barra do tempo que falta, embaixo do medidor.
+    if (engine.magnet > 0) {
+      const k = Math.min(1, engine.magnet / MAGNET.duration);
+      const bx = mx - 4;
+      const by = my + (full ? 44 : 24);
+      this.drawMagnet(bx, by, 0.6, time);
+      ctx.fillStyle = 'rgba(15, 20, 40, 0.45)';
+      roundRect(ctx, bx + 12, by - 4, 90, 8, 4);
+      ctx.fill();
+      ctx.fillStyle = engine.magnet > 2 || Math.sin(time * 20) > 0 ? '#ff5a5a' : '#ffffff';
+      roundRect(ctx, bx + 12, by - 4, Math.max(8, 90 * k), 8, 4);
       ctx.fill();
     }
     if (full) {

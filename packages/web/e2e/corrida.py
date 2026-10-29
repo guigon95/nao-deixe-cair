@@ -313,6 +313,31 @@ with sync_playwright() as p:
     check("copa: sem erros", not errs, "; ".join(errs[:2]))
     c.close()
 
+    # Ímã de capim: pegar liga o ímã (barra no HUD) e puxa os capins altos.
+    c = browser.new_context(viewport={"width": 844, "height": 390})
+    pg = c.new_page()
+    errs = []
+    pg.on("pageerror", lambda e: errs.append(str(e)))
+    pg.goto(BASE + "/corrida/?debug&seed=5")
+    pg.wait_for_selector("text=CORRER")
+    pg.click("text=CORRER")
+    pg.wait_for_timeout(300)
+    pg.evaluate("""() => { const e = window.__NDC__.engine, r = e.runner, l = e.track.level;
+        l.rocks.length = l.thorns.length = l.crates.length = l.springs.length = 0;
+        l.ground.length = 0; l.addGround(-800, r.x + 6000); e.track.genX = r.x + 6000;
+        l.powerups.push({ x: r.x + 120, y: 17, kind: 'magnet', taken: false });
+        for (let k = 0; k < 8; k++) l.fruits.push({ x: r.x + 260 + k * 30, y: 150, taken: false, risky: false });
+        l.fruits.sort((a, b) => a.x - b.x); }""")
+    f0 = pg.evaluate("() => window.__NDC__.engine.score.fruits")
+    pg.wait_for_function("() => window.__NDC__.engine.magnet > 0", timeout=4000)
+    pg.wait_for_timeout(250)
+    pg.screenshot(path=str(OUT / "corrida-12-ima.png"))
+    pg.wait_for_timeout(1500)
+    f1 = pg.evaluate("() => window.__NDC__.engine.score.fruits")
+    check("ímã puxa os capins altos sem pular", f1 - f0 >= 8, f"{f1 - f0} capins")
+    check("ímã: sem erros", not errs, "; ".join(errs[:2]))
+    c.close()
+
     # Layouts.
     for (w, h, name, touch) in [
         (390, 844, "iphone-em-pe", True),

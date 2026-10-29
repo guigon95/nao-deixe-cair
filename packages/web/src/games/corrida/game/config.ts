@@ -93,6 +93,27 @@ export const VINE = {
   minEnergy: 1.15,
 } as const;
 
+/** Ímã de capim: item raro que puxa os capins próximos por alguns segundos. */
+export const MAGNET = {
+  /** Duração (s). */
+  duration: 8,
+  /** Alcance (u) em volta da capivara (mais para a frente que para trás). */
+  reachAhead: 190,
+  reachBehind: 60,
+  reachUp: 190,
+  /** Velocidade com que o capim voa até a capivara (u/s, além da corrida). */
+  pull: 700,
+  /** Distância para comer o capim puxado. */
+  eat: 20,
+  /** Raio para pegar o próprio ímã. */
+  pickup: 22,
+  /** Não aparece antes disto (s) e espera pelo menos isto entre um e outro. */
+  firstAfter: 12,
+  minGap: 22,
+  /** Chance por padrão, passado o intervalo. */
+  chance: 0.35,
+} as const;
+
 /** Velocidade da corrida (u/s) em função do tempo de partida. */
 export const SPEED = {
   start: 290,

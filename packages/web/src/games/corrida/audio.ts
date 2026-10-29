@@ -78,6 +78,17 @@ export class RunnerSfx extends SynthAudio {
     } else this.tone(420, 900, 0.18, 'sine', 0.28);
   }
 
+  /** Ímã: "vuuum" subindo ao pegar; ao acabar, duas notas descendo bem baixinho. */
+  magnet(on: boolean): void {
+    if (on) {
+      this.tone(220, 880, 0.3, 'sawtooth', 0.12);
+      this.tone(440, 1320, 0.3, 'sine', 0.25, 0.04);
+    } else {
+      this.tone(660, 660, 0.08, 'sine', 0.15);
+      this.tone(440, 392, 0.14, 'sine', 0.15, 0.08);
+    }
+  }
+
   /** Chegou à copa: farfalhar de folhas + duas notas subindo. */
   canopy(): void {
     this.noise(0.25, 0.08, 2600, 900, 'bandpass');

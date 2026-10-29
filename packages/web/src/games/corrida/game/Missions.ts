@@ -25,6 +25,7 @@ export type MissionKind =
   | 'glide'
   | 'winter'
   | 'canopy'
+  | 'magnets'
   | 'runs';
 
 interface MissionDef {
@@ -55,6 +56,7 @@ export const MISSION_DEFS: readonly MissionDef[] = [
   { kind: 'noCrate', scope: 'run', base: 400, growth: 0.3, round: 50, minLevel: 2, text: (n) => `Corra ${n} m sem bater em caixote` },
   { kind: 'noDash', scope: 'run', base: 700, growth: 0.3, round: 50, minLevel: 3, text: (n) => `Corra ${n} m sem usar a Disparada` },
   { kind: 'canopy', scope: 'total', base: 2, growth: 0.4, round: 1, minLevel: 2, text: (n) => `Chegue à copa das árvores ${n} vezes` },
+  { kind: 'magnets', scope: 'total', base: 2, growth: 0.4, round: 1, minLevel: 2, text: (n) => `Pegue ${n} ímãs de capim` },
   { kind: 'winter', scope: 'run', base: 1, growth: 0, round: 1, minLevel: 3, text: () => 'Chegue ao inverno numa corrida' },
 ];
 
@@ -161,6 +163,10 @@ export class Missions {
 
   smash(): Mission[] {
     return this.bump({}, { smashes: 1 });
+  }
+
+  magnet(): Mission[] {
+    return this.bump({}, { magnets: 1 });
   }
 
   canopy(): Mission[] {

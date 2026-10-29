@@ -1,7 +1,8 @@
 import { difficultyAt, riskyFruitChance, speedAt } from './Difficulty';
 import { Level } from './Level';
 import { Builder, PATTERNS, pickPattern, type Pattern } from './patterns';
-import { randRange, type Rng } from '../../../shared/random';
+import { createRng, randRange, type Rng } from '../../../shared/random';
+import { MAGNET } from './config';
 
 /** Quanto gerar à frente da capivara (u): mais que uma tela larga. */
 export const LOOKAHEAD = 1500;
@@ -27,6 +28,9 @@ export class Track {
   /** Padrões gerados (para depuração e testes). */
   readonly history: Array<{ id: string; x: number; t: number }> = [];
   private prev: string | null = null;
+  /** Sorteios dos itens especiais (separado, para não mexer na sequência de padrões). */
+  private itemRng: Rng = createRng(1);
+  private lastMagnet = -Infinity;
   /** Força uma lista de padrões (testes); vazio = sorteio. */
   forced: string[] = [];
 
@@ -36,6 +40,8 @@ export class Track {
 
   reset(rng: Rng): void {
     this.rng = rng;
+    this.itemRng = createRng(Math.floor(rng() * 0xffffffff));
+    this.lastMagnet = -Infinity;
     this.level.clear();
     this.history.length = 0;
     this.prev = null;
@@ -67,7 +73,9 @@ export class Track {
     this.prev = pattern.id;
     const v = d.speed;
     const b = new Builder(this.level, this.genX, v, this.rng, riskyFruitChance(t));
+    const firstFruit = this.level.fruits.length;
     const dur = pattern.build(b);
+    this.maybeMagnet(t, firstFruit);
     this.history.push({ id: pattern.id, x: this.genX, t });
     if (this.history.length > 64) this.history.shift();
     // Chão do padrão, com os buracos.
@@ -82,6 +90,19 @@ export class Track {
     // Mantém as listas em ordem (capins de arcos podem sair um pouco fora de ordem).
     this.level.fruits.sort((p, q) => p.x - q.x);
     this.genX = end;
+  }
+
+  /** De vez em quando, troca um capim deste padrão (fora dos arriscados) por um ímã. */
+  private maybeMagnet(t: number, firstFruit: number): void {
+    if (t < MAGNET.firstAfter || t - this.lastMagnet < MAGNET.minGap) return;
+    if (this.itemRng() >= MAGNET.chance) return;
+    const fresh = this.level.fruits.slice(firstFruit).filter((f) => !f.risky);
+    if (!fresh.length) return;
+    const f = fresh[Math.floor(this.itemRng() * fresh.length)];
+    this.level.fruits.splice(this.level.fruits.indexOf(f), 1);
+    this.level.powerups.push({ x: f.x, y: f.y, kind: 'magnet', taken: false });
+    this.level.powerups.sort((p, q) => p.x - q.x);
+    this.lastMagnet = t;
   }
 }
 

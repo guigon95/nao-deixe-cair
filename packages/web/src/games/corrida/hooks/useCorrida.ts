@@ -234,6 +234,15 @@ export function useCorrida() {
           sfx.spring();
           fx.burst(e.x, e.y, 8, 120, [COLORS.petal, '#ffd23f'], 0.5, 2.6, false);
           break;
+        case 'magnet':
+          sfx.magnet(e.on);
+          if (e.on) {
+            completed(missions.magnet());
+            fx.float(e.x + 30, e.y + 60, 'ÍMÃ DE CAPIM!', true, '#ff9a9a');
+            fx.burst(e.x, e.y, 10, 120, ['#e8322f', '#ffffff', '#ffd23f'], 0.5, 2.5, false);
+            vibrate(12);
+          }
+          break;
         case 'canopy':
           completed(missions.canopy());
           fx.float(e.x + 40, e.y + 70, 'COPA DAS ÁRVORES!', true, '#c8f58a');

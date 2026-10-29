@@ -74,6 +74,14 @@ export interface Vine {
   len: number;
 }
 
+/** Item especial no percurso (por enquanto só o ímã de capim). */
+export interface PowerUp {
+  x: number;
+  y: number;
+  kind: 'magnet';
+  taken: boolean;
+}
+
 export interface Fruit {
   x: number;
   y: number;
@@ -140,6 +148,7 @@ export type GameEvent =
   | { type: 'dash'; on: boolean }
   | { type: 'vine'; on: boolean; x: number; y: number }
   | { type: 'canopy'; x: number; y: number }
+  | { type: 'magnet'; on: boolean; x: number; y: number }
   | { type: 'fastFall' }
   | { type: 'death'; cause: DeathCause; x: number; y: number; score: number; best: number; isNewRecord: boolean; livesLeft: number }
   | { type: 'continue'; livesLeft: number }

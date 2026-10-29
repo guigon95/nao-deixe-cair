@@ -242,7 +242,8 @@ describe('vidas e continuar', () => {
     expect(e.deathCause).toBe('river');
     e.continueRun();
     expect(e.track.level.groundAt(e.runner.x)).toBe(true);
-    for (let i = 0; i < 120 * 6 && e.state === GameState.PLAYING; i++) e.step(DT);
+    // O trecho limpo garantido dura CONTINUES.clearAhead segundos de corrida.
+    for (let i = 0; i < 120 * (CONTINUES.clearAhead - 0.2) && e.state === GameState.PLAYING; i++) e.step(DT);
     expect(e.state).toBe(GameState.PLAYING);
   });
 

@@ -1,4 +1,4 @@
-import { CONTINUES, DASH, SCORING, SIM, SWARM } from './config';
+import { CONTINUES, DASH, MAGNET, SCORING, SIM, SWARM } from './config';
 import { speedAt, tierAt } from './Difficulty';
 import { createRunner, runnerSpeed, stepRunner, type Controls, type StepSink } from './Physics';
 import { CANOPY } from './patterns';
@@ -56,6 +56,8 @@ export class Engine {
   deathCause: DeathCause | null = null;
   /** Nível de dificuldade atual (o HUD avisa quando sobe). */
   tier = 0;
+  /** Ímã de capim: segundos restantes (0 = desligado). */
+  magnet = 0;
   /** Pousada na copa das árvores (para avisar uma vez por subida). */
   private onCanopy = false;
   private pendingPress = false;
@@ -137,6 +139,7 @@ export class Engine {
     this.pendingPress = this.pendingDrop = this.pendingDash = false;
     this.holding = false;
     this.onCanopy = false;
+    this.magnet = 0;
     this.track.update(0, 0, speedAt(0));
     this.setState(GameState.PLAYING);
   }
@@ -264,6 +267,7 @@ export class Engine {
     if (this.swarm < SWARM.rest) this.swarm = Math.min(SWARM.rest, this.swarm + SWARM.recover * dt);
     else this.swarm = SWARM.rest;
 
+    this.stepItems(r, dt);
     this.score.tick(r.x);
     this.track.update(r.x, this.elapsed, base);
     const tier = tierAt(this.elapsed);
@@ -272,6 +276,44 @@ export class Engine {
     if (death) return this.die(death);
     if (this.swarm <= 0) return this.die('swarm');
     if (this.score.checkRecord()) this.emit({ type: 'newRecord', score: this.score.score });
+  }
+
+  /** Pega ímãs e, com o ímã ligado, puxa os capins próximos até a capivara. */
+  private stepItems(r: Runner, dt: number): void {
+    const lvl = this.track.level;
+    const cx = r.x;
+    const cy = r.y + 17;
+    for (const u of lvl.powerups) {
+      if (u.x - MAGNET.pickup > cx + 20) break;
+      if (u.taken || Math.abs(u.x - cx) > MAGNET.pickup + 13 || Math.abs(u.y - cy) > MAGNET.pickup + 17) continue;
+      u.taken = true;
+      const was = this.magnet > 0;
+      this.magnet = MAGNET.duration;
+      if (!was) this.emit({ type: 'magnet', on: true, x: u.x, y: u.y });
+    }
+    if (this.magnet <= 0) return;
+    this.magnet -= dt;
+    const speed = MAGNET.pull + runnerSpeed(r, this.speed);
+    for (const f of lvl.fruits) {
+      if (f.taken) continue;
+      const dx = f.x - cx;
+      if (dx > MAGNET.reachAhead) break;
+      if (dx < -MAGNET.reachBehind) continue;
+      const dy = f.y - cy;
+      if (Math.abs(dy) > MAGNET.reachUp) continue;
+      const d = Math.hypot(dx, dy);
+      if (d <= MAGNET.eat) {
+        this.sink.fruit(f, r);
+        continue;
+      }
+      const step = Math.min(d, speed * dt);
+      f.x -= (dx / d) * step;
+      f.y -= (dy / d) * step;
+    }
+    if (this.magnet <= 0) {
+      this.magnet = 0;
+      this.emit({ type: 'magnet', on: false, x: r.x, y: r.y });
+    }
   }
 
   private die(cause: DeathCause): void {
