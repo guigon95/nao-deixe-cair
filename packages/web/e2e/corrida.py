@@ -255,6 +255,34 @@ with sync_playwright() as p:
     check("piloto: sem erros", not errs, "; ".join(errs[:2]))
     c.close()
 
+    # Missões em trios: menu mostra o trio; cumprir mostra aviso e salva; trio completo sobe de nível.
+    c = browser.new_context(viewport={"width": 844, "height": 390}, has_touch=True, is_mobile=True)
+    pg = c.new_page()
+    errs = []
+    pg.on("pageerror", lambda e: errs.append(str(e)))
+    pg.goto(BASE + "/corrida/")
+    pg.evaluate("""() => localStorage.setItem('ndc:corrida:missions', JSON.stringify({ v: 1, level: 1, seed: 3, completed: 0,
+        slots: [{ kind: 'capimRun', target: 1, progress: 0, done: false }, { kind: 'meters', target: 20, progress: 0, done: false },
+                { kind: 'runs', target: 1, progress: 0, done: false }] }))""")
+    pg.goto(BASE + "/corrida/?debug&seed=7")
+    pg.wait_for_selector("text=CORRER")
+    check("menu mostra as 3 missões e o nível", pg.locator(".menu .missions-list li").count() == 3 and "nível 1" in pg.locator(".menu .missions").inner_text().lower())
+    pg.click("text=CORRER")
+    pg.wait_for_selector(".mission-toast", timeout=8000)
+    check("missão cumprida mostra aviso na corrida", "Missão cumprida" in pg.locator(".mission-toast").inner_text())
+    pg.screenshot(path=str(OUT / "corrida-09-missao.png"))
+    pg.wait_for_function("() => ['CONTINUE','GAME_OVER'].includes(window.__NDC__.engine.state)", timeout=60000)
+    if pg.locator("text=Encerrar corrida").count():
+        pg.click("text=Encerrar corrida")
+    pg.wait_for_selector(".gameover .missions", timeout=4000)
+    txt = pg.locator(".gameover .missions").inner_text()
+    check("trio completo sobe de nível no fim", "nível 2" in txt.lower(), txt.replace("\n", " | ")[:80])
+    saved = pg.evaluate("() => JSON.parse(localStorage.getItem('ndc:corrida:missions')).level")
+    check("nível salvo no aparelho", saved == 2)
+    pg.screenshot(path=str(OUT / "corrida-10-nivel.png"))
+    check("missões: sem erros", not errs, "; ".join(errs[:2]))
+    c.close()
+
     # Layouts.
     for (w, h, name, touch) in [
         (390, 844, "iphone-em-pe", True),

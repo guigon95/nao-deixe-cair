@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { RunnerSfx, vibrate } from '../audio';
 import { ARENA, SWARM } from '../game/config';
 import { Engine } from '../game/Engine';
+import { Missions, missionText, type Mission } from '../game/Missions';
 import { SwipeDetector } from '../game/Gestures';
 import { Autopilot } from '../game/testing/planner';
 import { GameState, type DeathCause } from '../game/types';
@@ -30,6 +31,13 @@ export interface UiState {
   meterFull: boolean;
   /** Vidas que ainda dá para gastar continuando nesta partida. */
   livesLeft: number;
+  /** Missões (cópia para a tela) e o nível da capivara. */
+  missions: Mission[];
+  missionLevel: number;
+  /** Aviso de missão cumprida durante a corrida. */
+  toast: { id: number; text: string } | null;
+  /** Fim da corrida: missões cumpridas nela e se subiu de nível. */
+  runMissions: { completed: string[]; leveledUp: boolean } | null;
 }
 
 export const CAUSE_TEXT: Record<DeathCause, string> = {
@@ -74,6 +82,10 @@ export function useCorrida() {
     cause: null,
     meterFull: false,
     livesLeft: 0,
+    missions: [],
+    missionLevel: 1,
+    toast: null,
+    runMissions: null,
   });
 
   useEffect(() => {
@@ -85,6 +97,26 @@ export function useCorrida() {
     const debug = params.has('debug');
     const seedParam = params.get('seed');
     const engine = new Engine({ storage, seed: seedParam ? Number(seedParam) : undefined });
+    const missions = new Missions(storage);
+    const snapshot = () => ({ missions: missions.slots.map((m) => ({ ...m })), missionLevel: missions.level });
+    let runDone: string[] = [];
+    let toastId = 0;
+    let lastRun = 0;
+    /** Missões cumpridas agora: aviso na tela, som e cópia nova para a interface. */
+    const completed = (list: Mission[]) => {
+      if (!list.length) return;
+      for (const m of list) runDone.push(m.kind);
+      sfx.success();
+      vibrate(12);
+      const text = list.length === 1 ? missionText(list[0]) : `${list.length} missões`;
+      setUi((u) => ({ ...u, ...snapshot(), toast: { id: ++toastId, text } }));
+    };
+    const finishRun = () => {
+      const r = missions.endRun();
+      for (const m of r.completed) runDone.push(m.kind);
+      setUi((u) => ({ ...u, ...snapshot(), runMissions: { completed: runDone, leveledUp: r.leveledUp } }));
+    };
+    setUi((u) => ({ ...u, ...snapshot() }));
     const fx = new Effects();
     const sfx = new RunnerSfx();
     const renderer = new Renderer(canvas);
@@ -129,7 +161,16 @@ export function useCorrida() {
     const unsubscribe = engine.on((e) => {
       switch (e.type) {
         case 'state': {
-          const fresh = e.state === GameState.PLAYING && e.previous !== GameState.RESUMING && e.previous !== GameState.PAUSED;
+          // Corrida nova = runId novo (vale também para "Reiniciar" na pausa).
+          const fresh = e.state === GameState.PLAYING && engine.runId !== lastRun;
+          if (fresh) {
+            lastRun = engine.runId;
+            runDone = [];
+            missions.startRun();
+            setUi((u) => ({ ...u, ...snapshot(), runMissions: null, toast: null }));
+          }
+          // Fim de verdade (ou desistiu pelo menu no meio): fecha a corrida das missões.
+          if (e.state === GameState.GAME_OVER || (e.state === GameState.READY && e.previous !== GameState.READY)) finishRun();
           if (fresh) {
             fx.clear();
             renderer.weather.reset();
@@ -163,6 +204,7 @@ export function useCorrida() {
           sfx.fastFall();
           break;
         case 'fruit':
+          completed(missions.capim());
           sfx.fruit(e.streak);
           fx.burst(e.x, e.y, 5, 70, ['#b6f04a', '#ffffff'], 0.35, 2, false);
           if (e.meterFull) {
@@ -172,6 +214,7 @@ export function useCorrida() {
           }
           break;
         case 'crate':
+          completed(missions.crate(e.stomp));
           sfx.crate(e.stomp);
           fx.burst(e.x, e.y, 14, 180, [COLORS.crate, COLORS.crateDark, '#e8b47a'], 0.6, 3.2, true);
           if (!e.stomp) {
@@ -181,19 +224,23 @@ export function useCorrida() {
           } else fx.float(e.x, e.y + 40, '+10', false, '#fff2a8');
           break;
         case 'smash':
+          completed(missions.smash());
           sfx.smash();
           fx.burst(e.x, e.y, 16, 220, [COLORS.rock, COLORS.rockDark, COLORS.rockLight], 0.7, 3.5, true);
           fx.float(e.x, e.y + 50, '+10', false, '#fff2a8');
           break;
         case 'spring':
+          completed(missions.spring());
           sfx.spring();
           fx.burst(e.x, e.y, 8, 120, [COLORS.petal, '#ffd23f'], 0.5, 2.6, false);
           break;
         case 'vine':
+          if (e.on) completed(missions.vine());
           sfx.vine(e.on);
           if (e.on) vibrate(8);
           break;
         case 'dash':
+          if (e.on) completed(missions.dash());
           if (e.on) {
             sfx.dash();
             fx.flash = 0.35;
@@ -249,6 +296,7 @@ export function useCorrida() {
       const fdt = Math.min(dt, 0.1);
       const frozen = st === GameState.PAUSED || st === GameState.RESUMING;
       if (st === GameState.PLAYING) {
+        completed(missions.tick(engine.score.meters, engine.runner.gliding ? fdt : 0));
         const r = engine.runner;
         if (r.grounded) fx.dust(r.x, r.y, engine.runSpeed, fdt);
         const near = engine.swarm < SWARM.warn * 1.3 ? 1 - engine.swarm / (SWARM.warn * 1.3) : 0;

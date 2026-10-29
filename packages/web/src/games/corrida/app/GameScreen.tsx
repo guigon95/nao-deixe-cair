@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { CONTINUES, STORAGE } from '../game/config';
 import { GameState } from '../game/types';
+import { missionText, type Mission } from '../game/Missions';
 import { CAUSE_TEXT, useCorrida } from '../hooks/useCorrida';
 import { usePlayer, useRanking } from '../../../shared/online/hooks';
 import { HubBack } from '../../../shared/ui/HubBack';
@@ -80,6 +81,15 @@ export function GameScreen() {
     }
   };
 
+  // Aviso de missão cumprida: some sozinho depois de um tempinho.
+  const [toast, setToast] = useState<{ id: number; text: string } | null>(null);
+  useEffect(() => {
+    if (!ui.toast) return;
+    setToast(ui.toast);
+    const t = window.setTimeout(() => setToast(null), 2600);
+    return () => window.clearTimeout(t);
+  }, [ui.toast]);
+
   const playing = ui.state === GameState.PLAYING || ui.state === GameState.RESUMING;
   const savedThisRun = rank.save.status === 'saved' ? rank.save.outcome?.result ?? null : null;
   const openRanking = () => {
@@ -111,6 +121,12 @@ export function GameScreen() {
                 ♥
               </span>
             ))}
+          </p>
+        )}
+
+        {toast && (
+          <p key={toast.id} className="mission-toast" role="status">
+            <span aria-hidden="true">✔</span> Missão cumprida: {toast.text}
           </p>
         )}
 
@@ -215,6 +231,7 @@ export function GameScreen() {
               </li>
               <li className="keys">Teclado: Espaço/↑ · ↓ · → · P pausa</li>
             </ul>
+            <MissionList missions={ui.missions} level={ui.missionLevel} />
             <button ref={primaryRef} className="btn btn-primary" onClick={start}>
               CORRER
             </button>
@@ -297,6 +314,12 @@ export function GameScreen() {
             <p className="best">
               Recorde: <strong>{ui.best}</strong>
             </p>
+            <MissionList
+              missions={ui.missions}
+              level={ui.missionLevel}
+              justDone={ui.runMissions?.completed}
+              leveledUp={ui.runMissions?.leveledUp}
+            />
             <SaveScore
               key={ui.runId}
               score={ui.score}
@@ -357,5 +380,48 @@ function Toggles({
         {settings.reducedMotion ? 'Menos movimento: sim' : 'Menos movimento: não'}
       </button>
     </div>
+  );
+}
+
+/** Trio de missões com progresso; no fim da corrida destaca as que acabou de cumprir. */
+function MissionList({
+  missions,
+  level,
+  justDone,
+  leveledUp,
+}: {
+  missions: Mission[];
+  level: number;
+  justDone?: string[];
+  leveledUp?: boolean;
+}) {
+  if (!missions.length) return null;
+  return (
+    <section className="missions" aria-label={`Missões, nível ${level}`}>
+      <p className="missions-head">
+        {leveledUp ? (
+          <strong className="level-up">Subiu para o nível {level}! Novas missões:</strong>
+        ) : (
+          <>
+            Missões <span className="missions-level">Nível {level}</span>
+          </>
+        )}
+      </p>
+      <ol className="missions-list">
+        {missions.map((m) => (
+          <li key={m.kind} className={m.done ? 'is-done' : undefined} data-new={justDone?.includes(m.kind) && !leveledUp ? '' : undefined}>
+            <span className="mission-check" aria-hidden="true">
+              {m.done ? '✔' : ''}
+            </span>
+            <span className="mission-text">{missionText(m)}</span>
+            {!m.done && m.target > 1 && (
+              <span className="mission-progress">
+                {m.progress}/{m.target}
+              </span>
+            )}
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }
