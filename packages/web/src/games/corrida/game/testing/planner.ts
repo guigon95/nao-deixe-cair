@@ -73,6 +73,16 @@ export interface PlanOptions {
 
 const DT = SIM.fixedDt;
 
+/** Pisou na lama (no chão, em cima de uma poça): conta como erro, como bater no caixote. */
+function onMud(level: Level, r: Runner): boolean {
+  if (!r.grounded || r.y !== 0 || !level.muds.length) return false;
+  for (const m of level.muds) {
+    if (m.x0 > r.x) return false;
+    if (r.x <= m.x1) return true;
+  }
+  return false;
+}
+
 export function planRoute(level: Level, start: Runner, opts: PlanOptions): Jump[] | null {
   const maxJumps = opts.maxJumps ?? 6;
   const ctx = {
@@ -149,7 +159,7 @@ function search(ctx: Ctx, r0: Runner, t0: number, stepOffset: number, jumpsLeft:
     const death = stepRunner(r, ctl, ctx.level, speed(ctx, t), DT, ctx.sink);
     t += DT;
     steps++;
-    if (death || ctx.sink.bad) break;
+    if (death || ctx.sink.bad || onMud(ctx.level, r)) break;
   }
   if (jumpsLeft <= 0) return null;
   // 2) Só vale pular pouco antes do perigo: dos pontos mais tardios para os mais cedo.
@@ -215,7 +225,7 @@ function tryJump(ctx: Ctx, r0: Runner, t0: number, holdSteps: number): { r: Runn
     ctx.sink.bad = false;
     const death = stepRunner(r, ctl, ctx.level, speed(ctx, t), DT, ctx.sink);
     t += DT;
-    if (death || ctx.sink.bad) return null;
+    if (death || ctx.sink.bad || onMud(ctx.level, r)) return null;
     // Pousou (depois de soltar): devolve o controle para a busca.
     if (i > 0 && r.grounded && i >= holdSteps) return { r, t, steps: i + 1, reached: r.x >= ctx.goalX };
   }

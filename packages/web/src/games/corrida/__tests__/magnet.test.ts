@@ -108,3 +108,24 @@ describe('ímã de capim', () => {
   });
 });
 
+
+describe('embalo do ímã (regressão)', () => {
+  it('com o ímã ligado, o embalo fica em 1 (não oscila)', async () => {
+    const { Engine } = await import('../game/Engine');
+    const { MemoryStorage } = await import('../../../shared/storage/storage');
+    const { SIM } = await import('../game/config');
+    const e = new Engine({ storage: new MemoryStorage(), seed: 4, lives: 0, resumeDelay: 0 });
+    e.start();
+    const l = e.track.level;
+    l.rocks.length = l.thorns.length = l.crates.length = 0;
+    l.ground.length = 0;
+    l.addGround(-800, 40_000);
+    e.track.genX = 40_000;
+    e.magnet = 6;
+    for (let i = 0; i < 120; i++) e.step(SIM.fixedDt);
+    for (let i = 0; i < 20; i++) {
+      e.step(SIM.fixedDt);
+      expect(e.boost).toBe(1);
+    }
+  });
+});

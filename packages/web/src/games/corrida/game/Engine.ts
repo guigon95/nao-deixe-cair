@@ -309,7 +309,8 @@ export class Engine {
     // embalo do ímã (+10%, sobe e desce em 0,5 s).
     const target = this.magnet > 0 ? 1 : 0;
     const k = dt / MAGNET.boostRamp;
-    this.boost = target > this.boost ? Math.min(1, this.boost + k) : Math.max(0, this.boost - k);
+    if (target > this.boost) this.boost = Math.min(1, this.boost + k);
+    else if (target < this.boost) this.boost = Math.max(0, this.boost - k);
     const kr = dt / MOUNT.ramp;
     this.ride = this.riding ? Math.min(1, this.ride + kr) : Math.max(0, this.ride - kr);
     // Montada não agarra cipó (montaria não balança); a anta atropela.
