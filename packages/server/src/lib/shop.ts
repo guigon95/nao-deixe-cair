@@ -27,6 +27,7 @@ export const CATALOG: Record<GameId, readonly CatalogItem[]> = {
   ],
   aviao: [],
   corrida: [],
+  cobrinha: [],
 };
 
 export const DEFAULT_SKIN = 'classica';

@@ -4,6 +4,7 @@ import type { GameId } from '../shared/storage/keys';
 export function GameArt({ id }: { id: GameId }) {
   if (id === 'bolinha') return <BallArt />;
   if (id === 'corrida') return <RunnerArt />;
+  if (id === 'cobrinha') return <SnakeArt />;
   return <PlaneArt />;
 }
 
@@ -138,6 +139,44 @@ function RunnerArt() {
         <ellipse cx="32.2" cy="-26.5" rx="0.9" ry="1.6" fill="#160d06" />
         <ellipse cx="17.5" cy="-30.2" rx="1.7" ry="1.1" fill="#1b120a" />
         <path d="M15.1 -30.9 Q17.5 -32.1 19.9 -30.9" stroke="#5b3a1f" strokeWidth="1.4" fill="none" />
+      </g>
+    </svg>
+  );
+}
+
+/** Fominha: a cobrinha de terno serpenteando no tapete verde atrás de um maço de dinheiro. */
+function SnakeArt() {
+  return (
+    <svg viewBox="0 0 200 120" width="100%" height="100%">
+      <rect width="200" height="120" fill="#14204a" />
+      <rect x="8" y="8" width="184" height="104" rx="8" fill="#ffd23f" />
+      <rect x="11" y="11" width="178" height="98" rx="6" fill="#2f8a4a" />
+      {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+        <rect key={i} x={11 + i * 22} y="11" width="11" height="98" fill="#2a7d43" />
+      ))}
+      <path
+        d="M30 92 H78 V58 H122 V40"
+        stroke="#23336a"
+        strokeWidth="16"
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M30 92 H78 V58 H122 V40" stroke="#34488f" strokeWidth="6" fill="none" strokeDasharray="2 10" strokeLinecap="round" />
+      <path d="M118 48 L122 60 L126 48 Z" fill="#e8443a" />
+      <g className="art-bob">
+        <circle cx="122" cy="32" r="15" fill="#ffc8a2" stroke="#3a2a2a" strokeWidth="1.5" />
+        <path d="M108 30 Q106 14 122 15 Q138 14 137 28 Q132 22 122 22 Q112 22 108 30 Z" fill="#2b2b3a" />
+        <circle cx="117" cy="31" r="2.6" fill="#1d1d2b" />
+        <circle cx="127" cy="31" r="2.6" fill="#1d1d2b" />
+        <path d="M114 38 Q122 46 130 38 Q122 41 114 38 Z" fill="#7a1e2e" />
+      </g>
+      <g transform="translate(160 36) rotate(-10)">
+        <rect x="-14" y="-8" width="28" height="16" rx="2" fill="#6fd38a" stroke="#1e5c30" strokeWidth="1.5" />
+        <rect x="-3" y="-8" width="6" height="16" fill="#fff3c4" />
+      </g>
+      <g transform="translate(158 82)">
+        <path d="M-12 8 L-8 -6 L8 -6 L12 8 Z" fill="#ffcc33" stroke="#9a6a00" strokeWidth="1.5" />
       </g>
     </svg>
   );

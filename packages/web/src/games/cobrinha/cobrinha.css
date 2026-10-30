@@ -1,0 +1,123 @@
+/* Ajustes visuais do Fominha sobre o tema compartilhado (painéis, botões). */
+.cobrinha {
+  --bg: #14204a;
+  background: #14204a;
+}
+
+.cobrinha .title-accent {
+  color: #ffd23f;
+  text-shadow: 0 0.06em 0 #b8860b, 0 0 0.6em rgba(255, 210, 63, 0.35);
+}
+
+.cobrinha .btn-primary {
+  background: linear-gradient(180deg, #8ee59a, #3fb45a);
+  color: #0d2a14;
+  box-shadow: 0 0.3em 0 #23763a, 0 0.6em 1.4em rgba(63, 180, 90, 0.3);
+}
+
+.cobrinha .btn-primary:active {
+  box-shadow: 0 0.15em 0 #23763a;
+}
+
+.cobrinha .panel {
+  background: rgba(15, 23, 58, 0.88);
+  border-color: rgba(255, 210, 63, 0.35);
+}
+
+.cobrinha .menu {
+  gap: 0.45em;
+  padding-top: 1em;
+}
+
+.fominha-hero {
+  margin-top: -0.2em;
+  animation: fominha-bob 1.6s ease-in-out infinite;
+}
+
+.fominha-eye {
+  animation: fominha-look 3.2s ease-in-out infinite;
+}
+
+@keyframes fominha-bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-3deg);
+  }
+  50% {
+    transform: translateY(-0.2em) rotate(3deg);
+  }
+}
+
+@keyframes fominha-look {
+  0%,
+  40%,
+  100% {
+    transform: translateX(0);
+  }
+  50%,
+  80% {
+    transform: translateX(-3px);
+  }
+}
+
+.cobrinha .subtitle {
+  margin: -0.3em 0 0;
+  font-weight: 800;
+  font-size: 0.95em;
+  color: #ffd23f;
+}
+
+.menu-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.3em;
+  font-size: 0.78em;
+  font-weight: 800;
+}
+
+.menu-items li {
+  padding: 0.2em 0.5em;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  white-space: nowrap;
+}
+
+.cobrinha .run-stats {
+  margin: 0;
+  display: flex;
+  gap: 1em;
+  justify-content: center;
+  font-size: 0.9em;
+  opacity: 0.9;
+}
+
+.go-line {
+  margin: 0;
+  font-weight: 800;
+  text-align: center;
+  color: #ffd23f;
+}
+
+.cobrinha .gameover .panel-title {
+  font-size: 1.25em;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.disclaimer {
+  margin: 0.2em 0 0;
+  font-size: 0.68em;
+  opacity: 0.6;
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fominha-hero,
+  .fominha-eye {
+    animation: none;
+  }
+}

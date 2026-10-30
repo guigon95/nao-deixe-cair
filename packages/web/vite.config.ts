@@ -21,6 +21,7 @@ export default defineConfig({
         bolinha: 'bolinha/index.html',
         aviao: 'aviao/index.html',
         corrida: 'corrida/index.html',
+        cobrinha: 'cobrinha/index.html',
       },
     },
   },

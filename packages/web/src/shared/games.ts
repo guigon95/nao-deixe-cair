@@ -36,6 +36,13 @@ export const GAMES: readonly GameInfo[] = [
     href: 'aviao/',
     accent: '#ff7a45',
   },
+  {
+    id: 'cobrinha',
+    name: 'Fominha',
+    tagline: 'Deslize para virar. Coma dinheiro, ouro e mansões e cresça sem bater.',
+    href: 'cobrinha/',
+    accent: '#3fb45a',
+  },
 ];
 
 export function readBest(storage: Storage, game: GameId): number {
