@@ -1,5 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { Analytics } from '@vercel/analytics/react';
 import '../../shared/ui/game.css';
 import './corrida.css';
 import { GameScreen } from './app/GameScreen';
@@ -9,5 +10,6 @@ createRoot(document.getElementById('root')!).render(
     <main className="app">
       <GameScreen />
     </main>
+    <Analytics />
   </StrictMode>,
 );
