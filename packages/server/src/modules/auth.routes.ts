@@ -1,4 +1,3 @@
-import crypto from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
@@ -58,20 +57,6 @@ export async function authRoutes(app: FastifyInstance, ctx: AppContext) {
   app.post('/api/auth/logout', async (req, reply) => {
     await destroySession(prisma, req, reply);
     return { ok: true };
-  });
-
-  // TEMPORÁRIO: troca de senha pelo administrador (só existe com ADMIN_RESET_TOKEN definido).
-  app.post('/api/admin/reset-password', strict, async (req) => {
-    const expected = process.env.ADMIN_RESET_TOKEN ?? '';
-    const got = String(req.headers['x-admin-token'] ?? '');
-    const ok =
-      expected.length >= 32 &&
-      got.length === expected.length &&
-      crypto.timingSafeEqual(Buffer.from(got), Buffer.from(expected));
-    if (!ok) throw new HttpError(404, 'Não encontrado');
-    const body = parse(credentials, req.body);
-    const updated = await prisma.player.updateMany({ where: { nameKey: nameKey(body.name) }, data: { passwordHash: await hashPassword(body.password) } });
-    return { updated: updated.count };
   });
 
   app.get('/api/auth/me', async (req) => {
