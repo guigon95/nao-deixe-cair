@@ -44,6 +44,7 @@ with sync_playwright() as p:
     a.evaluate("""() => localStorage.setItem('ndc:bolinha:wallet', JSON.stringify({coins: 80, owned: ['classica','padrao','bolhas'], skin: 'classica', trail: 'bolhas'}))""")
     a.reload(); a.wait_for_selector("text=JOGAR"); a.wait_for_timeout(500)
     a.tap(".menu >> text=Entrar"); a.wait_for_timeout(100)
+    a.tap(".account-switch-btn"); a.wait_for_timeout(100)
     a.fill("#player-name", NAME); a.fill("#player-password", PW); a.tap("button[type=submit]")
     a.wait_for_selector(f".menu >> text={NAME}", timeout=5000); a.wait_for_timeout(1200)
     coins = shop_coins(a)
@@ -68,7 +69,7 @@ with sync_playwright() as p:
     b, errB = device(br)
     b.goto(BASE + "/bolinha/?debug&seed=9"); b.wait_for_selector("text=JOGAR"); b.wait_for_timeout(500)
     check("aparelho novo começa sem moedas", int(b.locator(".shop-open").inner_text().split()[-1]) == 0)
-    b.tap(".menu >> text=Entrar"); b.tap("text=Já tenho conta")
+    b.tap(".menu >> text=Entrar")
     b.fill("#player-name", NAME); b.fill("#player-password", PW); b.tap("button[type=submit]")
     b.wait_for_selector(f".menu >> text={NAME}", timeout=5000); b.wait_for_timeout(1500)
     best_b = int(b.locator(".menu .best strong").inner_text()) if b.locator(".menu .best strong").count() else 0

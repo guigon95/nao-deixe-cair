@@ -582,7 +582,23 @@ button:focus-visible {
 }
 
 .account-switch {
-  align-self: center;
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.account-switch-q {
+  color: var(--dim);
+  font-size: 0.9em;
+}
+
+.account-switch-btn {
+  min-height: 44px;
 }
 
 .save-sub.is-error {

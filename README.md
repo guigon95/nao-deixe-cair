@@ -71,10 +71,13 @@ API em `packages/server` (Fastify 5 + Prisma 6 + Postgres), no mesmo formato do 
 | Rota | O quê |
 |---|---|
 | `GET /api/health` | 200 só quando API **e** banco respondem — o front usa isso para decidir entre modo online e local |
-| `POST /api/auth/register` · `login` · `logout`, `GET /api/auth/me` | conta com apelido + senha (bcrypt), sessão em cookie `httpOnly` |
+| `POST /api/auth/register` · `login` · `logout`, `GET /api/auth/me` | conta com apelido + senha (bcrypt), sessão em cookie `httpOnly` que dura `SESSION_TTL_DAYS` (180 dias): quem entrou continua conectado ao abrir o hub ou um jogo |
 | `GET /api/games/:jogo/ranking` | top 10 do jogo (melhor de cada conta + convidados) e, com sessão, a posição do jogador |
 | `POST /api/games/:jogo/runs` | token assinado do início da partida |
 | `POST /api/games/:jogo/scores` | envia a pontuação com o token |
+
+- **Tela de entrada**: abre em "Entrar na sua conta" (apelido + senha), com o botão "Criar conta" logo abaixo para quem ainda não tem cadastro.
+- **Continuar conectado**: ao abrir, o jogo tenta falar com o servidor até 3 vezes (o banco gratuito pode estar acordando) antes de desistir. Se o servidor estiver fora, a conta salva continua aparecendo e o jogo tenta reconectar a cada 20 s e quando a internet volta.
 
 Ranking semanal (é o que aparece primeiro):
 
@@ -119,7 +122,7 @@ Sem banco conectado o deploy continua funcionando: a API responde 503 e os jogos
 
 Na primeira abertura depois da atualização, `migrateLegacyKeys` copia **uma única vez** as chaves antigas `nao-deixe-cair:*` para as novas (sem apagar as antigas e sem sobrescrever valores novos). Ninguém perde recorde, ranking nem perfil.
 
-| `ndc:account` | nome da última conta online (só para mostrar na hora; a sessão de verdade é o cookie) |
+| `ndc:account` | nome da última conta online (mostrado na hora e enquanto o servidor não responde; a sessão de verdade é o cookie) |
 
 Front online em `packages/web/src/shared/online/`: `api.ts` (cliente HTTP), `services.ts` (rotas), `player.ts` (conta online ou perfil local), `RankingController.ts` (ranking online/local, tokens, fallback) e `hooks.ts` (`usePlayer`, `useRanking`, usados pelo hub e pelos dois jogos).
 

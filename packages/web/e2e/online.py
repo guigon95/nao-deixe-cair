@@ -40,8 +40,11 @@ with sync_playwright() as p:
     a.goto(BASE + "/"); a.wait_for_selector(".hub-foot[data-mode='online']", timeout=8000)
     check("hub detecta o servidor", True)
     a.tap(".hub-profile >> text=Entrar"); a.wait_for_timeout(150)
-    check("login online pede senha e começa em Criar conta",
-          a.locator("#player-password").count() == 1 and a.locator("text=Criar sua conta").count() == 1)
+    check("login online pede senha e começa em Entrar, com botão de criar conta",
+          a.locator("#player-password").count() == 1 and a.locator("text=Entrar na sua conta").count() == 1
+          and a.locator(".account-switch-btn >> text=Criar conta").count() == 1)
+    a.tap(".account-switch-btn"); a.wait_for_timeout(100)
+    check("botão Criar conta troca para o cadastro", a.locator("text=Criar sua conta").count() == 1)
     a.fill("#player-name", NAME_A); a.fill("#player-password", "123"); a.tap("button[type=submit]"); a.wait_for_timeout(150)
     check("senha curta mostra erro sem chamar o servidor", "6 caracteres" in a.locator("#name-hint").inner_text())
     a.fill("#player-password", PW); a.tap("button[type=submit]")
@@ -102,7 +105,6 @@ with sync_playwright() as p:
     # B entra na conta de A (outro aparelho)
     b.tap("text=Menu inicial"); b.wait_for_timeout(200)
     b.tap(".menu >> text=Entrar"); b.wait_for_timeout(100)
-    b.tap("text=Já tenho conta"); b.wait_for_timeout(100)
     b.fill("#player-name", NAME_A); b.fill("#player-password", "errada99"); b.tap("button[type=submit]")
     b.wait_for_selector("#name-hint.is-error", timeout=5000)
     check("senha errada mostra erro", "incorretos" in b.locator("#name-hint").inner_text())

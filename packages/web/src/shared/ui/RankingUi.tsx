@@ -178,6 +178,7 @@ function NameForm({
   submitLabel,
   initial,
   withPassword = false,
+  newPassword = false,
   onSubmit,
   onCancel,
   footer,
@@ -187,6 +188,8 @@ function NameForm({
   submitLabel: string;
   initial: string;
   withPassword?: boolean;
+  /** Criando conta: o gerenciador de senhas sugere uma senha nova. */
+  newPassword?: boolean;
   onSubmit: (name: string, password: string) => Promise<string | null> | string | null | void;
   onCancel: () => void;
   footer?: ReactNode;
@@ -247,7 +250,7 @@ function NameForm({
           name="player-password"
           className="name-input"
           type="password"
-          autoComplete="current-password"
+          autoComplete={newPassword ? 'new-password' : 'current-password'}
           enterKeyHint="done"
           maxLength={72}
           value={password}
@@ -289,7 +292,8 @@ function AccountForm({
   onSignIn: (name: string, password: string, create: boolean) => Promise<string | null> | string | null | void;
   onCancel: () => void;
 }) {
-  const [create, setCreate] = useState(true);
+  // Primeiro o login; quem não tem conta toca em "Criar conta".
+  const [create, setCreate] = useState(false);
   const suffix = saveAfter ? ' e salvar' : '';
   if (!online) {
     return (
@@ -314,17 +318,21 @@ function AccountForm({
       hint={
         create
           ? 'Escolha um apelido e uma senha. Sua conta vale em qualquer aparelho e suas pontuações entram no ranking sozinhas.'
-          : 'Use o apelido e a senha da sua conta.'
+          : 'Use o apelido e a senha da sua conta. Você continua conectado neste aparelho.'
       }
       submitLabel={create ? `Criar conta${suffix}` : `Entrar${suffix}`}
       initial={initial}
       withPassword
+      newPassword={create}
       onSubmit={(n, p) => onSignIn(n, p, create)}
       onCancel={onCancel}
       footer={
-        <button type="button" className="btn btn-link btn-tiny account-switch" onClick={() => setCreate((c) => !c)}>
-          {create ? 'Já tenho conta' : 'Não tem conta? Criar conta'}
-        </button>
+        <div className="account-switch">
+          <span className="account-switch-q">{create ? 'Já tem conta?' : 'Ainda não tem conta?'}</span>
+          <button type="button" className="btn btn-secondary btn-inline account-switch-btn" onClick={() => setCreate((c) => !c)}>
+            {create ? 'Entrar' : 'Criar conta'}
+          </button>
+        </div>
       }
     />
   );

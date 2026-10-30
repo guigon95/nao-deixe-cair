@@ -36,22 +36,33 @@ export class PlayerService {
     return { mode: 'checking', profile: this.cachedAccount() ?? this.local.current() };
   }
 
-  /** Descobre se há servidor e quem está logado. */
+  /**
+   * Descobre se há servidor e quem está logado. O banco pode estar "acordando"
+   * (plano gratuito dorme parado) ou a rede pode falhar por um instante: tenta
+   * de novo algumas vezes antes de desistir, para não pedir login à toa.
+   */
   async check(): Promise<PlayerState> {
-    // health só responde 200 quando a API E o banco estão de pé
-    if (!(await this.api.available())) return { mode: 'local', profile: this.local.current() };
-    try {
-      const me = await this.api.me();
-      this.cacheAccount(me);
-      return { mode: 'online', profile: me };
-    } catch (e) {
-      if (e instanceof ApiError && !e.unavailable) {
-        // servidor respondeu, mas com erro inesperado: trata como online sem conta
-        return { mode: 'online', profile: null };
+    for (let attempt = 0; attempt <= this.retryDelays.length; attempt++) {
+      if (attempt > 0) await this.wait(this.retryDelays[attempt - 1]);
+      // health só responde 200 quando a API E o banco estão de pé
+      if (!(await this.api.available())) continue;
+      try {
+        const me = await this.api.me();
+        this.cacheAccount(me);
+        return { mode: 'online', profile: me };
+      } catch (e) {
+        // erro de verdade do servidor (não de rede nem 5xx): online sem conta
+        if (e instanceof ApiError && !e.unavailable && e.status < 500) return { mode: 'online', profile: null };
       }
-      return { mode: 'local', profile: this.local.current() };
     }
+    // Servidor fora do ar: quem já tinha entrado continua aparecendo como
+    // conectado (as pontuações ficam neste aparelho até o servidor voltar).
+    return { mode: 'local', profile: this.cachedAccount() ?? this.local.current() };
   }
+
+  /** Esperas entre as tentativas de falar com o servidor (ms). */
+  retryDelays: number[] = [1200, 3000];
+  private wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
   /** Entra (ou cria a conta). Retorna o perfil ou a mensagem de erro. */
   async signIn(mode: PlayerMode, name: string, password: string, create: boolean): Promise<{ profile: Profile } | { error: string }> {
@@ -72,10 +83,9 @@ export class PlayerService {
   }
 
   async signOut(mode: PlayerMode): Promise<void> {
-    if (mode === 'online') {
-      this.cacheAccount(null);
-      await this.api.logout().catch(() => undefined);
-    } else this.local.signOut();
+    this.cacheAccount(null);
+    if (mode === 'online') await this.api.logout().catch(() => undefined);
+    else this.local.signOut();
   }
 
   private cachedAccount(): Profile | null {

@@ -41,10 +41,21 @@ export function usePlayer(storage: Storage): PlayerApi {
   useEffect(() => {
     alive.current = true;
     recheck();
+    // Voltou a internet ou a aba: confere de novo (sessão continua valendo).
+    const again = () => recheck();
+    window.addEventListener('online', again);
     return () => {
       alive.current = false;
+      window.removeEventListener('online', again);
     };
   }, [recheck]);
+
+  // Sem servidor por enquanto: tenta reconectar de tempos em tempos.
+  useEffect(() => {
+    if (state.mode !== 'local') return;
+    const id = window.setInterval(recheck, 20_000);
+    return () => window.clearInterval(id);
+  }, [state.mode, recheck]);
 
   const signIn = useCallback(
     async (name: string, password: string, create: boolean) => {

@@ -61,6 +61,7 @@ describe('PlayerService', () => {
   it('sem servidor usa o perfil local de antes', async () => {
     const storage = new MemoryStorage();
     const svc = new PlayerService(storage, new OnlineApi(fakeFetch(() => 'network').fn));
+    svc.retryDelays = [0, 0];
     svc.local.signIn('Gui');
     expect(await svc.check()).toMatchObject({ mode: 'local', profile: { name: 'Gui', provider: 'local' } });
     const r = await svc.signIn('local', 'Bia', '', false);
@@ -69,7 +70,39 @@ describe('PlayerService', () => {
 
   it('API sem banco (health 503) também é modo local', async () => {
     const svc = new PlayerService(new MemoryStorage(), new OnlineApi(fakeFetch(() => ({ status: 503, body: { ok: false } })).fn));
+    svc.retryDelays = [0, 0];
     expect((await svc.check()).mode).toBe('local');
+  });
+
+  it('banco acordando: tenta de novo e continua logado (sem pedir login à toa)', async () => {
+    let health = 0;
+    const f = fakeFetch((url) => {
+      if (url === '/api/health') return ++health < 3 ? { status: 503, body: { ok: false } } : { status: 200, body: { ok: true } };
+      return { status: 200, body: { player: { id: 'p1', name: 'Gui', createdAt: 'x' } } };
+    });
+    const svc = new PlayerService(new MemoryStorage(), new OnlineApi(f.fn));
+    svc.retryDelays = [0, 0];
+    expect(await svc.check()).toMatchObject({ mode: 'online', profile: { id: 'p1', name: 'Gui' } });
+    expect(health).toBe(3);
+  });
+
+  it('erro passageiro do servidor ao ver a sessão (500) também tenta de novo', async () => {
+    let me = 0;
+    const f = fakeFetch((url) => {
+      if (url === '/api/health') return { status: 200, body: { ok: true } };
+      return ++me === 1 ? { status: 500, body: { error: 'x' } } : { status: 200, body: { player: { id: 'p1', name: 'Gui', createdAt: 'x' } } };
+    });
+    const svc = new PlayerService(new MemoryStorage(), new OnlineApi(f.fn));
+    svc.retryDelays = [0, 0];
+    expect(await svc.check()).toMatchObject({ mode: 'online', profile: { name: 'Gui' } });
+  });
+
+  it('servidor fora do ar: quem já tinha entrado continua aparecendo como conectado', async () => {
+    const storage = new MemoryStorage();
+    storage.setItem(HUB_KEYS.account, JSON.stringify({ id: 'p1', name: 'Gui', provider: 'online', createdAt: 'x' }));
+    const svc = new PlayerService(storage, new OnlineApi(fakeFetch(() => 'network').fn));
+    svc.retryDelays = [0, 0];
+    expect(await svc.check()).toMatchObject({ mode: 'local', profile: { name: 'Gui', provider: 'online' } });
   });
 
   it('com servidor: conta logada, guarda o nome para a próxima abertura', async () => {
