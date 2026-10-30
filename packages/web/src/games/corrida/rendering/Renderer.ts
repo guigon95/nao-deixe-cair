@@ -84,6 +84,10 @@ export class Renderer {
   /** Câmera: x do mundo na borda esquerda da arena e quanto subiu (u). */
   camX = 0;
   lift = 0;
+  /** Caminho recente da capivara (mundo): os filhotes seguem por ele. */
+  private trail: Array<{ x: number; y: number }> = [];
+  /** Filhotes fugindo depois de uma batida (só desenho). */
+  private scattered: Array<{ x: number; y: number; vx: number; t: number; ph: number }> = [];
   /** 0..1: quanto do "modo céu" (tucano) está aparecendo. */
   sky = 0;
   private skyCache = new Map<string, CanvasGradient>();
@@ -131,6 +135,13 @@ export class Renderer {
   follow(engine: Engine, dt: number, snap = false): void {
     const p = this.runnerPos(engine);
     this.camX = p.x - BODY.screenX;
+    this.recordTrail(engine, p);
+    for (let i = this.scattered.length - 1; i >= 0; i--) {
+      const s = this.scattered[i];
+      s.t += dt;
+      s.x += s.vx * dt;
+      if (s.t > 1.6) this.scattered.splice(i, 1);
+    }
     // Sobe a câmera só quando a capivara vai alto (copa das árvores, mola). Pulos
     // normais (até ~160) não mexem a câmera; na copa (200) ela sobe ~55.
     // Na toca, desce para mostrar o túnel por baixo da terra.
@@ -232,6 +243,7 @@ export class Renderer {
       if (l.kind === 'capim') this.drawFruit({ x: l.x, y: l.y, taken: false, risky: false }, opts.time);
       else this.drawItem(l.kind, this.sx(l.x), this.sy(l.y), opts.time);
     }
+    this.drawPups(engine, opts.time);
     this.drawParticles(fx);
     this.drawRunner(engine, fx, opts.time, opts.beat ?? null);
     this.drawSwarm(engine, opts.time);
@@ -1303,6 +1315,96 @@ export class Renderer {
     }
   }
 
+  /** Guarda o caminho da capivara (para a fila de filhotes andar por ele). */
+  private recordTrail(engine: Engine, p: { x: number; y: number }): void {
+    const t = this.trail;
+    const last = t[t.length - 1];
+    if (!last || p.x < last.x - 50) {
+      t.length = 0;
+      t.push({ x: p.x, y: p.y });
+      return;
+    }
+    if (Math.hypot(p.x - last.x, p.y - last.y) >= 3) t.push({ x: p.x, y: p.y });
+    while (t.length > 2 && t[0].x < p.x - 320) t.shift();
+    void engine;
+  }
+
+  /** Ponto do caminho a `dist` unidades atrás da capivara. */
+  private trailAt(dist: number): { x: number; y: number } | null {
+    const t = this.trail;
+    if (t.length < 2) return null;
+    let left = dist;
+    for (let i = t.length - 1; i > 0; i--) {
+      const a = t[i];
+      const b = t[i - 1];
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      if (d >= left) {
+        const k = left / d;
+        return { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k };
+      }
+      left -= d;
+    }
+    return t[0];
+  }
+
+  /** Filhotes que fogem para trás depois de uma batida. */
+  scatterPups(n: number): void {
+    for (let i = 0; i < n; i++) {
+      const p = this.trailAt(30 + i * 27) ?? { x: this.camX + BODY.screenX - 20 * (i + 1), y: 0 };
+      this.scattered.push({ x: p.x, y: Math.max(0, p.y), vx: -(90 + i * 35), t: 0, ph: i * 1.7 });
+    }
+  }
+
+  /** Filhotes: os perdidos esperando no caminho, a fila atrás da capivara e os que fogem. */
+  private drawPups(engine: Engine, time: number): void {
+    const ctx = this.ctx;
+    const S = 0.55;
+    const pup = (x: number, y: number, run: number, pose: Pose, flip = false) => {
+      ctx.save();
+      ctx.translate(this.sx(x), this.sy(y));
+      ctx.scale(flip ? -S : S, S);
+      drawCapivara(ctx, 0, 0, { pose, run, squash: 0, time, tilt: 0 });
+      ctx.restore();
+    };
+    // Esperando no caminho: virado para a mãe, com um coraçãozinho pulsando.
+    for (const p of engine.track.level.pups) {
+      if (p.taken) continue;
+      const x = this.sx(p.x);
+      if (x < this.viewL - 30 || x > this.viewR + 30) continue;
+      const hop = Math.max(0, Math.sin(time * 6 + p.x)) * 3;
+      pup(p.x, hop, 0, 'idle', true);
+      const pulse = 1 + Math.sin(time * 7) * 0.15;
+      this.drawHeart(x - 2, this.sy(0) - 34 - hop, 6 * pulse);
+    }
+    // A fila: cada filhote anda pelo caminho da mãe, um pouco mais atrás.
+    if (!isDead(engine)) {
+      for (let i = 0; i < engine.pups; i++) {
+        const q = this.trailAt(30 + i * 27);
+        if (!q) break;
+        const air = q.y > 2;
+        pup(q.x, q.y, (q.x / 14 + i) % (Math.PI * 2), air ? 'fall' : 'run');
+      }
+    }
+    // Fugindo depois da batida (pulinhos para trás).
+    for (const s of this.scattered) {
+      const hop = Math.abs(Math.sin(s.t * 9 + s.ph)) * 10;
+      ctx.globalAlpha = Math.max(0, 1 - s.t / 1.6);
+      pup(s.x, s.y + hop, s.t * 20, 'run', true);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  /** Coraçãozinho (filhote esperando). */
+  private drawHeart(x: number, y: number, r: number): void {
+    const ctx = this.ctx;
+    ctx.fillStyle = '#ff5a7a';
+    ctx.beginPath();
+    ctx.moveTo(x, y + r * 0.9);
+    ctx.bezierCurveTo(x - r * 1.4, y - r * 0.1, x - r * 0.6, y - r * 1.1, x, y - r * 0.35);
+    ctx.bezierCurveTo(x + r * 0.6, y - r * 1.1, x + r * 1.4, y - r * 0.1, x, y + r * 0.9);
+    ctx.fill();
+  }
+
   /** Tufo de capim dourado (o do Jalapão), cintilando. */
   private drawGoldenTuft(x: number, y: number, s: number, time: number): void {
     const ctx = this.ctx;
@@ -2114,6 +2216,31 @@ export class Renderer {
       ctx.strokeText('DISPARADA PRONTA →', W - 10, my + 26);
       ctx.fillStyle = `rgba(255, 200, 90, ${pulse.toFixed(3)})`;
       ctx.fillText('DISPARADA PRONTA →', W - 10, my + 26);
+    }
+
+    // Filhotes na fila: ícones e o bônus, embaixo dos metros.
+    if (engine.pups > 0) {
+      const n = engine.pups;
+      const y0 = engine.golden > 0 ? 84 : 76;
+      ctx.save();
+      for (let i = 0; i < n; i++) {
+        ctx.save();
+        ctx.translate(W / 2 - (n * 19) / 2 + i * 19 - 12, y0 + 6);
+        ctx.scale(0.3, 0.3);
+        drawCapivara(ctx, 0, 0, { pose: 'idle', run: 0, squash: 0, time, tilt: 0 });
+        ctx.restore();
+      }
+      ctx.font = '800 11px system-ui, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+      const txt = `+${Math.round(n * 25)}%`;
+      const tx = W / 2 + (n * 19) / 2 - 2;
+      ctx.strokeText(txt, tx, y0 + 4);
+      ctx.fillStyle = '#ffd9a0';
+      ctx.fillText(txt, tx, y0 + 4);
+      ctx.restore();
+      ctx.textAlign = 'center';
     }
 
     // Dicas nos primeiros segundos.

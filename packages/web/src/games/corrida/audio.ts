@@ -351,6 +351,16 @@ export class RunnerSfx extends SynthAudio {
     this.tone(160, 90, 0.06, 'triangle', 0.25, 0.02, 0.002);
   }
 
+  /** Filhote: guinchinho agudo ao entrar na fila; ao se espalharem, piados descendo. */
+  pup(join: boolean): void {
+    if (join) {
+      this.tone(1300, 1900, 0.07, 'sine', 0.22);
+      this.tone(1500, 2200, 0.08, 'sine', 0.2, 0.09);
+    } else {
+      for (let i = 0; i < 3; i++) this.tone(1800 - i * 200, 1100 - i * 150, 0.08, 'sine', 0.18, i * 0.08);
+    }
+  }
+
   /** Montaria: aparece (ema: "bum" grave; anta: assobio), monta (fanfarra curta) ou sai (piado). */
   mount(phase: 'appear' | 'ride' | 'off', animal: 'ema' | 'anta' | 'tucano' = 'ema'): void {
     if (phase === 'appear' && animal === 'tucano') {

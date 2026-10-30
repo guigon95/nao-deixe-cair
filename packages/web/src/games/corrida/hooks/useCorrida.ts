@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { MUSIC, RunnerSfx, vibrate } from '../audio';
-import { ARENA, SWARM } from '../game/config';
+import { ARENA, PUPS, SWARM } from '../game/config';
 import { Engine } from '../game/Engine';
 import { Missions, missionText, type Mission } from '../game/Missions';
 import { SwipeDetector } from '../game/Gestures';
@@ -295,6 +295,17 @@ export function useCorrida(options: CorridaOptions = {}) {
         case 'log':
           if (e.phase === 'roll') sfx.logRoll();
           else completed(missions.log());
+          break;
+        case 'pup':
+          sfx.pup(e.phase === 'join');
+          if (e.phase === 'join') {
+            completed(missions.pups(e.count));
+            fx.float(e.x + 30, e.y + 70, e.count >= PUPS.max ? `${e.count} FILHOTES! +${e.count * 25}%` : `FILHOTE! +${e.count * 25}%`, true, '#ffd9a0');
+            fx.burst(e.x, e.y + 20, 8, 90, ['#ff5a7a', '#ffd9a0'], 0.5, 2.4, false);
+          } else {
+            fx.float(e.x + 20, e.y + 70, e.count > 1 ? 'OS FILHOTES SE ESPALHARAM!' : 'O FILHOTE FUGIU!', true, '#ffb3c0');
+            renderer.scatterPups(e.count);
+          }
           break;
         case 'acai':
           sfx.acai();

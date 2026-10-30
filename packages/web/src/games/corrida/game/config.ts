@@ -236,6 +236,19 @@ export const CONTINUES = {
   swarm: 240,
 } as const;
 
+/** Filhotes perdidos: pegando, entram na fila atrás da capivara e somam pontos. */
+export const PUPS = {
+  /** Chance por padrão, a partir de quando aparecem e intervalo mínimo (s). */
+  chance: 0.22,
+  firstAfter: 15,
+  minGap: 10,
+  /** Quantos cabem na fila e quanto cada um soma aos pontos (+25%). */
+  max: 5,
+  bonus: 0.25,
+  /** Raio para pegar. */
+  pickup: 26,
+} as const;
+
 /** Tora rolando. */
 export const LOG = {
   /** Raio (altura 2r = 36: um toque curto passa). */

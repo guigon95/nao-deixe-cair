@@ -1,4 +1,4 @@
-import { CONTINUES, CRATE_LOOT, SKY_TRAIL, DASH, GOLDEN, ITEMS, JUMP, MAGNET, MOUNT, MOUNTS, SCORING, SHIELD, SIM, SWARM, TOCA, type JumpParams } from './config';
+import { CONTINUES, CRATE_LOOT, PUPS, SKY_TRAIL, DASH, GOLDEN, ITEMS, JUMP, MAGNET, MOUNT, MOUNTS, SCORING, SHIELD, SIM, SWARM, TOCA, type JumpParams } from './config';
 import { speedAt, tierAt } from './Difficulty';
 import { logX } from './Level';
 import { createRunner, runnerSpeed, stepRunner, type Controls, type StepSink } from './Physics';
@@ -75,6 +75,8 @@ export class Engine {
   shield = false;
   /** Dentro da toca (por baixo da terra). */
   inBurrow = false;
+  /** Filhotes na fila atrás da capivara. */
+  pups = 0;
   /** Prêmios saindo dos caixotes, voando até a capivara. */
   readonly loot: Loot[] = [];
   /** Montaria (ema) solta, montada ou fugindo; null = nenhuma. */
@@ -205,6 +207,7 @@ export class Engine {
     this.mount = null;
     this.ride = 0;
     this.rideSpeed = 0;
+    this.pups = 0;
     this.track.update(0, 0, speedAt(0));
     this.setState(GameState.PLAYING);
   }
@@ -342,6 +345,7 @@ export class Engine {
     else this.swarm = SWARM.rest;
 
     this.stepItems(r, dt);
+    this.stepPups(r);
     this.stepMount(r, dt);
     this.stepLogs(r);
     this.stepSkyTrails(r);
@@ -489,6 +493,7 @@ export class Engine {
     m.y = Math.max(0, r.y);
     m.vy = cause === 'toca' ? 760 : 0;
     if (cause !== 'toca' && cause !== 'tired') {
+      this.losePups();
       r.vy = cause === 'river' ? JUMP.springVelocity : JUMP.jumpVelocity * MOUNT.hop;
       r.grounded = false;
       r.jumped = true;
@@ -577,6 +582,32 @@ export class Engine {
     }
   }
 
+  /** Multiplicador de pontos: capim dourado × bônus dos filhotes. */
+  private updateMult(): void {
+    this.score.mult = (this.golden > 0 ? GOLDEN.mult : 1) * (1 + PUPS.bonus * this.pups);
+  }
+
+  /** Pega os filhotes perdidos que estão no caminho. */
+  private stepPups(r: Runner): void {
+    for (const p of this.track.level.pups) {
+      if (p.x - PUPS.pickup > r.x + 20) break;
+      if (p.taken || Math.abs(p.x - r.x) > PUPS.pickup || r.y > 40 || r.y < -20) continue;
+      p.taken = true;
+      if (this.pups < PUPS.max) this.pups++;
+      this.updateMult();
+      this.emit({ type: 'pup', phase: 'join', count: this.pups, x: p.x, y: 0 });
+    }
+  }
+
+  /** Uma batida espalha os filhotes (eles fogem para trás). */
+  private losePups(): void {
+    if (this.pups <= 0) return;
+    const n = this.pups;
+    this.pups = 0;
+    this.updateMult();
+    this.emit({ type: 'pup', phase: 'lost', count: n, x: this.runner.x, y: this.runner.y });
+  }
+
   /** Efeito de um item especial pego (no percurso ou saído de um caixote). */
   private applyItem(kind: ItemKind, x: number, y: number): void {
     if (kind === 'magnet') {
@@ -593,7 +624,7 @@ export class Engine {
     } else if (kind === 'golden') {
       if (this.golden <= 0) this.emit({ type: 'golden', on: true, x, y });
       this.golden = GOLDEN.duration;
-      this.score.mult = GOLDEN.mult;
+      this.updateMult();
     }
   }
 
@@ -663,7 +694,7 @@ export class Engine {
       this.golden -= dt;
       if (this.golden <= 0) {
         this.golden = 0;
-        this.score.mult = 1;
+        this.updateMult();
         this.emit({ type: 'golden', on: false, x: r.x, y: r.y });
       }
     }
@@ -700,6 +731,7 @@ export class Engine {
   private useShield(cause: DeathCause): boolean {
     if (cause === 'swarm') return false;
     const r = this.runner;
+    this.losePups();
     this.shield = false;
     if (cause === 'river') {
       const lvl = this.track.level;
@@ -730,6 +762,7 @@ export class Engine {
 
   private die(cause: DeathCause): void {
     const r = this.runner;
+    this.losePups();
     if (this.mount?.state === 'ridden') {
       this.mount.state = 'fleeing';
       this.mount.t = 0;
@@ -836,7 +869,10 @@ export class Engine {
         else if (dashing) this.score.addBonus(SCORING.smash);
         else if (r.tank) this.score.addBonus(SCORING.smash);
         else if (this.riding) this.dismount('crate');
-        else r.slow = Math.min(r.slow, SWARM.slowFactor);
+        else {
+          r.slow = Math.min(r.slow, SWARM.slowFactor);
+          this.losePups();
+        }
         this.emit({ type: 'crate', x: (c.x0 + c.x1) / 2, y: c.top / 2, stomp: stomp || dashing || r.tank });
       },
       smash: (o: Rock | Thorns | Log, r) => {

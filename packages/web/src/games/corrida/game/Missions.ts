@@ -29,6 +29,7 @@ export type MissionKind =
   | 'burrows'
   | 'ema'
   | 'logs'
+  | 'pups'
   | 'runs';
 
 interface MissionDef {
@@ -42,6 +43,8 @@ interface MissionDef {
   round: number;
   /** Nível mínimo para aparecer. */
   minLevel: number;
+  /** Alvo máximo (quando o jogo tem um limite, como 5 filhotes na fila). */
+  max?: number;
   text(n: number): string;
 }
 
@@ -63,6 +66,7 @@ export const MISSION_DEFS: readonly MissionDef[] = [
   { kind: 'burrows', scope: 'total', base: 2, growth: 0.4, round: 1, minLevel: 2, text: (n) => `Entre na toca secreta ${n} vezes` },
   { kind: 'ema', scope: 'total', base: 2, growth: 0.4, round: 1, minLevel: 2, text: (n) => `Monte numa ema, anta ou tucano ${n} vezes` },
   { kind: 'logs', scope: 'total', base: 3, growth: 0.4, round: 1, minLevel: 1, text: (n) => `Desvie de ${n} toras rolando` },
+  { kind: 'pups', scope: 'run', base: 2, growth: 0.3, round: 1, minLevel: 2, max: 5, text: (n) => `Junte ${n} filhotes na fila numa corrida` },
   { kind: 'winter', scope: 'run', base: 1, growth: 0, round: 1, minLevel: 3, text: () => 'Chegue ao inverno numa corrida' },
 ];
 
@@ -98,7 +102,8 @@ export function missionText(m: Mission): string {
 
 export function targetFor(def: MissionDef, level: number): number {
   const raw = def.base * (1 + def.growth * (level - 1));
-  return Math.max(def.round, Math.round(raw / def.round) * def.round);
+  const t = Math.max(def.round, Math.round(raw / def.round) * def.round);
+  return def.max ? Math.min(def.max, t) : t;
 }
 
 /** Sorteia 3 missões de tipos diferentes, permitidas no nível. */
@@ -189,6 +194,11 @@ export class Missions {
 
   log(): Mission[] {
     return this.bump({}, { logs: 1 });
+  }
+
+  /** Filhotes na fila agora (missão de corrida: o melhor da corrida conta). */
+  pups(count: number): Mission[] {
+    return this.bump({ pups: count }, {});
   }
 
   spring(): Mission[] {

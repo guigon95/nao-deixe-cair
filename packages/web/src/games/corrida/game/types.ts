@@ -76,6 +76,12 @@ export interface Log {
   passed: boolean;
 }
 
+/** Filhote de capivara perdido, esperando no caminho. */
+export interface Pup {
+  x: number;
+  taken: boolean;
+}
+
 /** Caixote: atravessar atrasa (o enxame chega perto); cair em cima quica. */
 export interface Crate {
   x0: number;
@@ -221,6 +227,7 @@ export type GameEvent =
   | { type: 'canopy'; x: number; y: number }
   | { type: 'magnet'; on: boolean; x: number; y: number }
   | { type: 'acai'; x: number; y: number }
+  | { type: 'pup'; phase: 'join' | 'lost'; count: number; x: number; y: number }
   | { type: 'log'; phase: 'roll' | 'dodge'; x: number }
   | { type: 'mount'; phase: 'appear' | 'ride' | 'off'; animal: MountAnimal; x: number; y: number; reason?: 'hit' | 'river' | 'toca' | 'timeout' | 'tired' }
   | { type: 'loot'; x: number; y: number; kind: 'capim' | ItemKind; n: number }

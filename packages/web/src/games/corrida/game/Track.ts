@@ -2,7 +2,7 @@ import { difficultyAt, riskyFruitChance, speedAt } from './Difficulty';
 import { Level } from './Level';
 import { Builder, PATTERNS, pickPattern, type Pattern } from './patterns';
 import { createRng, randRange, type Rng } from '../../../shared/random';
-import { CRATE_LOOT, ITEMS, type MountAnimal } from './config';
+import { CRATE_LOOT, ITEMS, PUPS, type MountAnimal } from './config';
 import type { ItemKind } from './types';
 
 /** Quanto gerar à frente da capivara (u): mais que uma tela larga. */
@@ -35,6 +35,8 @@ export class Track {
   /** Sorteios dos itens especiais (separado, para não mexer na sequência de padrões). */
   private itemRng: Rng = createRng(1);
   private crateRng: Rng = createRng(2);
+  private pupRng: Rng = createRng(3);
+  private lastPup = -Infinity;
   private lastItem = -Infinity;
   private lastMount = -Infinity;
   /** Força uma lista de padrões (testes); vazio = sorteio. */
@@ -50,6 +52,8 @@ export class Track {
     this.itemRng = createRng(itemSeed);
     // Sorteio próprio dos caixotes: não mexe no percurso nem nos itens.
     this.crateRng = createRng((itemSeed ^ 0x9e3779b9) >>> 0);
+    this.pupRng = createRng((itemSeed ^ 0x51ed270b) >>> 0);
+    this.lastPup = -Infinity;
     this.lastItem = -Infinity;
     this.lastMount = -Infinity;
     this.level.clear();
@@ -88,6 +92,7 @@ export class Track {
     const dur = pattern.build(b);
     this.maybeItem(t, firstFruit);
     this.fillCrates(t, firstCrate);
+    this.maybePup(t, firstFruit);
     this.history.push({ id: pattern.id, x: this.genX, t });
     if (this.history.length > 64) this.history.shift();
     // Chão do padrão, com os buracos.
@@ -120,6 +125,20 @@ export class Track {
         }
       }
     }
+  }
+
+  /** De vez em quando, um filhote perdido espera no chão no lugar de um capim deste padrão. */
+  private maybePup(t: number, firstFruit: number): void {
+    if (t < PUPS.firstAfter || t - this.lastPup < PUPS.minGap) return;
+    if (this.pupRng() >= PUPS.chance) return;
+    // Só no chão (capim na altura dos pés) e fora dos arriscados.
+    const ground = this.level.fruits.slice(firstFruit).filter((f) => !f.risky && Math.abs(f.y - 17) < 0.5);
+    if (!ground.length) return;
+    const f = ground[Math.floor(this.pupRng() * ground.length)];
+    this.level.fruits.splice(this.level.fruits.indexOf(f), 1);
+    this.level.pups.push({ x: f.x, taken: false });
+    this.level.pups.sort((a, b) => a.x - b.x);
+    this.lastPup = t;
   }
 
   /** De vez em quando, troca um capim deste padrão (fora dos arriscados) por um item especial. */
