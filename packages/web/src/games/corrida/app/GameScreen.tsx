@@ -9,7 +9,7 @@ import { HubBack } from '../../../shared/ui/HubBack';
 import { LoginPanel, RankingPanel, SaveScore, WeeklyCallout } from '../../../shared/ui/RankingUi';
 import { corridaAds, useCorridaAds } from './useAds';
 
-type Overlay = 'ranking' | 'login' | null;
+type Overlay = 'ranking' | 'login' | 'rotate' | null;
 
 export function GameScreen() {
   // Pedido de nova partida pelo teclado passa pelo intersticial (ref: o hook de anúncios vem depois).
@@ -47,6 +47,27 @@ export function GameScreen() {
     onSaved: () => playSound('success'),
   });
   const [overlay, setOverlay] = useState<Overlay>(null);
+  // Primeira vez com o celular em pé: aviso animado de que dá para jogar deitado.
+  const [rotateSeen, setRotateSeen] = useState(() => {
+    try {
+      return storage.getItem(STORAGE.rotateSeen) === '1';
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    if (!rotateSeen && ui.portrait && ui.state === GameState.READY && overlay === null) setOverlay('rotate');
+  }, [rotateSeen, ui.portrait, ui.state, overlay]);
+  const closeRotate = () => {
+    try {
+      storage.setItem(STORAGE.rotateSeen, '1');
+    } catch {
+      /* vale só nesta visita */
+    }
+    setRotateSeen(true);
+    playSound('click');
+    setOverlay(null);
+  };
   // Recorde da conta (servidor) vale em qualquer aparelho.
   const accountBest = player.mode === 'online' && profile?.provider === 'online' ? (rank.me?.best ?? 0) : 0;
   useEffect(() => {
@@ -266,6 +287,8 @@ export function GameScreen() {
             }}
           />
         )}
+
+        {overlay === 'rotate' && <RotateIntro onOk={closeRotate} />}
 
         {overlay === 'login' && (
           <LoginPanel
@@ -553,6 +576,60 @@ function LastChance({
       )}
       <button className="btn btn-link" onClick={onSeeResult}>
         Ver resultado
+      </button>
+    </section>
+  );
+}
+
+/**
+ * Aviso de entrada: um celular girando de em pé para deitado (e voltando)
+ * mostra que dá para jogar na horizontal. Some no "Entendi" e não volta.
+ */
+function RotateIntro({ onOk }: { onOk: () => void }) {
+  const okRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => okRef.current?.focus({ preventScroll: true }), []);
+  return (
+    <section className="panel rotate-intro" data-ui role="dialog" aria-modal="true" aria-labelledby="rotate-title">
+      <div className="rotate-phone" aria-hidden="true">
+        <svg viewBox="-40 -40 80 80" width="132" height="132">
+          <g className="rotate-phone-body">
+            <rect x="-17" y="-30" width="34" height="60" rx="6" fill="#1d2440" stroke="#cfd8ff" strokeWidth="2.5" />
+            {/* Tela em pé: pouco caminho à vista. */}
+            <g className="rotate-screen-portrait">
+              <rect x="-13" y="-24" width="26" height="46" rx="2" fill="#8fd0a0" />
+              <rect x="-13" y="12" width="26" height="10" fill="#8a5a32" />
+              <rect x="-13" y="10" width="26" height="3" fill="#57b84a" />
+              <g transform="translate(-3 10)">
+                <ellipse cx="0" cy="-4" rx="5" ry="3.2" fill="#9c6a3f" />
+                <rect x="3" y="-7.5" width="5" height="4.2" rx="1.6" fill="#8d5e37" />
+              </g>
+            </g>
+            {/* Tela deitada: o jogo se ajusta e mostra mais do caminho (pedra, capins). */}
+            <g className="rotate-screen-landscape" transform="translate(0 -1) rotate(-90)">
+              <rect x="-23" y="-13" width="46" height="26" rx="2" fill="#8fd0a0" />
+              <rect x="-23" y="6" width="46" height="7" fill="#8a5a32" />
+              <rect x="-23" y="4.5" width="46" height="2.5" fill="#57b84a" />
+              <g transform="translate(-13 5)">
+                <ellipse cx="0" cy="-3.4" rx="4.4" ry="2.8" fill="#9c6a3f" />
+                <rect x="2.6" y="-6.6" width="4.4" height="3.8" rx="1.4" fill="#8d5e37" />
+              </g>
+              <path d="M7 4.5 Q9 0 11 4.5 Z" fill="#8b8f98" />
+              <circle cx="-2" cy="-1" r="1.6" fill="#b6f04a" />
+              <circle cx="2" cy="-3" r="1.6" fill="#b6f04a" />
+              <circle cx="17" cy="0" r="1.6" fill="#b6f04a" />
+            </g>
+            <circle cx="0" cy="26" r="1.6" fill="#cfd8ff" />
+          </g>
+          <path className="rotate-arrow" d="M 26 -20 A 32 32 0 0 1 30 12" fill="none" stroke="#ffd23f" strokeWidth="3" strokeLinecap="round" />
+          <path className="rotate-arrow" d="M 30 12 l -6 -3 M 30 12 l 3 -6" stroke="#ffd23f" strokeWidth="3" strokeLinecap="round" />
+        </svg>
+      </div>
+      <h2 id="rotate-title" className="panel-title">
+        Dá para jogar deitado!
+      </h2>
+      <p className="rotate-text">Vire o celular na horizontal para ver mais do caminho. Em pé também funciona.</p>
+      <button ref={okRef} className="btn btn-primary" onClick={onOk}>
+        OK, ENTENDI
       </button>
     </section>
   );

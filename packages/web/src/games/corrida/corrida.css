@@ -393,3 +393,118 @@
 .corrida .last-chance .run-stats {
   margin-top: -0.2em;
 }
+
+/* ---------- aviso: dá para jogar com o celular deitado ---------- */
+.rotate-intro {
+  text-align: center;
+  align-items: center;
+}
+
+.rotate-phone {
+  display: flex;
+  justify-content: center;
+  margin: 4px 0 2px;
+}
+
+.rotate-phone-body {
+  transform-origin: 0 0;
+  transform-box: view-box;
+  animation: rotate-phone 3.2s ease-in-out infinite;
+}
+
+.rotate-arrow {
+  animation: rotate-arrow 3.2s ease-in-out infinite;
+}
+
+/* Em pé → deita (90°) → fica um pouco → volta em pé. */
+@keyframes rotate-phone {
+  0%,
+  18% {
+    transform: rotate(0deg);
+  }
+  42%,
+  70% {
+    transform: rotate(90deg);
+  }
+  92%,
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+/* No meio do giro, a tela troca para a versão deitada (e volta). */
+.rotate-screen-portrait {
+  animation: rotate-screen-portrait 3.2s ease-in-out infinite;
+}
+
+.rotate-screen-landscape {
+  animation: rotate-screen-landscape 3.2s ease-in-out infinite;
+}
+
+@keyframes rotate-screen-portrait {
+  0%,
+  28% {
+    opacity: 1;
+  }
+  36%,
+  80% {
+    opacity: 0;
+  }
+  88%,
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes rotate-screen-landscape {
+  0%,
+  28% {
+    opacity: 0;
+  }
+  36%,
+  80% {
+    opacity: 1;
+  }
+  88%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes rotate-arrow {
+  0%,
+  10% {
+    opacity: 1;
+  }
+  40%,
+  92% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.rotate-text {
+  margin: 0;
+  max-width: 26ch;
+  color: var(--dim);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rotate-phone-body {
+    animation: none;
+    transform: rotate(90deg);
+  }
+  .rotate-arrow {
+    animation: none;
+  }
+  .rotate-screen-portrait {
+    animation: none;
+    opacity: 0;
+  }
+  .rotate-screen-landscape {
+    animation: none;
+    opacity: 1;
+  }
+}

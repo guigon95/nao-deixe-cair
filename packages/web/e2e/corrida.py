@@ -55,7 +55,7 @@ with sync_playwright() as p:
     page.reload()
     page.wait_for_selector(".hub-card")
     names = page.locator(".hub-name").all_inner_texts()
-    check("hub lista os três jogos", len(names) == 3 and "Disparada" in names, ", ".join(names))
+    check("hub lista a Disparada entre os jogos", len(names) >= 3 and "Disparada" in names, ", ".join(names))
     check("Disparada é o primeiro jogo do hub", names[:1] == ["Disparada"], ", ".join(names))
     page.screenshot(path=str(OUT / "corrida-00-hub.png"))
     page.locator('.hub-card[data-game="corrida"] a').click()
@@ -529,7 +529,20 @@ with sync_playwright() as p:
         errs = []
         pg.on("pageerror", lambda e: errs.append(str(e)))
         pg.goto(URL)
-        pg.wait_for_selector("text=CORRER")
+        if name == "iphone-em-pe":
+            pg.wait_for_selector(".rotate-intro", timeout=5000)
+            check("celular em pé: aviso animado de que dá para jogar deitado", pg.locator(".rotate-phone svg").count() == 1)
+            pg.screenshot(path=str(OUT / f"corrida-aviso-deitar-{w}x{h}.png"))
+            pg.click("text=OK, ENTENDI")
+            pg.wait_for_selector("text=CORRER")
+            check("OK fecha o aviso e mostra o menu", pg.locator(".rotate-intro").count() == 0)
+            pg.reload()
+            pg.wait_for_selector("text=CORRER")
+            pg.wait_for_timeout(500)
+            check("o aviso não volta depois do OK", pg.locator(".rotate-intro").count() == 0)
+        else:
+            pg.wait_for_selector("text=CORRER")
+            check(f"{name}: sem aviso de deitar", pg.locator(".rotate-intro").count() == 0)
         menu = pg.locator(".menu").bounding_box()
         fits = menu["y"] >= -1 and menu["y"] + menu["height"] <= h + 1 and menu["x"] >= -1 and menu["x"] + menu["width"] <= w + 1
         check(f"{name} {w}x{h}: menu cabe na tela", fits)

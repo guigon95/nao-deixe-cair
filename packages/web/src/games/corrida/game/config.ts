@@ -331,4 +331,6 @@ export const PIT_DEATH_Y = -14;
 export const STORAGE = {
   best: gameKey('corrida', 'best'),
   ranking: gameKey('corrida', 'ranking'),
+  /** Já viu o aviso de que dá para jogar com o celular deitado. */
+  rotateSeen: 'ndc:corrida:rotateSeen',
 } as const;
