@@ -8,6 +8,7 @@ import { usePlayer, useRanking } from '../../../shared/online/hooks';
 import { HubBack } from '../../../shared/ui/HubBack';
 import { LoginPanel, RankingPanel, SaveScore, WeeklyCallout } from '../../../shared/ui/RankingUi';
 import { corridaAds, useCorridaAds } from './useAds';
+import { shareResult, type ShareData, type ShareOutcome } from './share';
 
 type Overlay = 'ranking' | 'login' | 'rotate' | null;
 
@@ -429,6 +430,17 @@ export function GameScreen() {
               }}
               onShowRanking={openRanking}
             />
+            <ShareButton
+              key={`share-${ui.runId}`}
+              data={{
+                score: ui.score,
+                meters: ui.meters,
+                fruits: ui.fruits,
+                isNewRecord: ui.isNewRecord,
+                weekPosition: savedThisRun?.week?.position,
+              }}
+              onClick={() => playSound('click')}
+            />
             <button ref={primaryRef} className="btn btn-primary" onClick={playAgain} aria-busy={ads.restarting || undefined}>
               CORRER DE NOVO
             </button>
@@ -632,5 +644,35 @@ function RotateIntro({ onOk }: { onOk: () => void }) {
         OK, ENTENDI
       </button>
     </section>
+  );
+}
+
+/** Botão de compartilhar o resultado (imagem para o WhatsApp etc.). */
+function ShareButton({ data, onClick }: { data: ShareData; onClick: () => void }) {
+  const [state, setState] = useState<'idle' | 'busy' | ShareOutcome>('idle');
+  const msg: Partial<Record<ShareOutcome, string>> = {
+    downloaded: 'Imagem salva e texto copiado: é só colar no WhatsApp!',
+    copied: 'Texto com o link copiado!',
+    failed: 'Não deu para compartilhar aqui.',
+  };
+  return (
+    <div className="share-box">
+      <button
+        className="btn btn-secondary share-btn"
+        disabled={state === 'busy'}
+        onClick={async () => {
+          onClick();
+          setState('busy');
+          setState(await shareResult(data));
+        }}
+      >
+        <span aria-hidden="true">📤</span> {state === 'busy' ? 'Preparando…' : 'COMPARTILHAR'}
+      </button>
+      {state !== 'idle' && state !== 'busy' && msg[state] && (
+        <p className="share-msg" role="status">
+          {msg[state]}
+        </p>
+      )}
+    </div>
   );
 }

@@ -15,12 +15,16 @@ export class Score {
   mult = 1;
   best = 0;
   bestAtStart = 0;
+  /** Maior distância já corrida (m) e a do começo desta partida (placa no caminho). */
+  bestMeters = 0;
+  bestMetersAtStart = 0;
   private startX = 0;
   private recordAnnounced = false;
   private frozen = false;
 
   constructor(private storage: Storage) {
     this.best = this.loadBest();
+    this.bestMeters = this.loadNumber(STORAGE.bestMeters);
   }
 
   get meters(): number {
@@ -39,6 +43,7 @@ export class Score {
     this.mult = 1;
     this.startX = startX;
     this.bestAtStart = this.best;
+    this.bestMetersAtStart = this.bestMeters;
     this.recordAnnounced = false;
     this.frozen = false;
   }
@@ -83,6 +88,14 @@ export class Score {
         /* vale só nesta sessão */
       }
     }
+    if (this.meters > this.bestMeters) {
+      this.bestMeters = this.meters;
+      try {
+        this.storage.setItem(STORAGE.bestMeters, String(this.meters));
+      } catch {
+        /* vale só nesta sessão */
+      }
+    }
     return { score, best: this.best, isNewRecord };
   }
 
@@ -106,6 +119,15 @@ export class Score {
 
   get isFrozen(): boolean {
     return this.frozen;
+  }
+
+  private loadNumber(key: string): number {
+    try {
+      const n = Number.parseInt(this.storage.getItem(key) ?? '', 10);
+      return Number.isFinite(n) && n > 0 ? n : 0;
+    } catch {
+      return 0;
+    }
   }
 
   private loadBest(): number {

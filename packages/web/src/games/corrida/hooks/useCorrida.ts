@@ -307,6 +307,12 @@ export function useCorrida(options: CorridaOptions = {}) {
             renderer.scatterPups(e.count);
           }
           break;
+        case 'recordSign':
+          sfx.meterFull();
+          fx.float(e.x + 40, 110, 'PASSOU DO SEU RECORDE!', true, '#ffd23f');
+          fx.burst(e.x + 20, 40, 26, 220, RAINBOW, 0.9, 3, false);
+          vibrate([15, 30, 15]);
+          break;
         case 'acai':
           sfx.acai();
           fx.meterGlow = 1;

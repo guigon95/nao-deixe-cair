@@ -236,6 +236,9 @@ export const CONTINUES = {
   swarm: 240,
 } as const;
 
+/** A placa "Seu recorde" só aparece a partir desta distância (m). */
+export const RECORD_SIGN_MIN = 40;
+
 /** Filhotes perdidos: pegando, entram na fila atrás da capivara e somam pontos. */
 export const PUPS = {
   /** Chance por padrão, a partir de quando aparecem e intervalo mínimo (s). */
@@ -348,4 +351,6 @@ export const STORAGE = {
   ranking: gameKey('corrida', 'ranking'),
   /** Já viu o aviso de que dá para jogar com o celular deitado. */
   rotateSeen: 'ndc:corrida:rotateSeen',
+  /** Maior distância já corrida (m): a placa "Seu recorde" fica nesse ponto. */
+  bestMeters: 'ndc:corrida:bestMeters',
 } as const;

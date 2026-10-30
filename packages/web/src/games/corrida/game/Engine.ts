@@ -1,4 +1,4 @@
-import { CONTINUES, CRATE_LOOT, PUPS, SKY_TRAIL, DASH, GOLDEN, ITEMS, JUMP, MAGNET, MOUNT, MOUNTS, SCORING, SHIELD, SIM, SWARM, TOCA, type JumpParams } from './config';
+import { CONTINUES, CRATE_LOOT, PUPS, RECORD_SIGN_MIN, SKY_TRAIL, DASH, GOLDEN, ITEMS, JUMP, MAGNET, MOUNT, MOUNTS, SCORING, SHIELD, SIM, SWARM, TOCA, type JumpParams } from './config';
 import { speedAt, tierAt } from './Difficulty';
 import { logX } from './Level';
 import { createRunner, runnerSpeed, stepRunner, type Controls, type StepSink } from './Physics';
@@ -77,6 +77,8 @@ export class Engine {
   inBurrow = false;
   /** Filhotes na fila atrás da capivara. */
   pups = 0;
+  /** Já passou da placa do recorde de distância nesta partida. */
+  passedSign = false;
   /** Prêmios saindo dos caixotes, voando até a capivara. */
   readonly loot: Loot[] = [];
   /** Montaria (ema) solta, montada ou fugindo; null = nenhuma. */
@@ -208,6 +210,7 @@ export class Engine {
     this.ride = 0;
     this.rideSpeed = 0;
     this.pups = 0;
+    this.passedSign = false;
     this.track.update(0, 0, speedAt(0));
     this.setState(GameState.PLAYING);
   }
@@ -372,6 +375,11 @@ export class Engine {
     if (death) return this.die(death);
     if (this.swarm <= 0) return this.die('swarm');
     if (this.score.checkRecord()) this.emit({ type: 'newRecord', score: this.score.score });
+    // Passou da placa "Seu recorde" (maior distância das partidas anteriores).
+    if (!this.passedSign && this.score.bestMetersAtStart >= RECORD_SIGN_MIN && this.score.meters > this.score.bestMetersAtStart) {
+      this.passedSign = true;
+      this.emit({ type: 'recordSign', x: r.x });
+    }
   }
 
   /** Ema solta: corre à frente esperando; montada: acompanha; fugindo: dispara. */

@@ -1,4 +1,4 @@
-import { ARENA, BODY, DASH, GOLDEN, MAGNET, MOUNT, SWARM, TOCA } from '../game/config';
+import { ARENA, BODY, DASH, GOLDEN, MAGNET, MOUNT, RECORD_SIGN_MIN, SCORING, SWARM, TOCA } from '../game/config';
 import type { Engine } from '../game/Engine';
 import { SIZES } from '../game/patterns';
 import { logX } from '../game/Level';
@@ -187,6 +187,7 @@ export class Renderer {
     this.drawTrees(pal);
     if (this.sky > 0.02) this.drawSkyClouds(opts.time);
     this.drawGround(engine, pal, opts.time);
+    this.drawRecordSign(engine, opts.time);
     this.drawGators(engine, opts.time);
     const lvl = engine.track.level;
     for (const p of lvl.platforms) if (p.kind === 'copa') this.drawCanopy(p, pal);
@@ -1312,6 +1313,43 @@ export class Renderer {
         ctx.ellipse(x + 4 * s, y - 7 * s, 18 * s, 10 * s, 0, 0, Math.PI * 2);
         ctx.fill();
       }
+    }
+  }
+
+  /** Placa "SEU RECORDE" no ponto da maior distância das partidas anteriores. */
+  private drawRecordSign(engine: Engine, time: number): void {
+    const m = engine.score.bestMetersAtStart;
+    if (engine.state === GameState.READY || m < RECORD_SIGN_MIN) return;
+    const x = this.sx(m * SCORING.unitsPerMeter);
+    if (x < this.viewL - 60 || x > this.viewR + 60) return;
+    const ctx = this.ctx;
+    const g = this.sy(0);
+    const passed = engine.passedSign;
+    // Poste.
+    ctx.fillStyle = '#6b4423';
+    ctx.fillRect(x - 3, g - 58, 6, 58);
+    // Placa (balança um pouco ao vento).
+    ctx.save();
+    ctx.translate(x, g - 58);
+    ctx.rotate(Math.sin(time * 2) * 0.03);
+    ctx.fillStyle = passed ? '#ffd23f' : '#c98a4b';
+    ctx.strokeStyle = '#5a3a1a';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.roundRect(-38, -30, 76, 34, 5);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#3a240f';
+    ctx.textAlign = 'center';
+    ctx.font = '900 9px system-ui, sans-serif';
+    ctx.fillText(passed ? 'RECORDE BATIDO!' : 'SEU RECORDE', 0, -17);
+    ctx.font = '900 13px system-ui, sans-serif';
+    ctx.fillText(`${m} m`, 0, -3);
+    ctx.restore();
+    // Faixa quadriculada no chão, como uma linha de chegada.
+    for (let i = 0; i < 6; i++) {
+      ctx.fillStyle = i % 2 ? '#1d1d1d' : '#ffffff';
+      ctx.fillRect(x - 6 + (i % 2) * 6, g - 2 + Math.floor(i / 2) * 3, 6, 3);
     }
   }
 

@@ -508,3 +508,22 @@
     opacity: 1;
   }
 }
+
+/* ---------- compartilhar o resultado ---------- */
+.share-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.share-btn {
+  min-height: 44px;
+}
+
+.share-msg {
+  margin: 0;
+  font-size: 0.85em;
+  color: var(--dim);
+  text-align: center;
+}

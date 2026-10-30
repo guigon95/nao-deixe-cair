@@ -237,4 +237,5 @@ export type GameEvent =
   | { type: 'fastFall' }
   | { type: 'death'; cause: DeathCause; x: number; y: number; score: number; best: number; isNewRecord: boolean; livesLeft: number; adRevivesLeft: number }
   | { type: 'continue'; livesLeft: number; via: 'life' | 'ad' }
-  | { type: 'newRecord'; score: number };
+  | { type: 'newRecord'; score: number }
+  | { type: 'recordSign'; x: number };

@@ -233,7 +233,7 @@ with sync_playwright() as p:
     page.click(".hub-back")
     page.wait_for_selector(".hub-card")
     card = page.locator('.hub-card[data-game="corrida"]').inner_text()
-    check("volta ao hub e o cartão mostra o recorde", str(s5["score"]) in card)
+    check("volta ao hub e o cartão mostra o recorde", str(s5["score"]) in card, card.replace("\n", " | ") + f" (esperado {s5['score']})")
     check("sem erros de console", not errors, "; ".join(errors[:3]))
     ctx.close()
 
@@ -483,6 +483,32 @@ with sync_playwright() as p:
     check("tora: pulando na hora certa, passa por cima", pg.evaluate("() => window.__NDC__.engine.state") == "PLAYING"
           and pg.evaluate("() => window.__NDC__.engine.track.level.logs[0]?.passed ?? true"))
     check("tora: sem erros", not errs, "; ".join(errs[:2]))
+    c.close()
+
+    # Placa do recorde e compartilhar.
+    c = browser.new_context(viewport={"width": 844, "height": 390}, accept_downloads=True)
+    c.add_init_script("localStorage.setItem('ndc:corrida:bestMeters','60')")
+    pg = c.new_page()
+    errs = []
+    pg.on("pageerror", lambda e: errs.append(str(e)))
+    pg.goto(BASE + "/corrida/?debug&seed=5")
+    pg.wait_for_selector("text=CORRER")
+    pg.click("text=CORRER")
+    pg.wait_for_timeout(150)
+    pg.evaluate("""() => { const e = window.__NDC__.engine, r = e.runner, l = e.track.level;
+        l.rocks.length = l.thorns.length = l.crates.length = l.springs.length = 0; l.fruits.length = 0; l.powerups.length = 0; l.logs.length = 0; l.pups.length = 0;
+        l.ground.length = 0; l.addGround(-800, r.x + 20000); e.track.genX = r.x + 20000; }""")
+    pg.wait_for_function("() => window.__NDC__.engine.passedSign", timeout=10000)
+    check("recorde: passar da placa do recorde de distância é avisado", True)
+    pg.evaluate("() => { const e = window.__NDC__.engine; e.livesLeft = 0; const r = e.runner; e.track.level.rocks.push({ x0: r.x + 30, x1: r.x + 64, top: 30, variant: 0, broken: false }); }")
+    pg.wait_for_function("() => ['GAME_OVER','CONTINUE'].includes(window.__NDC__.engine.state)", timeout=5000)
+    if pg.evaluate("() => window.__NDC__.engine.state") == "CONTINUE":
+        pg.evaluate("() => window.__NDC__.engine.endRun()")
+    pg.wait_for_selector("text=COMPARTILHAR", timeout=5000)
+    with pg.expect_download() as dl:
+        pg.click("text=COMPARTILHAR")
+    check("compartilhar: sem menu do sistema, baixa a imagem do resultado", dl.value.suggested_filename == "disparada.png")
+    check("compartilhar: sem erros", not errs, "; ".join(errs[:2]))
     c.close()
 
     # Toca: buraco escondido sob folhas, túnel com capim e saída que lança de volta.
