@@ -1,4 +1,4 @@
-import { CONTINUES, CRATE_LOOT, DASH, GOLDEN, ITEMS, JUMP, MAGNET, MOUNT, MOUNTS, SCORING, SHIELD, SIM, SWARM, TOCA, type JumpParams } from './config';
+import { CONTINUES, CRATE_LOOT, SKY_TRAIL, DASH, GOLDEN, ITEMS, JUMP, MAGNET, MOUNT, MOUNTS, SCORING, SHIELD, SIM, SWARM, TOCA, type JumpParams } from './config';
 import { speedAt, tierAt } from './Difficulty';
 import { logX } from './Level';
 import { createRunner, runnerSpeed, stepRunner, type Controls, type StepSink } from './Physics';
@@ -83,6 +83,9 @@ export class Engine {
   ride = 0;
   /** Velocidade extra da montaria atual (fica durante a rampa de saída). */
   private rideSpeed = 0;
+  /** Até onde já há trilha de capim no céu (voando de tucano). */
+  private skyUntil = -Infinity;
+  private skyRng = createRng(7);
   /** Tempo restante do capim dourado (s). */
   golden = 0;
   /** Pousada na copa das árvores (para avisar uma vez por subida). */
@@ -341,6 +344,7 @@ export class Engine {
     this.stepItems(r, dt);
     this.stepMount(r, dt);
     this.stepLogs(r);
+    this.stepSkyTrails(r);
     // Caiu no buraco escondido: a toca aparece e, um pouco mais fundo, entrou.
     if (!this.inBurrow && r.y < 0 && r.vy <= 0) {
       const b = this.track.level.burrowAt(r.x);
@@ -499,6 +503,65 @@ export class Engine {
     this.emit({ type: 'mount', phase: 'off', animal: m.animal, x: r.x, y: r.y, reason: cause === 'toca' || cause === 'tired' || cause === 'river' ? cause : 'hit' });
     return true;
   }
+
+  /** Voando de tucano: está no "modo céu" (trilhas de capim no ar). */
+  get skyMode(): boolean {
+    return this.riding && this.mount!.animal === 'tucano' && !this.tucanoTired;
+  }
+
+  /** Com o tucano, vai colocando trilhas de capim no céu à frente. */
+  private stepSkyTrails(r: Runner): void {
+    if (!this.skyMode) {
+      this.skyUntil = -Infinity;
+      this.lastSkyY = null;
+      return;
+    }
+    const v = Math.max(1, runnerSpeed(r, this.speed * this.speedFactor));
+    // Só até onde o tucano ainda voa (com folga para descer).
+    const flyLeft = Math.max(0, MOUNT.tucanoTime - this.mount!.t) * v;
+    const limit = Math.min(r.x + SKY_TRAIL.ahead, r.x + flyLeft - 0.6 * v);
+    if (this.skyUntil < r.x) this.skyUntil = r.x + SKY_TRAIL.firstGap;
+    let added = false;
+    while (this.skyUntil < limit) {
+      this.skyUntil = this.addSkyTrail(this.skyUntil, limit, r.y);
+      added = true;
+    }
+    if (added) this.track.level.fruits.sort((a, b) => a.x - b.x);
+  }
+
+  /** Uma trilha (onda, rampa ou zigue-zague) a partir de x0; devolve onde acabou. */
+  private addSkyTrail(x0: number, limit: number, startY: number): number {
+    const T = SKY_TRAIL;
+    const rng = this.skyRng;
+    const kind = Math.floor(rng() * 3);
+    const len = Math.min(limit - x0, 420 + rng() * 360);
+    if (len < T.spacing * 3) return limit;
+    const mid = (T.low + T.high) / 2;
+    const y0 = Math.max(T.low, Math.min(T.high, this.lastSkyY ?? startY));
+    const n = Math.floor(len / T.spacing);
+    const amp = Math.min(55, (T.high - T.low) / 2 - 5);
+    // Onda: comprimento de onda longo o bastante para a inclinação caber.
+    const wave = Math.max(len, (2 * Math.PI * amp) / T.maxSlope);
+    const dir = y0 < mid ? 1 : -1;
+    let y = y0;
+    for (let i = 0; i <= n; i++) {
+      const dx = i * T.spacing;
+      let target: number;
+      if (kind === 0) target = mid + amp * Math.sin((2 * Math.PI * dx) / wave + Math.asin(Math.max(-1, Math.min(1, (y0 - mid) / amp))));
+      else if (kind === 1) target = y0 + dir * T.maxSlope * 0.9 * dx;
+      else target = y0 + dir * (Math.abs(((dx / 160) % 2) - 1) * 2 - 1 + 1) * 45;
+      // Respeita a inclinação máxima entre capins vizinhos e a faixa de altura.
+      const step = T.maxSlope * T.spacing;
+      y = Math.max(y - step, Math.min(y + step, target));
+      y = Math.max(T.low, Math.min(T.high, y));
+      this.track.level.fruits.push({ x: x0 + dx, y: y + 17, taken: false, risky: false });
+    }
+    this.lastSkyY = y;
+    // Pequeno respiro entre uma trilha e outra.
+    return x0 + n * T.spacing + 70 + rng() * 60;
+  }
+
+  private lastSkyY: number | null = null;
 
   /** Toras: avisa quando uma começa a rolar e quando a capivara desviou dela. */
   private stepLogs(r: Runner): void {

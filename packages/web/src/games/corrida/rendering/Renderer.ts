@@ -14,6 +14,8 @@ import { boteShape, Gators, WATER_Y, type Gator } from './gators';
 
 /** Onde o chão (y = 0) aparece na arena, sem câmera subindo. */
 export const GROUND_Y = 288;
+/** Quanto a câmera sobe no modo céu (tucano): sobra só uma faixa de terra. */
+const SKY_LIFT = 52;
 
 export const COLORS = {
   rock: '#8d929c',
@@ -81,6 +83,8 @@ export class Renderer {
   /** Câmera: x do mundo na borda esquerda da arena e quanto subiu (u). */
   camX = 0;
   lift = 0;
+  /** 0..1: quanto do "modo céu" (tucano) está aparecendo. */
+  sky = 0;
   private skyCache = new Map<string, CanvasGradient>();
   private hazeCache: CanvasGradient | null = null;
   private shieldAuraCache: CanvasGradient | null = null;
@@ -129,7 +133,10 @@ export class Renderer {
     // Sobe a câmera só quando a capivara vai alto (copa das árvores, mola). Pulos
     // normais (até ~160) não mexem a câmera; na copa (200) ela sobe ~55.
     // Na toca, desce para mostrar o túnel por baixo da terra.
-    const target = p.y < TOCA.below ? TOCA.camera : Math.min(85, Math.max(0, p.y - 165) * 1.6);
+    // Voando de tucano: a câmera sobe (mais céu, só uma faixa de terra).
+    const skyTarget = engine.skyMode ? 1 : 0;
+    this.sky = snap ? skyTarget : this.sky + (skyTarget - this.sky) * Math.min(1, dt * 2.2);
+    const target = p.y < TOCA.below ? TOCA.camera : Math.max(SKY_LIFT * this.sky, Math.min(85, Math.max(0, p.y - 165) * 1.6));
     this.lift = snap ? target : this.lift + (target - this.lift) * Math.min(1, dt * 8);
   }
 
@@ -166,6 +173,7 @@ export class Renderer {
     if (this.weather.rain > 0) this.drawStormClouds(opts.time);
     this.drawHills(pal);
     this.drawTrees(pal);
+    if (this.sky > 0.02) this.drawSkyClouds(opts.time);
     this.drawGround(engine, pal, opts.time);
     this.drawGators(engine, opts.time);
     const lvl = engine.track.level;
@@ -1241,6 +1249,31 @@ export class Renderer {
     const tw = Math.max(0, Math.sin(time * 4));
     if (tw > 0.3) this.drawSparkle(-11, -9, 3.5 * tw, '#ffffff');
     ctx.restore();
+  }
+
+  /** Nuvens na altura do voo (modo céu do tucano), em duas camadas de profundidade. */
+  private drawSkyClouds(time: number): void {
+    const ctx = this.ctx;
+    const a = this.sky;
+    for (const layer of [0, 1]) {
+      const par = layer ? 0.75 : 0.45;
+      const step = layer ? 260 : 330;
+      const base = this.camX * par + time * (layer ? 30 : 12);
+      const from = Math.floor((base + this.viewL) / step) - 1;
+      const to = Math.ceil((base + this.viewR) / step) + 1;
+      ctx.fillStyle = layer ? `rgba(255, 255, 255, ${(0.85 * a).toFixed(3)})` : `rgba(255, 255, 255, ${(0.55 * a).toFixed(3)})`;
+      for (let i = from; i <= to; i++) {
+        const x = i * step - base + hash(i * 4.1 + layer) * 120;
+        const y = this.sy(70 + hash(i * 2.3 + layer * 7) * 170);
+        const s = (layer ? 1 : 0.7) * (0.8 + hash(i * 6.7) * 0.6);
+        ctx.beginPath();
+        ctx.ellipse(x, y, 34 * s, 11 * s, 0, 0, Math.PI * 2);
+        ctx.ellipse(x - 18 * s, y + 2, 18 * s, 8 * s, 0, 0, Math.PI * 2);
+        ctx.ellipse(x + 20 * s, y + 3, 20 * s, 8 * s, 0, 0, Math.PI * 2);
+        ctx.ellipse(x + 4 * s, y - 7 * s, 18 * s, 10 * s, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
   }
 
   /** Tufo de capim dourado (o do Jalapão), cintilando. */

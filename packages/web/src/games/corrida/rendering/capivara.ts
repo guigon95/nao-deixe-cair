@@ -281,19 +281,16 @@ function drawGlider(ctx: CanvasRenderingContext2D, o: CapivaraLook): void {
     ctx.ellipse(fx + 1, fy, 3.2, 1.8, 0, 0, Math.PI * 2);
     ctx.fill();
   }
-  // Braços erguidos (por trás da cabeça) até o talo, acima da cabeça.
-  const grip = { x: 4, y: -66 };
+  // Segura o talo com as duas mãos, uma acima da outra, acima da cabeça.
+  const grip = { x: 3, y: -64 };
+  const lowHand = { x: grip.x - 1, y: grip.y + 1 };
+  const highHand = { x: grip.x + 0.5, y: grip.y - 7 };
+  // Braço de trás: sobe pelo lado de trás da cabeça até a mão de baixo.
   ctx.strokeStyle = CAPIVARA.bodyDark;
   ctx.lineWidth = 4.6;
   ctx.beginPath();
-  ctx.moveTo(-5, -38);
-  ctx.quadraticCurveTo(-8, -54, grip.x - 2, grip.y + 3);
-  ctx.stroke();
-  ctx.strokeStyle = '#875832';
-  ctx.lineWidth = 5;
-  ctx.beginPath();
-  ctx.moveTo(1, -39);
-  ctx.quadraticCurveTo(-1, -55, grip.x + 1, grip.y + 2);
+  ctx.moveTo(-6, -38);
+  ctx.quadraticCurveTo(-11, -54, lowHand.x - 1.5, lowHand.y + 1);
   ctx.stroke();
   // Corpo em pé: barriga clara virada para frente, dorso escuro atrás.
   const g = ctx.createLinearGradient(-12, 0, 12, 0);
@@ -324,12 +321,31 @@ function drawGlider(ctx: CanvasRenderingContext2D, o: CapivaraLook): void {
   drawHead(ctx, { ...o, pose: 'fall' });
   ctx.restore();
   drawLeaf(ctx, t, grip.x, grip.y);
-  // Patinhas fechadas no talo.
-  ctx.fillStyle = CAPIVARA.feet;
+  // Braço da frente: passa pela nuca (atrás do olho) até a mão de cima.
+  ctx.strokeStyle = '#875832';
+  ctx.lineWidth = 5;
   ctx.beginPath();
-  ctx.ellipse(grip.x - 1, grip.y + 3, 2.6, 2, 0, 0, Math.PI * 2);
-  ctx.ellipse(grip.x + 1.5, grip.y + 1, 2.6, 2, 0, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.moveTo(4, -40);
+  ctx.quadraticCurveTo(7, -55, highHand.x + 1.5, highHand.y + 1.5);
+  ctx.stroke();
+  // As duas mãos fechadas no talo (com dedinhos).
+  for (const [h, far] of [
+    [lowHand, true],
+    [highHand, false],
+  ] as const) {
+    ctx.fillStyle = far ? '#2c1c0f' : CAPIVARA.feet;
+    ctx.beginPath();
+    ctx.ellipse(h.x, h.y, 3, 2.3, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 230, 200, 0.35)';
+    ctx.lineWidth = 0.6;
+    ctx.beginPath();
+    ctx.moveTo(h.x - 1, h.y - 2);
+    ctx.lineTo(h.x - 1, h.y + 2);
+    ctx.moveTo(h.x + 1, h.y - 2);
+    ctx.lineTo(h.x + 1, h.y + 2);
+    ctx.stroke();
+  }
 }
 
 /**

@@ -299,3 +299,57 @@ describe('tucano (montaria que voa)', () => {
     expect(mounts(events, 'off').some((ev) => ev.type === 'mount' && ev.reason === 'hit')).toBe(true);
   });
 });
+
+describe('tucano: trilhas de capim no céu', () => {
+  const sky = (e: Engine, x0: number) => e.track.level.fruits.filter((f) => f.x > x0 && f.y > 60);
+
+  it('voando de tucano aparecem trilhas no céu, com subidas que o tucano alcança', async () => {
+    const { SKY_TRAIL } = await import('../game/config');
+    const { e, l } = flat();
+    l.fruits.length = 0;
+    e.mount = { animal: 'tucano', state: 'ridden', x: e.runner.x, y: 0, vy: 0, t: 0 };
+    const x0 = e.runner.x;
+    run(e, 0.1);
+    expect(e.skyMode).toBe(true);
+    const trail = sky(e, x0).sort((a, b) => a.x - b.x);
+    expect(trail.length).toBeGreaterThan(15);
+    for (const f of trail) {
+      expect(f.y - 17).toBeGreaterThanOrEqual(SKY_TRAIL.low - 0.01);
+      expect(f.y - 17).toBeLessThanOrEqual(SKY_TRAIL.high + 0.01);
+    }
+    for (let i = 1; i < trail.length; i++) {
+      const dx = trail[i].x - trail[i - 1].x;
+      if (dx > SKY_TRAIL.spacing + 1) continue; // respiro entre trilhas
+      expect(Math.abs(trail[i].y - trail[i - 1].y) / dx).toBeLessThanOrEqual(SKY_TRAIL.maxSlope + 0.01);
+    }
+  });
+
+  it('sem tucano não há trilhas no céu; quando ele cansa, param de aparecer', () => {
+    const { e, l } = flat();
+    l.fruits.length = 0;
+    run(e, 1);
+    expect(e.skyMode).toBe(false);
+    expect(sky(e, 0)).toHaveLength(0);
+    e.mount = { animal: 'tucano', state: 'ridden', x: e.runner.x, y: 0, vy: 0, t: MOUNT.tucanoTime + 1 };
+    run(e, 0.2);
+    expect(e.skyMode).toBe(false);
+    expect(sky(e, 0)).toHaveLength(0);
+  });
+
+  it('dá para pegar boa parte da trilha guiando o tucano', () => {
+    const { e, l } = flat();
+    l.fruits.length = 0;
+    e.mount = { animal: 'tucano', state: 'ridden', x: e.runner.x, y: 0, vy: 0, t: 0 };
+    run(e, 0.05);
+    const before = e.score.fruits;
+    // Piloto simples: segura quando o próximo capim está acima, solta quando abaixo.
+    for (let i = 0; i < 6 / DT && e.state === GameState.PLAYING; i++) {
+      const r = e.runner;
+      const next = l.fruits.find((f) => !f.taken && f.x > r.x + 10 && f.y > 60);
+      e.setHolding(!!next && next.y - 17 > r.y + 2);
+      e.step(DT);
+    }
+    const total = l.fruits.filter((f) => f.y > 60).length;
+    expect(e.score.fruits - before).toBeGreaterThan(total * 0.6);
+  });
+});

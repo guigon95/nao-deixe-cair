@@ -288,6 +288,23 @@ export const MOUNT = {
   tucanoHover: 72,
 } as const;
 
+/**
+ * Voando de tucano: trilhas de capim no céu (ondas, rampas, zigue-zague)
+ * para guiar o voo. As inclinações respeitam o quanto o tucano sobe e desce.
+ */
+export const SKY_TRAIL = {
+  /** Distância entre capins na trilha (u). */
+  spacing: 34,
+  /** Faixa de altura dos pés da capivara carregada. */
+  low: 60,
+  high: 205,
+  /** Inclinação máxima (dy/dx): o tucano sobe ~380 u/s e desce ~330 u/s. */
+  maxSlope: 0.45,
+  /** Gera trilhas até esta distância à frente e começa logo depois da tela. */
+  ahead: 950,
+  firstGap: 220,
+} as const;
+
 export type MountAnimal = 'ema' | 'anta' | 'tucano';
 
 export interface MountSpec {
