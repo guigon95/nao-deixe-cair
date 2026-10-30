@@ -252,6 +252,11 @@ export const PUPS = {
   pickup: 26,
 } as const;
 
+/** Lama: quanto atrasa (fator de velocidade enquanto pisa nela). */
+export const MUD = {
+  slow: 0.55,
+} as const;
+
 /** Tora rolando. */
 export const LOG = {
   /** Raio (altura 2r = 36: um toque curto passa). */

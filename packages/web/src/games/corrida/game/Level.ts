@@ -1,4 +1,4 @@
-import type { Burrow, Crate, Log, Pup, Fruit, GroundSpan, Platform, PowerUp, Rock, Spring, Thorns, Vine } from './types';
+import type { Burrow, Crate, Log, Mud, Pup, Fruit, GroundSpan, Platform, PowerUp, Rock, Spring, Thorns, Vine } from './types';
 
 /**
  * Conteúdo do percurso já gerado: listas em ordem crescente de x. O gerador
@@ -18,6 +18,7 @@ export class Level {
   burrows: Burrow[] = [];
   logs: Log[] = [];
   pups: Pup[] = [];
+  muds: Mud[] = [];
 
   clear(): void {
     this.ground.length = 0;
@@ -32,6 +33,7 @@ export class Level {
     this.burrows.length = 0;
     this.logs.length = 0;
     this.pups.length = 0;
+    this.muds.length = 0;
   }
 
   /** Acrescenta chão; emenda com o trecho anterior se encostar. */
@@ -54,6 +56,7 @@ export class Level {
     keep(this.thorns);
     keep(this.crates);
     keep(this.springs);
+    keep(this.muds);
     // Toras que encontrariam a capivara no trecho limpo somem.
     for (let i = this.logs.length - 1; i >= 0; i--) if (logMeet(this.logs[i]) <= b + 300) this.logs.splice(i, 1);
     // Toca no trecho: some (os buracos dela viram chão até o fim dela).
@@ -102,6 +105,7 @@ export class Level {
     dropBefore(this.powerups, x, (u) => u.x + 30);
     dropBefore(this.burrows, x, (u) => u.x1);
     dropBefore(this.pups, x, (u) => u.x + 30);
+    dropBefore(this.muds, x, (m) => m.x1);
     for (let i = this.logs.length - 1; i >= 0; i--) if (logMeet(this.logs[i]) + 300 < x) this.logs.splice(i, 1);
   }
 
@@ -137,7 +141,8 @@ export class Level {
       this.powerups.length +
       this.burrows.length +
       this.logs.length +
-      this.pups.length
+      this.pups.length +
+      this.muds.length
     );
   }
 }

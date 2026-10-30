@@ -313,6 +313,11 @@ export function useCorrida(options: CorridaOptions = {}) {
           fx.burst(e.x + 20, 40, 26, 220, RAINBOW, 0.9, 3, false);
           vibrate([15, 30, 15]);
           break;
+        case 'mud':
+          sfx.mud();
+          fx.float(e.x + 30, 60, 'ATOLOU!', false, '#d9b48a');
+          fx.burst(e.x, 4, 10, 120, ['#5a3a1c', '#7a5230', '#3d2611'], 0.5, 2.6, true);
+          break;
         case 'acai':
           sfx.acai();
           fx.meterGlow = 1;

@@ -27,6 +27,14 @@ export interface Rock {
   /** Variante visual. */
   variant: number;
   broken: boolean;
+  /** Cupinzeiro (Cerrado): mais alto, de terra vermelha; dá para subir em cima. */
+  kind?: 'cupim';
+}
+
+/** Lama (Pantanal): correndo nela a capivara fica lenta; pulando, passa. */
+export interface Mud {
+  x0: number;
+  x1: number;
 }
 
 /** Galho/tronco suspenso: só segura quem vem de cima ("uma via"). */
@@ -125,6 +133,8 @@ export interface Thorns {
   x1: number;
   top: number;
   broken: boolean;
+  /** Mandacaru (Caatinga): cacto alto e estreito, cheio de espinhos. */
+  kind?: 'mandacaru';
 }
 
 /** Flor-mola: pousar em cima lança bem alto. */
@@ -227,6 +237,7 @@ export type GameEvent =
   | { type: 'canopy'; x: number; y: number }
   | { type: 'magnet'; on: boolean; x: number; y: number }
   | { type: 'acai'; x: number; y: number }
+  | { type: 'mud'; x: number }
   | { type: 'pup'; phase: 'join' | 'lost'; count: number; x: number; y: number }
   | { type: 'log'; phase: 'roll' | 'dodge'; x: number }
   | { type: 'mount'; phase: 'appear' | 'ride' | 'off'; animal: MountAnimal; x: number; y: number; reason?: 'hit' | 'river' | 'toca' | 'timeout' | 'tired' }

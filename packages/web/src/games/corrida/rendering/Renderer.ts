@@ -2,7 +2,7 @@ import { ARENA, BODY, DASH, GOLDEN, MAGNET, MOUNT, RECORD_SIGN_MIN, SCORING, SWA
 import type { Engine } from '../game/Engine';
 import { SIZES } from '../game/patterns';
 import { logX } from '../game/Level';
-import { GameState, type Burrow, type Log, type Crate, type Fruit, type ItemKind, type Platform, type Rock, type Spring, type Thorns, type Vine } from '../game/types';
+import { GameState, type Burrow, type Log, type Mud, type Crate, type Fruit, type ItemKind, type Platform, type Rock, type Spring, type Thorns, type Vine } from '../game/types';
 import { computeLayout, type Layout } from '../../../shared/layout/layout';
 import type { Effects } from './effects';
 import { dominantSeason, mix, paletteAt, SEASONS, type Palette, type SeasonId } from './palette';
@@ -197,6 +197,7 @@ export class Renderer {
     if (this.sky > 0.02) this.drawSkyClouds(opts.time);
     this.drawGround(engine, pal, opts.time);
     this.drawRecordSign(engine, opts.time);
+    for (const m of engine.track.level.muds) this.drawMud(m, opts.time);
     this.drawGators(engine, opts.time);
     const lvl = engine.track.level;
     for (const p of lvl.platforms) if (p.kind === 'copa') this.drawCanopy(p, pal);
@@ -223,7 +224,10 @@ export class Renderer {
     for (const r of lvl.rocks) if (!r.broken) this.drawRock(r);
     const rx = this.runnerPos(engine).x;
     for (const l of lvl.logs) if (!l.broken) this.drawLog(l, rx, opts.time);
-    for (const t of lvl.thorns) if (!t.broken) this.drawThorns(t);
+    for (const t of lvl.thorns) if (!t.broken) {
+      if (t.kind === 'mandacaru') this.drawMandacaruObstacle(t);
+      else this.drawThorns(t);
+    }
     // O que fica dentro de uma toca ainda escondida não aparece.
     const hidden = (x: number, y: number) => y < 0 && lvl.burrowAt(x)?.opened === false;
     for (const f of lvl.fruits) if (!f.taken && !hidden(f.x, f.y)) this.drawFruit(f, opts.time);
@@ -1060,6 +1064,31 @@ export class Renderer {
     const x0 = this.sx(r.x0);
     const x1 = this.sx(r.x1);
     if (x1 < this.viewL - 10 || x0 > this.viewR + 10) return;
+    if (r.kind === 'cupim') {
+      // Cupinzeiro de verdade no caminho: terra vermelha com calombos e furinhos.
+      const w = x1 - x0;
+      const base = this.sy(0) + 2;
+      const top = this.sy(r.top);
+      ctx.fillStyle = '#a24f2a';
+      ctx.beginPath();
+      ctx.moveTo(x0 - 2, base);
+      ctx.quadraticCurveTo(x0 + 2, top + 20, x0 + w * 0.35, top + 2);
+      ctx.quadraticCurveTo(x0 + w * 0.5, top - 3, x0 + w * 0.68, top + 4);
+      ctx.quadraticCurveTo(x1 - 2, top + 24, x1 + 2, base);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#c56a3c';
+      ctx.beginPath();
+      ctx.ellipse(x0 + w * 0.38, top + 16, 6, 9, -0.3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#5e2a12';
+      for (const [dx, dy] of [[0.3, 0.45], [0.62, 0.3], [0.55, 0.7], [0.25, 0.75]] as const) {
+        ctx.beginPath();
+        ctx.arc(x0 + w * dx, top + (base - top) * dy, 1.8, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      return;
+    }
     const top = this.sy(r.top);
     const base = this.sy(0) + 2;
     const w = x1 - x0;
@@ -1331,6 +1360,88 @@ export class Renderer {
     ctx.lineTo(Math.cos(2.3) * (l.r - 7), Math.sin(2.3) * (l.r - 7));
     ctx.stroke();
     ctx.restore();
+  }
+
+  /** Mandacaru no caminho: cacto alto com braços e espinhos claros. */
+  private drawMandacaruObstacle(t: Thorns): void {
+    const ctx = this.ctx;
+    const x0 = this.sx(t.x0);
+    const x1 = this.sx(t.x1);
+    if (x1 < this.viewL - 20 || x0 > this.viewR + 20) return;
+    const cx = (x0 + x1) / 2;
+    const base = this.sy(0) + 1;
+    const top = this.sy(t.top);
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#2f6b3a';
+    ctx.lineWidth = 13;
+    ctx.beginPath();
+    ctx.moveTo(cx, base);
+    ctx.lineTo(cx, top + 5);
+    ctx.stroke();
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.moveTo(cx, base - 18);
+    ctx.lineTo(cx - 9, base - 18);
+    ctx.lineTo(cx - 9, base - 32);
+    ctx.moveTo(cx, base - 24);
+    ctx.lineTo(cx + 9, base - 24);
+    ctx.lineTo(cx + 9, base - 38);
+    ctx.stroke();
+    ctx.strokeStyle = '#4f9a58';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx - 2, base - 2);
+    ctx.lineTo(cx - 2, top + 6);
+    ctx.stroke();
+    // Espinhos (bem visíveis: perigo).
+    ctx.strokeStyle = '#fff3c4';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    for (let y = base - 6; y > top + 4; y -= 6) {
+      ctx.moveTo(cx - 6, y);
+      ctx.lineTo(cx - 10, y - 2);
+      ctx.moveTo(cx + 6, y - 3);
+      ctx.lineTo(cx + 10, y - 5);
+    }
+    ctx.stroke();
+    ctx.fillStyle = '#e84a5f';
+    ctx.beginPath();
+    ctx.arc(cx, top + 3, 2.6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  /** Poça de lama: marrom brilhante, com bolhas estourando. */
+  private drawMud(m: Mud, time: number): void {
+    const ctx = this.ctx;
+    const x0 = this.sx(m.x0);
+    const x1 = this.sx(m.x1);
+    if (x1 < this.viewL - 10 || x0 > this.viewR + 10) return;
+    const g = this.sy(0);
+    ctx.fillStyle = '#5a3a1c';
+    ctx.beginPath();
+    ctx.moveTo(x0 - 6, g + 2);
+    ctx.quadraticCurveTo(x0, g - 5, x0 + 10, g - 4);
+    ctx.lineTo(x1 - 10, g - 4);
+    ctx.quadraticCurveTo(x1, g - 5, x1 + 6, g + 2);
+    ctx.lineTo(x1 + 4, g + 9);
+    ctx.lineTo(x0 - 4, g + 9);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 230, 190, 0.35)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(x0 + 10, g - 2);
+    ctx.lineTo(x0 + (x1 - x0) * 0.45, g - 2);
+    ctx.stroke();
+    ctx.fillStyle = '#7a5230';
+    const n = Math.max(2, Math.round((x1 - x0) / 40));
+    for (let i = 0; i < n; i++) {
+      const ph = (time * 0.8 + hash(m.x0 * 0.01 + i)) % 1;
+      const bx = x0 + ((i + 0.5) / n) * (x1 - x0);
+      ctx.beginPath();
+      ctx.arc(bx, g - 3, 1.5 + ph * 3, Math.PI, 0);
+      ctx.fill();
+    }
   }
 
   private drawThorns(t: Thorns): void {

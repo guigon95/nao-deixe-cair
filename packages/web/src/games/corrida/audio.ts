@@ -351,6 +351,12 @@ export class RunnerSfx extends SynthAudio {
     this.tone(160, 90, 0.06, 'triangle', 0.25, 0.02, 0.002);
   }
 
+  /** Lama: "chlep" grave e molhado. */
+  mud(): void {
+    this.noise(0.18, 0.12, 700, 180, 'lowpass');
+    this.tone(140, 70, 0.14, 'sine', 0.3, 0.02);
+  }
+
   /** Filhote: guinchinho agudo ao entrar na fila; ao se espalharem, piados descendo. */
   pup(join: boolean): void {
     if (join) {

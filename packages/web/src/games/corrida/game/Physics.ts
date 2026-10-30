@@ -1,4 +1,4 @@
-import { BODY, DASH, JUMP, PIT_DEATH_Y, SWARM, TOCA, VINE, type JumpParams } from './config';
+import { BODY, DASH, JUMP, MUD, PIT_DEATH_Y, SWARM, TOCA, VINE, type JumpParams } from './config';
 import { logX, type Level } from './Level';
 import type { Crate, DeathCause, Fruit, Log, Rock, Runner, Spring, Thorns, Vine } from './types';
 
@@ -220,6 +220,17 @@ export function stepRunner(
         r.buffer = 0;
         r.airTime = 0;
         sink.jump(r);
+      }
+    }
+  }
+
+  // ── lama: no chão, em cima dela, a capivara atola e fica lenta ──
+  if (r.grounded && r.y === 0 && r.dash <= 0 && level.muds.length) {
+    for (const m of level.muds) {
+      if (m.x0 > r.x) break;
+      if (r.x <= m.x1) {
+        r.slow = Math.min(r.slow, MUD.slow);
+        break;
       }
     }
   }

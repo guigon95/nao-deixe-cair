@@ -69,6 +69,23 @@ export class Builder {
     this.level.rocks.push({ x0: x, x1: x + s.w, top: s.h, variant: Math.floor(this.rng() * 3), broken: false });
   }
 
+  /** Cupinzeiro (Cerrado): alto (58), dá para subir nele. */
+  cupim(t: number): void {
+    const x = this.X(t);
+    this.level.rocks.push({ x0: x, x1: x + 40, top: 58, variant: 0, broken: false, kind: 'cupim' });
+  }
+
+  /** Mandacaru (Caatinga): cacto alto e estreito (espinhos). */
+  mandacaru(t: number): void {
+    const x = this.X(t);
+    this.level.thorns.push({ x0: x, x1: x + 22, top: 46, broken: false, kind: 'mandacaru' });
+  }
+
+  /** Poça de lama de t0 a t1 (s). */
+  mud(t0: number, t1: number): void {
+    this.level.muds.push({ x0: this.X(t0), x1: this.X(t1) });
+  }
+
   crate(t: number): void {
     const x = this.X(t);
     this.level.crates.push({ x0: x, x1: x + SIZES.crate.w, top: SIZES.crate.h, broken: false, brokenAt: 0 });
@@ -446,6 +463,81 @@ export const PATTERNS: readonly Pattern[] = [
       b.crate(2.9);
       b.row(1.8, 2.3, 0, 3);
       return 4.45;
+    },
+  },
+  {
+    // Lama (Pantanal): pule a poça (segurando) ou atole e fique lenta.
+    id: 'lama',
+    tier: 1,
+    weight: 3,
+    biomes: { mata: 0, pantanal: 1, cerrado: 0.3, caatinga: 0 },
+    build(b) {
+      b.mud(0, 0.5);
+      b.arc(-0.1, HOLD_FULL, 5);
+      return 0.5;
+    },
+  },
+  {
+    // Lama e logo depois uma pedra: pule a lama sem atolar para pular a pedra.
+    id: 'lama-pedra',
+    tier: 2,
+    weight: 2,
+    biomes: { mata: 0, pantanal: 1, cerrado: 0, caatinga: 0 },
+    build(b) {
+      b.mud(0, 0.45);
+      b.rock(0.95);
+      b.arc(0.8, HOLD_TAP, 3);
+      return 1.05;
+    },
+  },
+  {
+    // Cupinzeiro (Cerrado): pule por cima ou suba nele (capim em cima).
+    id: 'cupinzeiro',
+    tier: 1,
+    weight: 3,
+    biomes: { mata: 0, pantanal: 0, cerrado: 1, caatinga: 0 },
+    build(b) {
+      b.cupim(0);
+      b.row(0.02, 0.1, 58, 2);
+      return 0.15;
+    },
+  },
+  {
+    // Dois cupinzeiros: de um para o outro por cima ou dois pulos.
+    id: 'cupinzeiros',
+    tier: 2,
+    weight: 2,
+    biomes: { mata: 0, pantanal: 0, cerrado: 1, caatinga: 0 },
+    build(b) {
+      b.cupim(0);
+      b.cupim(0.55);
+      b.row(0.15, 0.45, 95, 3);
+      return 0.7;
+    },
+  },
+  {
+    // Mandacaru (Caatinga): cacto alto, pulo um pouco segurado.
+    id: 'mandacaru',
+    tier: 1,
+    weight: 3,
+    biomes: { mata: 0, pantanal: 0, cerrado: 0, caatinga: 1 },
+    build(b) {
+      b.mandacaru(0);
+      b.arc(-0.14, HOLD_FULL, 4);
+      return 0.1;
+    },
+  },
+  {
+    // Dois mandacarus seguidos.
+    id: 'mandacarus',
+    tier: 2,
+    weight: 2,
+    biomes: { mata: 0, pantanal: 0, cerrado: 0, caatinga: 1 },
+    build(b) {
+      b.mandacaru(0);
+      b.mandacaru(0.85);
+      b.row(0.38, 0.55, 0, 2);
+      return 0.95;
     },
   },
   {

@@ -79,6 +79,8 @@ export class Engine {
   pups = 0;
   /** Já passou da placa do recorde de distância nesta partida. */
   passedSign = false;
+  /** Pisando na lama agora (para avisar uma vez por poça). */
+  private inMud = false;
   /** Prêmios saindo dos caixotes, voando até a capivara. */
   readonly loot: Loot[] = [];
   /** Montaria (ema) solta, montada ou fugindo; null = nenhuma. */
@@ -351,6 +353,9 @@ export class Engine {
     this.stepPups(r);
     this.stepMount(r, dt);
     this.stepLogs(r);
+    const mud = r.grounded && r.y === 0 && this.track.level.muds.some((m) => r.x >= m.x0 && r.x <= m.x1);
+    if (mud && !this.inMud) this.emit({ type: 'mud', x: r.x });
+    this.inMud = mud;
     this.stepSkyTrails(r);
     // Caiu no buraco escondido: a toca aparece e, um pouco mais fundo, entrou.
     if (!this.inBurrow && r.y < 0 && r.vy <= 0) {
