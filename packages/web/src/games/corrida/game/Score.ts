@@ -32,7 +32,8 @@ export class Score {
   }
 
   get score(): number {
-    return this.meters + this.fruits * SCORING.fruit + this.bonus + this.extra;
+    // Bônus de filhote (+25%) gera frações: os pontos são sempre inteiros.
+    return Math.floor(this.meters + this.fruits * SCORING.fruit + this.bonus + this.extra);
   }
 
   reset(startX: number): void {

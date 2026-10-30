@@ -2,7 +2,8 @@ import { difficultyAt, riskyFruitChance, speedAt } from './Difficulty';
 import { Level } from './Level';
 import { Builder, PATTERNS, pickPattern, type Pattern } from './patterns';
 import { createRng, randRange, type Rng } from '../../../shared/random';
-import { CRATE_LOOT, ITEMS, PUPS, type MountAnimal } from './config';
+import { CRATE_LOOT, ITEMS, PUPS, SCORING, type MountAnimal } from './config';
+import { dominantBiome } from './biome';
 import type { ItemKind } from './types';
 
 /** Quanto gerar à frente da capivara (u): mais que uma tela larga. */
@@ -83,7 +84,8 @@ export class Track {
 
   private addPattern(t: number): void {
     const d = difficultyAt(t);
-    const pattern = this.forced.length > 0 ? byId(this.forced.shift()!) : pickPattern(this.rng, d.tier, this.prev);
+    const biome = dominantBiome(this.genX / SCORING.unitsPerMeter);
+    const pattern = this.forced.length > 0 ? byId(this.forced.shift()!) : pickPattern(this.rng, d.tier, this.prev, biome);
     this.prev = pattern.id;
     const v = d.speed;
     const b = new Builder(this.level, this.genX, v, this.rng, riskyFruitChance(t));

@@ -1,5 +1,6 @@
 import { JUMP, LOG, TOCA } from './config';
 import type { Level } from './Level';
+import type { BiomeId } from './biome';
 import type { Rng } from '../../../shared/random';
 
 /**
@@ -200,6 +201,8 @@ export const HOLD_TAP = 0.08;
 
 export interface Pattern {
   id: string;
+  /** Peso extra (ou 0 = nunca) em cada bioma; o que não está aqui vale 1. */
+  biomes?: Partial<Record<BiomeId, number>>;
   /** Nível mínimo de dificuldade (ver Difficulty.ts). */
   tier: number;
   weight: number;
@@ -216,6 +219,7 @@ export const PATTERNS: readonly Pattern[] = [
   {
     // Pulo baixo sobre uma pedra.
     id: 'pedra',
+    biomes: { caatinga: 1.6, pantanal: 0.6 },
     tier: 0,
     weight: 4,
     build(b) {
@@ -227,6 +231,7 @@ export const PATTERNS: readonly Pattern[] = [
   {
     // Pedra alta: segurar um pouco mais (ou subir nela).
     id: 'pedrona',
+    biomes: { caatinga: 1.6, cerrado: 1.3 },
     tier: 0,
     weight: 2,
     build(b) {
@@ -249,6 +254,7 @@ export const PATTERNS: readonly Pattern[] = [
   {
     // Riacho: pulo curto.
     id: 'riacho',
+    biomes: { pantanal: 2, caatinga: 0.3 },
     tier: 0,
     weight: 3,
     build(b) {
@@ -260,6 +266,7 @@ export const PATTERNS: readonly Pattern[] = [
   {
     // Rio médio: segurar o pulo.
     id: 'rio',
+    biomes: { pantanal: 2, caatinga: 0.3 },
     tier: 1,
     weight: 3,
     build(b) {
@@ -272,6 +279,7 @@ export const PATTERNS: readonly Pattern[] = [
   {
     // Moita de espinhos baixa e comprida.
     id: 'espinhos',
+    biomes: { caatinga: 2 },
     tier: 1,
     weight: 3,
     build(b) {
@@ -283,6 +291,7 @@ export const PATTERNS: readonly Pattern[] = [
   {
     // Duas pedras: dois pulos separados.
     id: 'duas-pedras',
+    biomes: { caatinga: 1.5 },
     tier: 1,
     weight: 3,
     build(b) {
@@ -307,6 +316,7 @@ export const PATTERNS: readonly Pattern[] = [
   {
     // Cipó por cima de uma pedra: pule e agarre para balançar pelos capins (ou só pule a pedra).
     id: 'cipo-capim',
+    biomes: { caatinga: 0, cerrado: 0.5 },
     tier: 1,
     weight: 2,
     build(b) {
@@ -331,6 +341,7 @@ export const PATTERNS: readonly Pattern[] = [
   {
     // Flor-mola antes de um rio largo: encostar nela lança por cima.
     id: 'mola',
+    biomes: { caatinga: 0.5 },
     tier: 1,
     weight: 2,
     build(b) {
@@ -349,6 +360,7 @@ export const PATTERNS: readonly Pattern[] = [
   {
     // Pedra e logo depois um rio.
     id: 'pedra-rio',
+    biomes: { pantanal: 1.5, caatinga: 0.4 },
     tier: 2,
     weight: 3,
     build(b) {
@@ -373,6 +385,7 @@ export const PATTERNS: readonly Pattern[] = [
   {
     // Rio largo: segurar o pulo e planar no fim.
     id: 'rio-largo',
+    biomes: { pantanal: 2.2, caatinga: 0.2 },
     tier: 2,
     weight: 2,
     build(b) {
@@ -384,6 +397,7 @@ export const PATTERNS: readonly Pattern[] = [
   {
     // Ponte de galho sobre o rio: pular no galho e pular de novo.
     id: 'ponte',
+    biomes: { pantanal: 1.8, caatinga: 0.3 },
     tier: 2,
     weight: 2,
     build(b) {
@@ -396,6 +410,7 @@ export const PATTERNS: readonly Pattern[] = [
   {
     // Rio largo com cipó no meio: pular, agarrar e se lançar para o outro lado.
     id: 'cipo',
+    biomes: { caatinga: 0, cerrado: 0.5 },
     tier: 2,
     weight: 3,
     build(b) {
@@ -409,6 +424,7 @@ export const PATTERNS: readonly Pattern[] = [
     // Copa das árvores: pule no cipó e ele te lança lá em cima, onde há muito
     // capim e pequenos vãos entre as copas. Embaixo, o caminho segue com caixotes.
     id: 'copa',
+    biomes: { caatinga: 0, cerrado: 0.4, pantanal: 0.6 },
     tier: 2,
     weight: 2,
     build(b) {
@@ -438,6 +454,7 @@ export const PATTERNS: readonly Pattern[] = [
     // teto é baixo) — e o buraco de saída lança de volta para a superfície.
     // Quem pula o buraco segue por cima, com pedras e espinhos.
     id: 'toca',
+    biomes: { cerrado: 1.6, pantanal: 0.4 },
     tier: 2,
     weight: 2,
     build(b) {
@@ -458,6 +475,7 @@ export const PATTERNS: readonly Pattern[] = [
   {
     // Tora rolando: um toque curto passa por cima (ou quique nela).
     id: 'tora',
+    biomes: { caatinga: 0.4, mata: 1.3 },
     tier: 1,
     weight: 3,
     build(b) {
@@ -469,6 +487,7 @@ export const PATTERNS: readonly Pattern[] = [
   {
     // Duas toras seguidas: dois pulos no ritmo.
     id: 'toras',
+    biomes: { caatinga: 0.3 },
     tier: 3,
     weight: 2,
     build(b) {
@@ -519,6 +538,7 @@ export const PATTERNS: readonly Pattern[] = [
   {
     // Espinhos longos: pulo segurado + planar.
     id: 'espinhos-longos',
+    biomes: { caatinga: 2 },
     tier: 3,
     weight: 2,
     build(b) {
@@ -530,6 +550,7 @@ export const PATTERNS: readonly Pattern[] = [
   {
     // Rio, pedra e rio: ritmo de três pulos.
     id: 'ritmo',
+    biomes: { caatinga: 0.5 },
     tier: 3,
     weight: 2,
     build(b) {
@@ -543,6 +564,7 @@ export const PATTERNS: readonly Pattern[] = [
   {
     // Dois galhos sobre um rio comprido: pular de galho em galho.
     id: 'galhos-no-rio',
+    biomes: { pantanal: 1.8, caatinga: 0.2 },
     tier: 4,
     weight: 2,
     build(b) {
@@ -570,10 +592,11 @@ export const PATTERNS: readonly Pattern[] = [
 ];
 
 /** Escolhe um padrão permitido no nível, pelo peso, evitando repetir o anterior. */
-export function pickPattern(rng: Rng, tier: number, previous: string | null): Pattern {
-  const pool = PATTERNS.filter((p) => p.tier <= tier && p.id !== previous);
+export function pickPattern(rng: Rng, tier: number, previous: string | null, biome: BiomeId = 'mata'): Pattern {
+  const bw = (p: Pattern) => p.biomes?.[biome] ?? 1;
+  const pool = PATTERNS.filter((p) => p.tier <= tier && p.id !== previous && bw(p) > 0);
   // Padrões do nível recém-liberado aparecem um pouco mais (sensação de novidade).
-  const w = (p: Pattern) => p.weight * (p.tier === tier && tier > 0 ? 1.6 : 1);
+  const w = (p: Pattern) => p.weight * bw(p) * (p.tier === tier && tier > 0 ? 1.6 : 1);
   let total = 0;
   for (const p of pool) total += w(p);
   let r = rng() * total;

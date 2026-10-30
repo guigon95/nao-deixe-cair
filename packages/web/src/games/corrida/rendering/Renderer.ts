@@ -9,6 +9,7 @@ import { dominantSeason, mix, paletteAt, SEASONS, type Palette, type SeasonId } 
 import { drawCapivara, type Pose } from './capivara';
 import { drawMount, MOUNT_SEAT_DRAW, TUCANO_CARRY_DRAW } from './mounts';
 import { drawTucano } from './tucano';
+import { BIOMES, biomeWeights, dominantBiome, type BiomeId } from '../game/biome';
 import { crateShake } from './crateShake';
 import { Weather } from './weather';
 import { boteShape, Gators, WATER_Y, type Gator } from './gators';
@@ -95,6 +96,9 @@ export class Renderer {
   private shieldAuraCache: CanvasGradient | null = null;
   private auraCache: CanvasGradient | null = null;
   private lastSeason: SeasonId = 'verao';
+  private lastBiome: BiomeId = 'mata';
+  /** Peso de cada bioma neste quadro (cenário). */
+  private bw: Record<BiomeId, number> = { mata: 1, pantanal: 0, cerrado: 0, caatinga: 0 };
   /** Chuva (atualizada pelo hook a cada quadro). */
   readonly weather = new Weather();
   /** Botes do jacaré (atualizados pelo hook a cada quadro). */
@@ -178,6 +182,10 @@ export class Renderer {
     const season = engine.state === GameState.READY ? 'verao' : dominantSeason(meters);
     if (engine.state === GameState.PLAYING && season !== this.lastSeason) fx.showBanner(SEASONS.banner[season]);
     this.lastSeason = season;
+    const biome = engine.state === GameState.READY ? 'mata' : dominantBiome(meters);
+    if (engine.state === GameState.PLAYING && biome !== this.lastBiome) fx.showBanner(BIOMES.banner[biome]);
+    this.lastBiome = biome;
+    this.bw = engine.state === GameState.READY ? { mata: 1, pantanal: 0, cerrado: 0, caatinga: 0 } : biomeWeights(meters);
     this.winter = pal.winter >= 0.5;
     if (engine.state === GameState.PLAYING && this.weather.started) fx.showBanner(this.winter ? 'NEVASCA!' : 'CHUVA!');
 
@@ -185,6 +193,7 @@ export class Renderer {
     if (this.weather.rain > 0) this.drawStormClouds(opts.time);
     this.drawHills(pal);
     this.drawTrees(pal);
+    this.drawBiomeDecor(pal, opts.time);
     if (this.sky > 0.02) this.drawSkyClouds(opts.time);
     this.drawGround(engine, pal, opts.time);
     this.drawRecordSign(engine, opts.time);
@@ -311,7 +320,8 @@ export class Renderer {
     ctx.moveTo(this.viewL, this.viewB);
     for (let x = this.viewL; x <= this.viewR + 16; x += 16) {
       const wx = x + this.camX * 0.15;
-      const h = 34 * Math.sin(wx / 210) + 18 * Math.sin(wx / 83 + 1.7) + 50;
+      // Pantanal é plano: os morros baixam com o peso dele.
+      const h = (34 * Math.sin(wx / 210) + 18 * Math.sin(wx / 83 + 1.7) + 50) * (1 - 0.65 * this.bw.pantanal);
       ctx.lineTo(x, base - h);
     }
     ctx.lineTo(this.viewR + 16, this.viewB);
@@ -335,6 +345,12 @@ export class Renderer {
       const x = i * spacing + r1 * 40 - offset;
       const h = 70 + r2 * 90;
       const base = ground - 8 + this.lift * 0.4;
+      // Cada árvore pertence a um bioma (na transição, elas vão trocando uma a uma).
+      const tb = this.treeBiome(i);
+      if (tb !== 'mata') {
+        this.drawBiomeTree(tb, i, x, base, h, r1, r2, pal);
+        continue;
+      }
       // No inverno as araucárias vão tomando o lugar das árvores uma a uma (transição gradual).
       if (hash(i * 4.41 + 7) < pal.winter) {
         this.drawAraucaria(x, base, h + 25, 26 + r2 * 18, r1 > 0.5 ? pal.mid : pal.midDark, pal.midDark);
@@ -398,6 +414,215 @@ export class Renderer {
    * Araucária (pinheiro-do-paraná): tronco reto e alto, galhos que sobem em
    * curva formando a copa achatada de "candelabro", com geada por cima.
    */
+  /** Pantanal: lagoas com garças (e algumas voando). */
+  private drawBiomeDecor(pal: Palette, time: number): void {
+    const w = this.bw.pantanal;
+    if (w <= 0.02) return;
+    const ctx = this.ctx;
+    const ground = this.sy(0);
+    const par = 0.62;
+    const sp = 210;
+    const off = this.camX * par;
+    const first = Math.floor((this.viewL + off) / sp) - 1;
+    const last = Math.ceil((this.viewR + off) / sp) + 1;
+    for (let i = first; i <= last; i++) {
+      if (hash(i * 3.17 + 5) > w) continue;
+      const x = i * sp - off + hash(i * 1.3) * 60;
+      const y = ground - 5 + this.lift * 0.3;
+      const pw = 50 + hash(i * 2.7) * 40;
+      ctx.fillStyle = pal.water;
+      ctx.beginPath();
+      ctx.ellipse(x, y, pw, 6, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = pal.waterLight;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.ellipse(x - pw * 0.2, y - 1, pw * 0.4, 2, 0, 0, Math.PI);
+      ctx.stroke();
+      // Garça em pé na beira (às vezes duas).
+      const n = hash(i * 9.1) > 0.6 ? 2 : 1;
+      for (let k = 0; k < n; k++) this.drawEgret(x - pw * 0.3 + k * 26, y - 1, hash(i * 4.2 + k) > 0.5, time + i);
+    }
+    // Garças voando bem alto, devagar.
+    ctx.globalAlpha = w;
+    for (let k = 0; k < 3; k++) {
+      const fx = ((time * 26 + k * 260 - this.camX * 0.1) % 900) + this.viewL - 60;
+      const fy = this.sy(250 + k * 22) + Math.sin(time * 2 + k) * 4;
+      const flap = Math.sin(time * 8 + k * 2);
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(fx - 12, fy - flap * 5);
+      ctx.quadraticCurveTo(fx - 5, fy - 3, fx, fy);
+      ctx.quadraticCurveTo(fx + 5, fy - 3, fx + 12, fy - flap * 5);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /** Garça-branca em pé: pernas finas, pescoço em S, bico amarelo. */
+  private drawEgret(x: number, y: number, flip: boolean, t: number): void {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.translate(x, y);
+    if (flip) ctx.scale(-1, 1);
+    ctx.strokeStyle = '#2b2b2b';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(-1, 0);
+    ctx.lineTo(-1, -12);
+    ctx.moveTo(2, 0);
+    ctx.lineTo(1, -12);
+    ctx.stroke();
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.ellipse(0, -16, 7, 4.5, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+    const peck = Math.max(0, Math.sin(t * 0.9)) > 0.97 ? 6 : 0;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(4, -18);
+    ctx.quadraticCurveTo(9, -22, 5, -26 + peck);
+    ctx.quadraticCurveTo(3, -29 + peck, 7, -31 + peck);
+    ctx.stroke();
+    ctx.strokeStyle = '#f2c230';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(7, -31 + peck);
+    ctx.lineTo(13, -30 + peck);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /** Bioma da árvore i (sorteio fixo comparado aos pesos do quadro). */
+  private treeBiome(i: number): BiomeId {
+    let r = hash(i * 8.83 + 2);
+    for (const id of BIOMES.order) {
+      r -= this.bw[id];
+      if (r < 0) return id;
+    }
+    return 'mata';
+  }
+
+  /** Vegetação de Pantanal, Cerrado e Caatinga (mesmo lugar das árvores da mata). */
+  private drawBiomeTree(b: BiomeId, i: number, x: number, base: number, h: number, r1: number, r2: number, pal: Palette): void {
+    const ctx = this.ctx;
+    if (b === 'pantanal') {
+      if (r1 < 0.45) {
+        // Carandá: palmeira alta e fina, leque de folhas.
+        const ph = h + 30;
+        ctx.strokeStyle = pal.midDark;
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.moveTo(x, base);
+        ctx.quadraticCurveTo(x + 6, base - ph * 0.5, x + 2, base - ph);
+        ctx.stroke();
+        ctx.strokeStyle = pal.mid;
+        ctx.lineWidth = 4;
+        ctx.lineCap = 'round';
+        for (let k = 0; k < 7; k++) {
+          const a = -Math.PI + (k / 6) * Math.PI;
+          ctx.beginPath();
+          ctx.moveTo(x + 2, base - ph);
+          ctx.lineTo(x + 2 + Math.cos(a) * 24, base - ph + Math.sin(a) * 16 - 2);
+          ctx.stroke();
+        }
+      } else {
+        // Capão de mato baixo e largo.
+        ctx.fillStyle = r2 > 0.5 ? pal.mid : pal.midDark;
+        ctx.beginPath();
+        ctx.ellipse(x, base - 22, 40 + r2 * 20, 26, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      return;
+    }
+    if (b === 'cerrado') {
+      if (r1 > 0.8) {
+        this.drawCupinzeiro(x, base, 40 + r2 * 34);
+        return;
+      }
+      // Árvore torta de casca grossa e copa rala (às vezes um ipê florido).
+      const th = 50 + r2 * 50;
+      ctx.strokeStyle = '#5a3d24';
+      ctx.lineWidth = 6;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(x, base);
+      ctx.quadraticCurveTo(x - 12, base - th * 0.5, x + 6, base - th);
+      ctx.moveTo(x - 4, base - th * 0.55);
+      ctx.lineTo(x + 16, base - th * 0.8);
+      ctx.stroke();
+      const ipe = hash(i * 3.71) < 0.35;
+      ctx.fillStyle = ipe ? (hash(i * 1.9) < 0.6 ? COLORS.ipeAmarelo : '#e874b0') : r2 > 0.5 ? pal.mid : pal.midDark;
+      ctx.beginPath();
+      ctx.ellipse(x + 6, base - th - 6, 26 + r2 * 10, 14, 0, 0, Math.PI * 2);
+      ctx.ellipse(x + 18, base - th * 0.82, 14, 9, 0, 0, Math.PI * 2);
+      ctx.fill();
+      return;
+    }
+    // Caatinga: mandacarus e arbustos secos sem folha.
+    if (r1 < 0.55) this.drawMandacaru(x, base, 50 + r2 * 60, pal.mid);
+    else {
+      ctx.strokeStyle = '#7a6a55';
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      for (let k = 0; k < 7; k++) {
+        const a = -Math.PI / 2 + (hash(i * 2.2 + k) - 0.5) * 2.2;
+        const l = 22 + hash(i * 4.4 + k) * 26;
+        ctx.moveTo(x, base);
+        ctx.lineTo(x + Math.cos(a) * l, base + Math.sin(a) * l);
+      }
+      ctx.stroke();
+    }
+  }
+
+  /** Cupinzeiro: monte de terra vermelha, alto e cheio de calombos. */
+  private drawCupinzeiro(x: number, base: number, h: number): void {
+    const ctx = this.ctx;
+    ctx.fillStyle = '#9c4a28';
+    ctx.beginPath();
+    ctx.moveTo(x - h * 0.42, base);
+    ctx.quadraticCurveTo(x - h * 0.36, base - h * 0.7, x - 4, base - h);
+    ctx.quadraticCurveTo(x + 6, base - h * 1.04, x + 8, base - h * 0.86);
+    ctx.quadraticCurveTo(x + h * 0.38, base - h * 0.5, x + h * 0.44, base);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.15)';
+    ctx.beginPath();
+    ctx.ellipse(x + h * 0.15, base - h * 0.4, h * 0.12, h * 0.08, 0, 0, Math.PI * 2);
+    ctx.ellipse(x - h * 0.15, base - h * 0.7, h * 0.08, h * 0.06, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  /** Mandacaru: cacto colunar com braços para cima. */
+  private drawMandacaru(x: number, base: number, h: number, color: string): void {
+    const ctx = this.ctx;
+    ctx.strokeStyle = color;
+    ctx.lineCap = 'round';
+    ctx.lineWidth = 11;
+    ctx.beginPath();
+    ctx.moveTo(x, base);
+    ctx.lineTo(x, base - h);
+    ctx.stroke();
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.moveTo(x, base - h * 0.45);
+    ctx.lineTo(x - 16, base - h * 0.45);
+    ctx.lineTo(x - 16, base - h * 0.75);
+    ctx.moveTo(x, base - h * 0.6);
+    ctx.lineTo(x + 15, base - h * 0.6);
+    ctx.lineTo(x + 15, base - h * 0.85);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(x, base - 4);
+    ctx.lineTo(x, base - h + 4);
+    ctx.stroke();
+  }
+
   private drawAraucaria(x: number, base: number, h: number, w: number, crown: string, trunk: string): void {
     const ctx = this.ctx;
     const top = base - h;
@@ -520,6 +745,30 @@ export class Renderer {
         ctx.fillRect(x, g0 + 22 + hash(i * 1.9) * 40, 5, 3);
       }
       ctx.fillRect(a, g0 + 12, b - a, 3);
+      // Caatinga: chão rachado (linhas em zigue-zague na terra).
+      if (this.bw.caatinga > 0.05) {
+        ctx.strokeStyle = `rgba(70, 35, 12, ${(0.45 * this.bw.caatinga).toFixed(3)})`;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        const cs = 38;
+        const cf = Math.floor((a + this.camX) / cs);
+        const ct = Math.ceil((b + this.camX) / cs);
+        for (let i = cf; i <= ct; i++) {
+          const cx = i * cs - this.camX + hash(i * 7.7) * 14;
+          if (cx < a + 3 || cx > b - 3) continue;
+          let px = cx;
+          let py = g0 + 14;
+          ctx.moveTo(px, py);
+          for (let k = 0; k < 4; k++) {
+            px += (hash(i * 3.1 + k) - 0.5) * 14;
+            py += 6 + hash(i * 5.3 + k) * 6;
+            ctx.lineTo(px, py);
+          }
+          ctx.moveTo(cx, g0 + 20);
+          ctx.lineTo(cx + 12, g0 + 24);
+        }
+        ctx.stroke();
+      }
       // Grama
       ctx.fillStyle = pal.grass;
       ctx.fillRect(a, g0 - 2, b - a, 12);

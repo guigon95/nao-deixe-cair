@@ -35,6 +35,8 @@ describe('filhotes em fila', () => {
     expect(e.pups).toBe(3);
     expect(events.filter((ev) => ev.type === 'pup' && ev.phase === 'join')).toHaveLength(3);
     expect(e.score.mult).toBeCloseTo(1 + 3 * PUPS.bonus);
+    run(e, 1);
+    expect(Number.isInteger(e.score.score)).toBe(true);
   });
 
   it('no máximo 5 na fila', () => {

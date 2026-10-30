@@ -9,6 +9,8 @@
  * (pedra cinza, espinho com ponta vermelha, capim verde com contorno).
  */
 
+import { BIOME_TINT, biomeAt } from '../game/biome';
+
 export type SeasonId = 'verao' | 'outono' | 'inverno' | 'primavera';
 
 export const SEASONS = {
@@ -208,9 +210,11 @@ const cache = new Map<string, Palette>();
 export function paletteAt(meters: number): Palette {
   const s = seasonAt(meters);
   const d = dayAt(meters);
+  const bio = biomeAt(meters);
   const qs = Math.round(s.t * 32);
   const qd = Math.round(d.t * 48);
-  const key = `${s.from}>${s.to}:${qs}|${d.a}>${d.b}:${qd}`;
+  const qb = Math.round(bio.t * 32);
+  const key = `${s.from}>${s.to}:${qs}|${d.a}>${d.b}:${qd}|${bio.from}>${bio.to}:${qb}`;
   const cached = cache.get(key);
   if (cached) return cached;
   const ks = qs / 32;
@@ -220,6 +224,19 @@ export function paletteAt(meters: number): Palette {
   const out = {} as Palette;
   for (const k of KEYS) out[k] = mix(A[k], B[k], ks);
   const w = (id: SeasonId) => (s.from === id ? 1 - ks : 0) + (s.to === id ? ks : 0);
+  // Tom do bioma (antes da hora do dia, que escurece tudo por igual).
+  const kb = qb / 32;
+  for (const [id, wgt] of [
+    [bio.from, 1 - kb],
+    [bio.to, kb],
+  ] as const) {
+    if (id === 'mata' || wgt <= 0) continue;
+    const tint = BIOME_TINT[id];
+    for (const k of Object.keys(tint) as Array<keyof typeof tint>) {
+      const [c, amt] = tint[k]!;
+      out[k] = mix(out[k], c, amt * wgt);
+    }
+  }
   out.winter = w('inverno');
   out.autumn = w('outono');
   out.spring = w('primavera');
