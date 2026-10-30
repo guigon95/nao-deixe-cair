@@ -363,3 +363,7 @@ Parâmetros em `src/games/bolinha/game/config.ts` e `Difficulty.ts`. Detalhes do
 - O e2e `aviao.py` tem uma falha (`segurar faz subir (como a bolinha)`) que já existia no `master` antes da monetização; nada da Acrobata foi alterado.
 - Anúncios: a integração com o Google foi testada só com mocks e com o provedor simulado; o fluxo real depende da aprovação no H5 Games Ads (veja `docs/MONETIZACAO.md`). A Bolinha ainda usa `shared/ads/rewarded.ts` (`NoAds`, que libera o continuar sem anúncio) — não foi alterada.
 - O anti-trapaça é básico (token + teto por tempo): quem editar o jogo no navegador ainda consegue enviar pontuações plausíveis.
+
+## Métricas de visitas (Vercel Web Analytics)
+
+O hub e cada jogo chamam `startAnalytics()` (`packages/web/src/shared/analytics.ts`) ao abrir: usa o `inject()` do `@vercel/analytics` e só liga no site publicado (em `localhost` não carrega nada). Os números aparecem no painel da Vercel, em **Analytics**, no projeto `nao-deixe-cair`.
