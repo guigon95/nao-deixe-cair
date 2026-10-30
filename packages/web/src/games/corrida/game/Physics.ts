@@ -251,7 +251,9 @@ function burrowStep(r: Runner, level: Level, sink: StepSink): void {
       r.y = b.roof - BODY.height;
       if (r.vy > 0) r.vy = 0;
     }
-    if (r.x >= b.exitStart + TOCA.launchAfter && r.y < TOCA.below && (r.vy <= 0 || r.dash > 0)) {
+    // No buraco de saída: abaixo da superfície e sem já estar sendo lançada,
+    // sai sozinha — parada, caindo ou pulando para tentar sair.
+    if (r.x >= b.exitStart + TOCA.launchAfter && r.y < 0 && (r.vy < TOCA.relaunchBelow || r.dash > 0)) {
       if (r.dash > 0) {
         r.dash = 0;
         r.dashTail = DASH.tail;

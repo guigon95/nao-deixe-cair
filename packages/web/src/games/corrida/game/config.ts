@@ -260,6 +260,8 @@ export const TOCA = {
   launchAfter: 12,
   /** Lançamento da saída: joga a capivara bem para o alto (~250 acima do chão). */
   exitVelocity: 1500,
+  /** Na saída, lança de novo quem estiver subindo mais devagar que isto (um pulo comum). */
+  relaunchBelow: 900,
   /** Quanto a câmera desce para mostrar a toca. */
   camera: -130,
 } as const;

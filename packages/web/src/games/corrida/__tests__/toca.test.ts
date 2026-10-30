@@ -102,6 +102,32 @@ describe('toca da capivara', () => {
     });
   }
 
+  it('dentro da toca, pular em qualquer momento (inclusive no buraco de saída) nunca mata: ela sai sozinha', () => {
+    for (const v of SPEEDS) {
+      const { level, end, burrow } = single(v);
+      // Vários pulos (toque curto até segurar) em cada instante dentro da toca.
+      for (let x = burrow.holeEnd; x < burrow.x1; x += 14) {
+        for (const hold of [1, 12, 40, 160]) {
+          const r = createRunner(0);
+          const { sink } = counter();
+          const ctl = { hold: false, pressed: false, drop: false };
+          let pressed = -1;
+          let under = false;
+          for (let i = 0; r.x < end && i < 20_000; i++) {
+            if (pressed < 0 && r.x >= x && r.y < TOCA.below) pressed = i;
+            ctl.pressed = i === pressed;
+            ctl.hold = pressed >= 0 && i >= pressed && i < pressed + hold;
+            const death = stepRunner(r, ctl, level, v, DT, sink);
+            if (r.y < TOCA.below) under = true;
+            expect(death, `v=${Math.round(v)} pulo em x=${Math.round(x - burrow.x0)} segurando ${hold} passos`).toBeNull();
+          }
+          expect(under).toBe(true);
+          expect(r.y).toBeGreaterThanOrEqual(0);
+        }
+      }
+    }
+  }, 60_000);
+
   it('na toca, as pedras e espinhos de cima não machucam', () => {
     const { level, burrow } = single(SPEED.start);
     const r = createRunner(burrow.holeEnd + 10);
