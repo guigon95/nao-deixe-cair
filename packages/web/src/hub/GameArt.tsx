@@ -117,13 +117,27 @@ function RunnerArt() {
       ].map(([x, y]) => (
         <ellipse key={`${x}-${y}`} cx={x} cy={y} rx="3" ry="2" fill="#ffcc33" />
       ))}
-      <g className="art-bob" transform="translate(84 74) rotate(-8)">
-        <path d="M-12 6 L-13 13 M-6 7 L-5 13 M6 7 L5 13 M11 6 L13 12" stroke="#6e4826" strokeWidth="4" strokeLinecap="round" />
-        <ellipse cx="-2" cy="0" rx="16" ry="10" fill="#9a6a40" />
-        <path d="M6 -12 L18 -12 Q 25 -11 25 -5 Q 25 1 19 1 L8 3 Q 4 -4 6 -12 Z" fill="#9a6a40" />
-        <path d="M20 -11 Q 25 -10 25 -5 Q 25 1 20 1.4 Z" fill="#5a3a20" />
-        <circle cx="9" cy="-13" r="2.6" fill="#6e4826" />
-        <path d="M13.5 -8.6 a1.6 1.6 0 0 0 3 0" stroke="#1b120a" strokeWidth="1.3" fill="none" />
+      <defs>
+        <linearGradient id="hub-capi-fur" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#7f5232" />
+          <stop offset="0.55" stopColor="#9c6a3f" />
+          <stop offset="1" stopColor="#c39860" />
+        </linearGradient>
+      </defs>
+      {/* A mesma capivara do jogo (rendering/capivara.ts), em SVG. */}
+      <g className="art-bob" transform="translate(84 74) rotate(-8) translate(-2 13) scale(0.8)">
+        <path d="M-11 -12 L-9 -3 M11 -11 L14 -3" stroke="#5b3a1f" strokeWidth="5" strokeLinecap="round" />
+        <path d="M12 -12 Q14 -22 8 -27 Q-4 -32 -15 -31 Q-25 -29 -24 -18 Q-23 -9 -14 -9 Q-2 -7 12 -12 Z" fill="url(#hub-capi-fur)" />
+        <path d="M-15 -12 L-18 -4 M7 -11 L4 -3" stroke="#875832" strokeWidth="5.5" strokeLinecap="round" />
+        <ellipse cx="-17" cy="-3" rx="3.4" ry="1.8" fill="#3d2715" />
+        <ellipse cx="5" cy="-2.5" rx="3.4" ry="1.8" fill="#3d2715" />
+        <ellipse cx="9.5" cy="-35" rx="3.2" ry="3.6" fill="#5b3a1f" />
+        <path d="M4 -28 Q6 -35 14 -35.5 L25 -34 Q31 -33.5 33 -29 Q35 -24 33.5 -19 Q32 -15.5 27 -15.5 Q19 -15 13 -13 Q6 -15 4 -28 Z" fill="#8d5e37" />
+        <path d="M27.5 -33.6 Q31 -33.5 33 -29 Q35 -24 33.5 -19 Q32 -15.5 28 -15.6 Q29.5 -25 27.5 -33.6 Z" fill="#4a2f1b" />
+        <ellipse cx="24.5" cy="-33.4" rx="2.6" ry="1.1" fill="#2f1d10" opacity="0.75" />
+        <ellipse cx="32.2" cy="-26.5" rx="0.9" ry="1.6" fill="#160d06" />
+        <ellipse cx="17.5" cy="-30.2" rx="1.7" ry="1.1" fill="#1b120a" />
+        <path d="M15.1 -30.9 Q17.5 -32.1 19.9 -30.9" stroke="#5b3a1f" strokeWidth="1.4" fill="none" />
       </g>
     </svg>
   );
