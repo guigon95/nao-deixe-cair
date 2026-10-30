@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { MUD, SCORING, SIM } from '../game/config';
+import { MUD, SCORING, SIM, SPEED } from '../game/config';
+import { Level } from '../game/Level';
+import { createRunner } from '../game/Physics';
+import { planRoute } from '../game/testing/planner';
 import { BIOMES, biomeAt, dominantBiome } from '../game/biome';
 import { Engine } from '../game/Engine';
 import { Track } from '../game/Track';
-import { PATTERNS } from '../game/patterns';
+import { Builder, PATTERNS } from '../game/patterns';
 import { GameState, type GameEvent } from '../game/types';
 import { createRng } from '../../../shared/random';
 import { MemoryStorage } from '../../../shared/storage/storage';
@@ -85,5 +88,57 @@ describe('biomas', () => {
     l.thorns.push({ x0: e.runner.x + 60, x1: e.runner.x + 82, top: 46, broken: false, kind: 'mandacaru' });
     run(e, 1);
     expect(e.deathCause).toBe('thorns');
+  });
+});
+
+describe('sucuri e ninho de marimbondo', () => {
+  function ahead(e: Engine, kind: 'snake' | 'nest', t: number) {
+    const b = new Builder(e.track.level, e.runner.x, e.speed, createRng(1));
+    if (kind === 'snake') b.snake(t);
+    else b.nest(t);
+  }
+
+  it('sucuri: correndo por baixo passa; pulando bem embaixo dela, toma o bote', () => {
+    const a = flat();
+    ahead(a.e, 'snake', 1);
+    run(a.e, 2);
+    expect(a.e.state).toBe(GameState.PLAYING);
+    expect(a.events.some((ev) => ev.type === 'snake')).toBe(true);
+
+    const b = flat();
+    ahead(b.e, 'snake', 1);
+    run(b.e, 0.85);
+    b.e.setHolding(true);
+    run(b.e, 0.3);
+    b.e.setHolding(false);
+    run(b.e, 0.6);
+    expect(b.e.deathCause).toBe('snake');
+  });
+
+  it('ninho: cai na frente da capivara; sem pular, ela bate nele; pulando, passa', () => {
+    const a = flat();
+    ahead(a.e, 'nest', 1.5);
+    run(a.e, 2.5);
+    expect(a.e.deathCause).toBe('nest');
+    expect(a.events.some((ev) => ev.type === 'nest' && ev.phase === 'drop')).toBe(true);
+    expect(a.events.some((ev) => ev.type === 'nest' && ev.phase === 'land')).toBe(true);
+
+    const level = new Level();
+    level.addGround(-800, 40_000);
+    for (const v of [SPEED.start, SPEED.max]) {
+      level.nests.length = 0;
+      new Builder(level, 0, v, createRng(1)).nest(2);
+      expect(planRoute(level, createRunner(0), { goalX: 3.5 * v, elapsed: 0, fixedSpeed: v, maxJumps: 3 })).not.toBeNull();
+    }
+  });
+
+  it('a Disparada atravessa a sucuri e o ninho', () => {
+    const { e } = flat();
+    ahead(e, 'nest', 1.6);
+    run(e, 1.3);
+    e.meter = 12;
+    e.dash();
+    run(e, 1);
+    expect(e.state).toBe(GameState.PLAYING);
   });
 });

@@ -357,6 +357,22 @@ export class RunnerSfx extends SynthAudio {
     this.tone(140, 70, 0.14, 'sine', 0.3, 0.02);
   }
 
+  /** Sucuri dando o bote: sibilo. */
+  hiss(): void {
+    this.noise(0.4, 0.1, 5200, 3800, 'bandpass');
+  }
+
+  /** Ninho: estalo do galho quebrando (cair) ou baque com zumbido (no chão). */
+  nest(phase: 'drop' | 'land'): void {
+    if (phase === 'drop') {
+      this.noise(0.08, 0.14, 2600, 1200, 'bandpass');
+      this.tone(520, 300, 0.06, 'square', 0.12, 0.01);
+    } else {
+      this.tone(120, 60, 0.1, 'sine', 0.3);
+      this.tone(220, 240, 0.35, 'sawtooth', 0.06, 0.04);
+    }
+  }
+
   /** Filhote: guinchinho agudo ao entrar na fila; ao se espalharem, piados descendo. */
   pup(join: boolean): void {
     if (join) {

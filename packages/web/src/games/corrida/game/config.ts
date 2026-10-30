@@ -257,6 +257,29 @@ export const MUD = {
   slow: 0.55,
 } as const;
 
+/** Sucuri: pendurada a `branch` de altura; o bote desce a cabeça até `low`. */
+export const SNAKE = {
+  branch: 200,
+  low: 52,
+  /** Dá o bote quando a capivara está a este tempo do galho (s)... */
+  lead: 0.6,
+  /** ...e desce ao longo desta distância percorrida pela capivara (u). */
+  drop: 70,
+  /** Meia largura do corpo (u). */
+  half: 7,
+} as const;
+
+/** Ninho de marimbondo caindo. */
+export const NEST = {
+  height: 210,
+  /** Começa a cair quando a capivara está a este tempo do ninho (s) e cai em `fall` s. */
+  lead: 1.35,
+  fall: 0.5,
+  /** Tamanho no chão. */
+  w: 26,
+  h: 26,
+} as const;
+
 /** Tora rolando. */
 export const LOG = {
   /** Raio (altura 2r = 36: um toque curto passa). */

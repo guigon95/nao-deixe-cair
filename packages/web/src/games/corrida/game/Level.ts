@@ -1,4 +1,4 @@
-import type { Burrow, Crate, Log, Mud, Pup, Fruit, GroundSpan, Platform, PowerUp, Rock, Spring, Thorns, Vine } from './types';
+import type { Burrow, Crate, Log, Mud, Nest, Pup, Snake, Fruit, GroundSpan, Platform, PowerUp, Rock, Spring, Thorns, Vine } from './types';
 
 /**
  * Conteúdo do percurso já gerado: listas em ordem crescente de x. O gerador
@@ -19,6 +19,8 @@ export class Level {
   logs: Log[] = [];
   pups: Pup[] = [];
   muds: Mud[] = [];
+  snakes: Snake[] = [];
+  nests: Nest[] = [];
 
   clear(): void {
     this.ground.length = 0;
@@ -34,6 +36,8 @@ export class Level {
     this.logs.length = 0;
     this.pups.length = 0;
     this.muds.length = 0;
+    this.snakes.length = 0;
+    this.nests.length = 0;
   }
 
   /** Acrescenta chão; emenda com o trecho anterior se encostar. */
@@ -57,6 +61,8 @@ export class Level {
     keep(this.crates);
     keep(this.springs);
     keep(this.muds);
+    for (let i = this.snakes.length - 1; i >= 0; i--) if (this.snakes[i].ax >= a && this.snakes[i].ax <= b + 200) this.snakes.splice(i, 1);
+    for (let i = this.nests.length - 1; i >= 0; i--) if (this.nests[i].x >= a && this.nests[i].x <= b + 200) this.nests.splice(i, 1);
     // Toras que encontrariam a capivara no trecho limpo somem.
     for (let i = this.logs.length - 1; i >= 0; i--) if (logMeet(this.logs[i]) <= b + 300) this.logs.splice(i, 1);
     // Toca no trecho: some (os buracos dela viram chão até o fim dela).
@@ -106,6 +112,8 @@ export class Level {
     dropBefore(this.burrows, x, (u) => u.x1);
     dropBefore(this.pups, x, (u) => u.x + 30);
     dropBefore(this.muds, x, (m) => m.x1);
+    dropBefore(this.snakes, x, (s) => s.ax + 40);
+    dropBefore(this.nests, x, (n) => n.x + 40);
     for (let i = this.logs.length - 1; i >= 0; i--) if (logMeet(this.logs[i]) + 300 < x) this.logs.splice(i, 1);
   }
 
@@ -142,7 +150,9 @@ export class Level {
       this.burrows.length +
       this.logs.length +
       this.pups.length +
-      this.muds.length
+      this.muds.length +
+      this.snakes.length +
+      this.nests.length
     );
   }
 }
@@ -161,4 +171,21 @@ export function logX(l: Log, rx: number): number {
 /** x da capivara em que a tora a encontra (centro com centro). */
 export function logMeet(l: Log): number {
   return (l.x0 + l.k * l.trig) / (1 + l.k);
+}
+
+/** Altura da cabeça da sucuri quando a capivara está em `rx` (pendurada → bote → sobe depois). */
+export function snakeHead(s: { ax: number; by: number; trig: number }, rx: number, low: number, drop: number): number {
+  const top = s.by - 26;
+  if (rx < s.trig) return top;
+  // Depois que a capivara passou, ela volta a subir devagar.
+  if (rx > s.ax + 60) return Math.min(top, low + (rx - s.ax - 60) * 1.2);
+  const k = Math.min(1, (rx - s.trig) / drop);
+  return top - (top - low) * k * k;
+}
+
+/** Altura (base) do ninho caindo quando a capivara está em `rx`. */
+export function nestY(n: { trig: number; fall: number }, rx: number, height: number): number {
+  if (rx < n.trig) return height;
+  const k = Math.min(1, (rx - n.trig) / n.fall);
+  return height * (1 - k * k);
 }

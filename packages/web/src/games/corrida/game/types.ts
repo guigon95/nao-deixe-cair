@@ -31,6 +31,34 @@ export interface Rock {
   kind?: 'cupim';
 }
 
+/**
+ * Sucuri pendurada num galho: quando a capivara chega perto (`trig`, x da
+ * capivara), desce num bote até a altura de um pulo. Por baixo, correndo,
+ * passa; pulando, bate nela. Posição em função do x da capivara (como a tora).
+ */
+export interface Snake {
+  /** x do galho (e do corpo pendurado) e altura do galho. */
+  ax: number;
+  by: number;
+  trig: number;
+  broken: boolean;
+  struck: boolean;
+}
+
+/**
+ * Ninho de marimbondo que cai da árvore na frente da capivara: começa a cair
+ * quando ela passa de `trig` e chega ao chão `fall` unidades depois; no chão
+ * vira um obstáculo para pular.
+ */
+export interface Nest {
+  x: number;
+  trig: number;
+  fall: number;
+  broken: boolean;
+  dropping: boolean;
+  landed: boolean;
+}
+
 /** Lama (Pantanal): correndo nela a capivara fica lenta; pulando, passa. */
 export interface Mud {
   x0: number;
@@ -221,7 +249,7 @@ export interface Runner {
   justLanded: boolean;
 }
 
-export type DeathCause = 'rock' | 'thorns' | 'river' | 'swarm' | 'log';
+export type DeathCause = 'rock' | 'thorns' | 'river' | 'swarm' | 'log' | 'snake' | 'nest';
 
 export type GameEvent =
   | { type: 'state'; state: GameState; previous: GameState }
@@ -238,6 +266,8 @@ export type GameEvent =
   | { type: 'magnet'; on: boolean; x: number; y: number }
   | { type: 'acai'; x: number; y: number }
   | { type: 'mud'; x: number }
+  | { type: 'snake'; x: number }
+  | { type: 'nest'; phase: 'drop' | 'land'; x: number }
   | { type: 'pup'; phase: 'join' | 'lost'; count: number; x: number; y: number }
   | { type: 'log'; phase: 'roll' | 'dodge'; x: number }
   | { type: 'mount'; phase: 'appear' | 'ride' | 'off'; animal: MountAnimal; x: number; y: number; reason?: 'hit' | 'river' | 'toca' | 'timeout' | 'tired' }

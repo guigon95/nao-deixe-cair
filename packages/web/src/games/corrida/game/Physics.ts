@@ -1,6 +1,6 @@
-import { BODY, DASH, JUMP, MUD, PIT_DEATH_Y, SWARM, TOCA, VINE, type JumpParams } from './config';
-import { logX, type Level } from './Level';
-import type { Crate, DeathCause, Fruit, Log, Rock, Runner, Spring, Thorns, Vine } from './types';
+import { BODY, DASH, JUMP, MUD, NEST, PIT_DEATH_Y, SNAKE, SWARM, TOCA, VINE, type JumpParams } from './config';
+import { logX, nestY, snakeHead, type Level } from './Level';
+import type { Crate, DeathCause, Fruit, Log, Nest, Rock, Runner, Snake, Spring, Thorns, Vine } from './types';
 
 /** Comandos de UM passo de simulação. */
 export interface Controls {
@@ -20,7 +20,7 @@ export interface StepSink {
   jump(r: Runner): void;
   land(r: Runner, hard: boolean): void;
   crate(c: Crate, stomp: boolean, r: Runner): void;
-  smash(o: Rock | Thorns | Log, r: Runner): void;
+  smash(o: Rock | Thorns | Log | Snake | Nest, r: Runner): void;
   spring(s: Spring, r: Runner): void;
   fruit(f: Fruit, r: Runner): void;
   grab(v: Vine, r: Runner): void;
@@ -409,6 +409,30 @@ function collide(r: Runner, level: Level, sink: StepSink): DeathCause | null {
       continue;
     }
     return 'log';
+  }
+
+  // Sucuri dando o bote: o corpo pendurado vai do galho até a cabeça.
+  for (const s of level.snakes) {
+    if (s.broken || s.ax - SNAKE.half > right || s.ax + SNAKE.half < left) continue;
+    const head = snakeHead(s, r.x, SNAKE.low, SNAKE.drop);
+    if (top <= head + 2 || bottom >= s.by) continue;
+    if (dash) {
+      sink.smash(s, r);
+      continue;
+    }
+    return 'snake';
+  }
+
+  // Ninho de marimbondo (caindo ou já no chão).
+  for (const n of level.nests) {
+    if (n.broken || n.x - NEST.w / 2 > right - 2 || n.x + NEST.w / 2 < left + 2) continue;
+    const ny = nestY(n, r.x, NEST.height);
+    if (bottom >= ny + NEST.h - 2 || top <= ny + 2) continue;
+    if (dash) {
+      sink.smash(n, r);
+      continue;
+    }
+    return 'nest';
   }
 
   for (const c of level.crates) {

@@ -1,8 +1,8 @@
-import { ARENA, BODY, DASH, GOLDEN, MAGNET, MOUNT, RECORD_SIGN_MIN, SCORING, SWARM, TOCA } from '../game/config';
+import { ARENA, BODY, DASH, GOLDEN, MAGNET, MOUNT, NEST, RECORD_SIGN_MIN, SCORING, SNAKE, SWARM, TOCA } from '../game/config';
 import type { Engine } from '../game/Engine';
 import { SIZES } from '../game/patterns';
-import { logX } from '../game/Level';
-import { GameState, type Burrow, type Log, type Mud, type Crate, type Fruit, type ItemKind, type Platform, type Rock, type Spring, type Thorns, type Vine } from '../game/types';
+import { logX, nestY, snakeHead } from '../game/Level';
+import { GameState, type Burrow, type Log, type Mud, type Nest, type Snake, type Crate, type Fruit, type ItemKind, type Platform, type Rock, type Spring, type Thorns, type Vine } from '../game/types';
 import { computeLayout, type Layout } from '../../../shared/layout/layout';
 import type { Effects } from './effects';
 import { dominantSeason, mix, paletteAt, SEASONS, type Palette, type SeasonId } from './palette';
@@ -224,6 +224,8 @@ export class Renderer {
     for (const r of lvl.rocks) if (!r.broken) this.drawRock(r);
     const rx = this.runnerPos(engine).x;
     for (const l of lvl.logs) if (!l.broken) this.drawLog(l, rx, opts.time);
+    for (const s of lvl.snakes) this.drawSnake(s, rx, opts.time);
+    for (const n of lvl.nests) this.drawNest(n, rx, opts.time);
     for (const t of lvl.thorns) if (!t.broken) {
       if (t.kind === 'mandacaru') this.drawMandacaruObstacle(t);
       else this.drawThorns(t);
@@ -1360,6 +1362,141 @@ export class Renderer {
     ctx.lineTo(Math.cos(2.3) * (l.r - 7), Math.sin(2.3) * (l.r - 7));
     ctx.stroke();
     ctx.restore();
+  }
+
+  /** Galho grosso saindo da copa, onde a sucuri e o ninho ficam pendurados. */
+  private drawBranch(x: number, y: number): void {
+    const ctx = this.ctx;
+    ctx.strokeStyle = '#5a3d24';
+    ctx.lineCap = 'round';
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.moveTo(x - 90, y - 30);
+    ctx.quadraticCurveTo(x - 40, y - 2, x + 30, y + 2);
+    ctx.stroke();
+    ctx.fillStyle = '#2f6b3a';
+    ctx.beginPath();
+    ctx.ellipse(x - 80, y - 36, 34, 16, 0, 0, Math.PI * 2);
+    ctx.ellipse(x - 30, y - 12, 22, 10, 0.2, 0, Math.PI * 2);
+    ctx.ellipse(x + 26, y - 4, 14, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  /** Sucuri: corpo grosso oliva com manchas escuras, enrolado no galho e caindo no bote. */
+  private drawSnake(s: Snake, rx: number, time: number): void {
+    const x = this.sx(s.ax);
+    if (x < this.viewL - 120 || x > this.viewR + 120) return;
+    const ctx = this.ctx;
+    const by = this.sy(s.by);
+    this.drawBranch(x, by);
+    if (s.broken) return;
+    const headY = this.sy(snakeHead(s, rx, SNAKE.low, SNAKE.drop));
+    // Voltas no galho.
+    ctx.strokeStyle = '#6b7a2a';
+    ctx.lineWidth = 7;
+    ctx.beginPath();
+    ctx.ellipse(x - 14, by + 1, 14, 5, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    // Corpo pendurado, ondulando.
+    const len = headY - by;
+    const sway = s.struck ? 0.4 : 1;
+    ctx.lineCap = 'round';
+    for (const [w, col] of [
+      [9, '#4f5a1d'],
+      [6.5, '#7d8c32'],
+    ] as const) {
+      ctx.strokeStyle = col;
+      ctx.lineWidth = w;
+      ctx.beginPath();
+      ctx.moveTo(x, by);
+      for (let k = 1; k <= 12; k++) {
+        const u = k / 12;
+        ctx.lineTo(x + Math.sin(u * 7 + time * 3) * 5 * sway * (1 - u * 0.6), by + len * u);
+      }
+      ctx.stroke();
+    }
+    // Manchas.
+    ctx.fillStyle = '#2b2f10';
+    for (let k = 1; k < 11; k += 2) {
+      const u = k / 12;
+      ctx.beginPath();
+      ctx.ellipse(x + Math.sin(u * 7 + time * 3) * 5 * sway * (1 - u * 0.6), by + len * u, 2.6, 1.8, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // Cabeça (de boca aberta no bote) e língua.
+    ctx.fillStyle = '#6b7a2a';
+    ctx.beginPath();
+    ctx.ellipse(x + 2, headY + 2, 7, 9, 0.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#f2e14a';
+    ctx.beginPath();
+    ctx.arc(x - 2, headY, 1.6, 0, Math.PI * 2);
+    ctx.arc(x + 5, headY - 1, 1.6, 0, Math.PI * 2);
+    ctx.fill();
+    if (s.struck || Math.sin(time * 9) > 0.6) {
+      ctx.strokeStyle = '#e8344a';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(x + 2, headY + 10);
+      ctx.lineTo(x + 2, headY + 16);
+      ctx.lineTo(x - 1, headY + 19);
+      ctx.moveTo(x + 2, headY + 16);
+      ctx.lineTo(x + 5, headY + 19);
+      ctx.stroke();
+    }
+  }
+
+  /** Ninho de marimbondo: papelão cinza em gomos, pendurado, caindo e, no chão, com marimbondos em volta. */
+  private drawNest(n: Nest, rx: number, time: number): void {
+    const x = this.sx(n.x);
+    if (x < this.viewL - 120 || x > this.viewR + 120) return;
+    const ctx = this.ctx;
+    this.drawBranch(x, this.sy(NEST.height + NEST.h + 8));
+    if (n.broken) return;
+    const wy = nestY(n, rx, NEST.height);
+    const y = this.sy(wy);
+    // Raminho segurando (enquanto não caiu).
+    if (!n.dropping) {
+      ctx.strokeStyle = '#5a3d24';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x, y - NEST.h);
+      ctx.lineTo(x, this.sy(NEST.height + NEST.h + 8));
+      ctx.stroke();
+    }
+    const spin = n.dropping && !n.landed ? (rx - n.trig) * 0.02 : n.landed ? 0.25 : 0;
+    ctx.save();
+    ctx.translate(x, y - NEST.h / 2);
+    ctx.rotate(spin);
+    ctx.fillStyle = '#b8ad96';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, NEST.w / 2, NEST.h / 2 + 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#8a7f68';
+    ctx.lineWidth = 1.4;
+    for (let k = -2; k <= 2; k++) {
+      ctx.beginPath();
+      ctx.ellipse(0, k * 4.5, NEST.w / 2 - Math.abs(k) * 1.5, 2, 0, 0, Math.PI);
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#3a3226';
+    ctx.beginPath();
+    ctx.arc(0, NEST.h / 2 - 2, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    // Marimbondos zunindo em volta (mais depois que caiu).
+    const many = n.landed ? 6 : 2;
+    for (let k = 0; k < many; k++) {
+      const a = time * (6 + k) + k * 1.9;
+      const bx = x + Math.cos(a) * (16 + k * 2);
+      const byy = y - NEST.h / 2 + Math.sin(a * 1.3) * (12 + k);
+      ctx.fillStyle = '#ffcf33';
+      ctx.beginPath();
+      ctx.ellipse(bx, byy, 3, 2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#1d1d1d';
+      ctx.fillRect(bx - 0.5, byy - 2, 1.2, 4);
+    }
   }
 
   /** Mandacaru no caminho: cacto alto com braços e espinhos claros. */

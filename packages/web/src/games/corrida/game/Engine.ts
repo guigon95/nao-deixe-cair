@@ -5,7 +5,7 @@ import { createRunner, runnerSpeed, stepRunner, type Controls, type StepSink } f
 import { CANOPY } from './patterns';
 import { Score } from './Score';
 import { Track } from './Track';
-import { GameState, type Crate, type DeathCause, type Fruit, type GameEvent, type ItemKind, type Loot, type Log, type Mount, type Rock, type Runner, type Spring, type Thorns } from './types';
+import { GameState, type Crate, type DeathCause, type Fruit, type GameEvent, type ItemKind, type Loot, type Log, type Mount, type Nest, type Snake, type Rock, type Runner, type Spring, type Thorns } from './types';
 import { createRng, randomSeed } from '../../../shared/random';
 import type { Storage } from '../../../shared/storage/storage';
 
@@ -353,6 +353,7 @@ export class Engine {
     this.stepPups(r);
     this.stepMount(r, dt);
     this.stepLogs(r);
+    this.stepHazards(r);
     const mud = r.grounded && r.y === 0 && this.track.level.muds.some((m) => r.x >= m.x0 && r.x <= m.x1);
     if (mud && !this.inMud) this.emit({ type: 'mud', x: r.x });
     this.inMud = mud;
@@ -580,6 +581,28 @@ export class Engine {
   }
 
   private lastSkyY: number | null = null;
+
+  /** Sucuri e ninhos: avisa o bote, o ninho começando a cair e batendo no chão. */
+  private stepHazards(r: Runner): void {
+    const lvl = this.track.level;
+    for (const s of lvl.snakes) {
+      if (!s.struck && !s.broken && r.x >= s.trig) {
+        s.struck = true;
+        this.emit({ type: 'snake', x: s.ax });
+      }
+    }
+    for (const n of lvl.nests) {
+      if (n.broken) continue;
+      if (!n.dropping && r.x >= n.trig) {
+        n.dropping = true;
+        this.emit({ type: 'nest', phase: 'drop', x: n.x });
+      }
+      if (!n.landed && r.x >= n.trig + n.fall) {
+        n.landed = true;
+        this.emit({ type: 'nest', phase: 'land', x: n.x });
+      }
+    }
+  }
 
   /** Toras: avisa quando uma começa a rolar e quando a capivara desviou dela. */
   private stepLogs(r: Runner): void {
@@ -888,11 +911,13 @@ export class Engine {
         }
         this.emit({ type: 'crate', x: (c.x0 + c.x1) / 2, y: c.top / 2, stomp: stomp || dashing || r.tank });
       },
-      smash: (o: Rock | Thorns | Log, r) => {
+      smash: (o: Rock | Thorns | Log | Snake | Nest, r) => {
         if (o.broken) return;
         o.broken = true;
         this.score.addBonus(SCORING.smash);
         if ('k' in o) this.emit({ type: 'smash', x: logX(o, r.x), y: o.r });
+        else if ('ax' in o) this.emit({ type: 'smash', x: o.ax, y: 90 });
+        else if ('fall' in o) this.emit({ type: 'smash', x: o.x, y: 14 });
         else this.emit({ type: 'smash', x: (o.x0 + o.x1) / 2, y: o.top / 2 });
       },
       spring: (s: Spring, r) => {

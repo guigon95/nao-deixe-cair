@@ -1,4 +1,4 @@
-import { JUMP, LOG, TOCA } from './config';
+import { JUMP, LOG, NEST, SNAKE, TOCA } from './config';
 import type { Level } from './Level';
 import type { BiomeId } from './biome';
 import type { Rng } from '../../../shared/random';
@@ -79,6 +79,18 @@ export class Builder {
   mandacaru(t: number): void {
     const x = this.X(t);
     this.level.thorns.push({ x0: x, x1: x + 22, top: 46, broken: false, kind: 'mandacaru' });
+  }
+
+  /** Sucuri pendurada em t (s): dá o bote quando a capivara chega perto. */
+  snake(t: number): void {
+    const ax = this.X(t);
+    this.level.snakes.push({ ax, by: SNAKE.branch, trig: ax - SNAKE.lead * this.v, broken: false, struck: false });
+  }
+
+  /** Ninho de marimbondo que cai na frente da capivara e fica no chão em t (s). */
+  nest(t: number): void {
+    const x = this.X(t);
+    this.level.nests.push({ x, trig: x - NEST.lead * this.v, fall: NEST.fall * this.v, broken: false, dropping: false, landed: false });
   }
 
   /** Poça de lama de t0 a t1 (s). */
@@ -538,6 +550,57 @@ export const PATTERNS: readonly Pattern[] = [
       b.mandacaru(0.85);
       b.row(0.38, 0.55, 0, 2);
       return 0.95;
+    },
+  },
+  {
+    // Sucuri no galho: passe CORRENDO por baixo (pular aqui é bater nela).
+    id: 'sucuri',
+    tier: 2,
+    weight: 3,
+    biomes: { mata: 0.6, pantanal: 1.4, cerrado: 0, caatinga: 0 },
+    build(b) {
+      b.snake(0.3);
+      b.row(0.1, 0.5, 0, 4);
+      return 0.55;
+    },
+  },
+  {
+    // Sucuri e logo depois uma pedra: espere passar a cobra para pular.
+    id: 'sucuri-pedra',
+    tier: 3,
+    weight: 2,
+    biomes: { mata: 0.5, pantanal: 1.2, cerrado: 0, caatinga: 0 },
+    build(b) {
+      b.snake(0.2);
+      b.rock(0.85);
+      b.arc(0.68, HOLD_TAP, 3);
+      return 0.95;
+    },
+  },
+  {
+    // Ninho de marimbondo cai da árvore na frente: pule por cima dele.
+    id: 'ninho',
+    tier: 1,
+    weight: 3,
+    biomes: { mata: 0.7, pantanal: 0, cerrado: 1.4, caatinga: 0.4 },
+    build(b) {
+      b.nest(0.2);
+      b.arc(0.0, HOLD_TAP, 3);
+      return 0.3;
+    },
+  },
+  {
+    // Dois ninhos caindo em sequência.
+    id: 'ninhos',
+    tier: 3,
+    weight: 2,
+    biomes: { mata: 0.5, pantanal: 0, cerrado: 1.2, caatinga: 0 },
+    build(b) {
+      b.nest(0.2);
+      b.nest(0.95);
+      b.arc(0.0, HOLD_TAP, 3);
+      b.arc(0.75, HOLD_TAP, 3);
+      return 1.05;
     },
   },
   {

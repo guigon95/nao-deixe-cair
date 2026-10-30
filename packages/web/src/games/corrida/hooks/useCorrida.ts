@@ -51,6 +51,8 @@ export const CAUSE_TEXT: Record<DeathCause, string> = {
   river: 'O jacaré pegou!',
   swarm: 'Os marimbondos alcançaram',
   log: 'Atropelada por uma tora rolando',
+  snake: 'A sucuri deu o bote!',
+  nest: 'Mexeu no ninho de marimbondo',
 };
 
 const RAINBOW = ['#ff5a5a', '#ffb347', '#ffe95a', '#6be36b', '#5ac8ff', '#c77dff'];
@@ -317,6 +319,13 @@ export function useCorrida(options: CorridaOptions = {}) {
           sfx.mud();
           fx.float(e.x + 30, 60, 'ATOLOU!', false, '#d9b48a');
           fx.burst(e.x, 4, 10, 120, ['#5a3a1c', '#7a5230', '#3d2611'], 0.5, 2.6, true);
+          break;
+        case 'snake':
+          sfx.hiss();
+          break;
+        case 'nest':
+          sfx.nest(e.phase);
+          if (e.phase === 'land') fx.burst(e.x, 6, 8, 90, ['#b8ad96', '#8a7f68'], 0.4, 2.2, true);
           break;
         case 'acai':
           sfx.acai();
