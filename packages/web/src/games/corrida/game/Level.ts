@@ -1,4 +1,4 @@
-import type { Burrow, Crate, Fruit, GroundSpan, Platform, PowerUp, Rock, Spring, Thorns, Vine } from './types';
+import type { Burrow, Crate, Log, Fruit, GroundSpan, Platform, PowerUp, Rock, Spring, Thorns, Vine } from './types';
 
 /**
  * Conteúdo do percurso já gerado: listas em ordem crescente de x. O gerador
@@ -16,6 +16,7 @@ export class Level {
   vines: Vine[] = [];
   powerups: PowerUp[] = [];
   burrows: Burrow[] = [];
+  logs: Log[] = [];
 
   clear(): void {
     this.ground.length = 0;
@@ -28,6 +29,7 @@ export class Level {
     this.vines.length = 0;
     this.powerups.length = 0;
     this.burrows.length = 0;
+    this.logs.length = 0;
   }
 
   /** Acrescenta chão; emenda com o trecho anterior se encostar. */
@@ -50,6 +52,8 @@ export class Level {
     keep(this.thorns);
     keep(this.crates);
     keep(this.springs);
+    // Toras que encontrariam a capivara no trecho limpo somem.
+    for (let i = this.logs.length - 1; i >= 0; i--) if (logMeet(this.logs[i]) <= b + 300) this.logs.splice(i, 1);
     // Toca no trecho: some (os buracos dela viram chão até o fim dela).
     for (let i = this.burrows.length - 1; i >= 0; i--) {
       const u = this.burrows[i];
@@ -95,6 +99,7 @@ export class Level {
     dropBefore(this.vines, x, (v) => v.ax + v.len);
     dropBefore(this.powerups, x, (u) => u.x + 30);
     dropBefore(this.burrows, x, (u) => u.x1);
+    for (let i = this.logs.length - 1; i >= 0; i--) if (logMeet(this.logs[i]) + 300 < x) this.logs.splice(i, 1);
   }
 
   /** Existe chão sob [a, b]? (Usado pelos testes e pelo desenho.) */
@@ -127,7 +132,8 @@ export class Level {
       this.fruits.length +
       this.vines.length +
       this.powerups.length +
-      this.burrows.length
+      this.burrows.length +
+      this.logs.length
     );
   }
 }
@@ -136,4 +142,14 @@ function dropBefore<T>(list: T[], x: number, end: (t: T) => number): void {
   let n = 0;
   while (n < list.length && end(list[n]) < x) n++;
   if (n > 0) list.splice(0, n);
+}
+
+/** Centro da tora quando a capivara está em `rx`. */
+export function logX(l: Log, rx: number): number {
+  return l.x0 - l.k * Math.max(0, rx - l.trig);
+}
+
+/** x da capivara em que a tora a encontra (centro com centro). */
+export function logMeet(l: Log): number {
+  return (l.x0 + l.k * l.trig) / (1 + l.k);
 }

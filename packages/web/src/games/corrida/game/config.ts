@@ -236,6 +236,16 @@ export const CONTINUES = {
   swarm: 240,
 } as const;
 
+/** Tora rolando. */
+export const LOG = {
+  /** Raio (altura 2r = 36: um toque curto passa). */
+  r: 18,
+  /** Velocidade em relação à da capivara. */
+  k: 0.7,
+  /** Começa a rolar quando a capivara está a este tempo do encontro (s). */
+  lead: 1.4,
+} as const;
+
 /** Toca: caminho por baixo da terra. */
 export const TOCA = {
   /**

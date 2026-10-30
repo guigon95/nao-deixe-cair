@@ -28,6 +28,7 @@ export type MissionKind =
   | 'magnets'
   | 'burrows'
   | 'ema'
+  | 'logs'
   | 'runs';
 
 interface MissionDef {
@@ -61,6 +62,7 @@ export const MISSION_DEFS: readonly MissionDef[] = [
   { kind: 'magnets', scope: 'total', base: 2, growth: 0.4, round: 1, minLevel: 2, text: (n) => `Pegue ${n} ímãs de capim` },
   { kind: 'burrows', scope: 'total', base: 2, growth: 0.4, round: 1, minLevel: 2, text: (n) => `Entre na toca secreta ${n} vezes` },
   { kind: 'ema', scope: 'total', base: 2, growth: 0.4, round: 1, minLevel: 2, text: (n) => `Monte numa ema, anta ou tucano ${n} vezes` },
+  { kind: 'logs', scope: 'total', base: 3, growth: 0.4, round: 1, minLevel: 1, text: (n) => `Desvie de ${n} toras rolando` },
   { kind: 'winter', scope: 'run', base: 1, growth: 0, round: 1, minLevel: 3, text: () => 'Chegue ao inverno numa corrida' },
 ];
 
@@ -183,6 +185,10 @@ export class Missions {
 
   ema(): Mission[] {
     return this.bump({}, { ema: 1 });
+  }
+
+  log(): Mission[] {
+    return this.bump({}, { logs: 1 });
   }
 
   spring(): Mission[] {

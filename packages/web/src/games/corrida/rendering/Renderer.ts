@@ -1,7 +1,8 @@
 import { ARENA, BODY, DASH, GOLDEN, MAGNET, MOUNT, SWARM, TOCA } from '../game/config';
 import type { Engine } from '../game/Engine';
 import { SIZES } from '../game/patterns';
-import { GameState, type Burrow, type Crate, type Fruit, type ItemKind, type Platform, type Rock, type Spring, type Thorns, type Vine } from '../game/types';
+import { logX } from '../game/Level';
+import { GameState, type Burrow, type Log, type Crate, type Fruit, type ItemKind, type Platform, type Rock, type Spring, type Thorns, type Vine } from '../game/types';
 import { computeLayout, type Layout } from '../../../shared/layout/layout';
 import type { Effects } from './effects';
 import { dominantSeason, mix, paletteAt, SEASONS, type Palette, type SeasonId } from './palette';
@@ -175,6 +176,8 @@ export class Renderer {
     for (const sp of lvl.springs) this.drawSpring(sp, engine.elapsed);
     for (const c of lvl.crates) if (!c.broken) this.drawCrate(c, opts.time);
     for (const r of lvl.rocks) if (!r.broken) this.drawRock(r);
+    const rx = this.runnerPos(engine).x;
+    for (const l of lvl.logs) if (!l.broken) this.drawLog(l, rx, opts.time);
     for (const t of lvl.thorns) if (!t.broken) this.drawThorns(t);
     // O que fica dentro de uma toca ainda escondida não aparece.
     const hidden = (x: number, y: number) => y < 0 && lvl.burrowAt(x)?.opened === false;
@@ -947,6 +950,90 @@ export class Renderer {
       this.drawSparkle(x0 + w / 2, top + h / 2, 7 + pulse * 3, '#fffbe0');
       this.drawSparkle(x0 + w - 6, top + 5, 2 + 3 * Math.max(0, Math.sin(time * 4 + 1)), '#ffffff');
     }
+  }
+
+  /**
+   * Tora rolando: vista de ponta (casca escura, anéis da madeira e rachaduras
+   * girando) com poeira levantando atrás. Fora da tela, um "!" avisa na borda
+   * direita, na altura dela.
+   */
+  private drawLog(l: Log, rx: number, time: number): void {
+    // Parada (esperando a capivara chegar perto) ela fica fora da tela: não desenha.
+    if (!l.rolling) return;
+    const ctx = this.ctx;
+    const wx = logX(l, rx);
+    const x = this.sx(wx);
+    const y = this.sy(l.r);
+    if (x - l.r > this.viewR) {
+      const pulse = 0.5 + 0.5 * Math.sin(time * 14);
+      const ax = this.viewR - 20;
+      ctx.fillStyle = `rgba(255, 70, 70, ${(0.75 + 0.25 * pulse).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.moveTo(ax, y - 15);
+      ctx.lineTo(ax + 13, y + 9);
+      ctx.lineTo(ax - 13, y + 9);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 15px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('!', ax, y + 7);
+      return;
+    }
+    if (x + l.r < this.viewL - 20) return;
+    const ang = -(l.x0 - wx) / l.r;
+    // Poeira atrás (lado direito), enquanto rola.
+    if (l.rolling) {
+      ctx.fillStyle = 'rgba(200, 175, 130, 0.45)';
+      for (let i = 0; i < 3; i++) {
+        const ph = (time * 3 + i / 3) % 1;
+        ctx.beginPath();
+        ctx.arc(x + l.r + 4 + ph * 18, this.sy(0) - 4 - ph * 8, 3 + ph * 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    // Sombra.
+    ctx.fillStyle = 'rgba(0,0,0,0.22)';
+    ctx.beginPath();
+    ctx.ellipse(x, this.sy(0) + 1, l.r * 0.9, 3.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(ang);
+    // Casca com nós.
+    ctx.fillStyle = '#5b3a1e';
+    ctx.beginPath();
+    ctx.arc(0, 0, l.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#4a2f17';
+    for (let i = 0; i < 6; i++) {
+      const a = (i * Math.PI * 2) / 6;
+      ctx.beginPath();
+      ctx.arc(Math.cos(a) * l.r, Math.sin(a) * l.r, 2.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // Madeira e anéis.
+    ctx.fillStyle = '#d9a86c';
+    ctx.beginPath();
+    ctx.arc(0, 0, l.r - 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#b07d45';
+    ctx.lineWidth = 1.4;
+    for (const k of [0.68, 0.42, 0.18]) {
+      ctx.beginPath();
+      ctx.arc(0, 0, (l.r - 4) * k, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    // Rachaduras (mostram o giro).
+    ctx.strokeStyle = '#8a5a2b';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(l.r - 5, 0);
+    ctx.moveTo(0, 0);
+    ctx.lineTo(Math.cos(2.3) * (l.r - 7), Math.sin(2.3) * (l.r - 7));
+    ctx.stroke();
+    ctx.restore();
   }
 
   private drawThorns(t: Thorns): void {

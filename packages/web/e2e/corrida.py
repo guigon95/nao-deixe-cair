@@ -457,6 +457,34 @@ with sync_playwright() as p:
     check("tucano: sem erros", not errs, "; ".join(errs[:2]))
     c.close()
 
+    # Tora rolando: vem na direção da capivara; um pulo na hora certa passa.
+    c = browser.new_context(viewport={"width": 844, "height": 390})
+    pg = c.new_page()
+    errs = []
+    pg.on("pageerror", lambda e: errs.append(str(e)))
+    pg.goto(BASE + "/corrida/?debug&seed=5")
+    pg.wait_for_selector("text=CORRER")
+    pg.click("text=CORRER")
+    pg.wait_for_timeout(150)
+    pg.evaluate("""() => { const e = window.__NDC__.engine, r = e.runner, l = e.track.level;
+        l.rocks.length = l.thorns.length = l.crates.length = l.springs.length = 0; l.fruits.length = 0; l.powerups.length = 0; l.logs.length = 0;
+        l.ground.length = 0; l.addGround(-800, r.x + 20000); e.track.genX = r.x + 20000;
+        const v = e.speed, meet = r.x + 2.2 * v, lead = 1.4 * v;
+        l.logs.push({ x0: meet + 0.7 * lead, trig: meet - lead, k: 0.7, r: 18, broken: false, rolling: false, passed: false });
+        window.__meet = meet; }""")
+    pg.wait_for_function("() => window.__NDC__.engine.track.level.logs[0].rolling", timeout=4000)
+    check("tora: começa a rolar quando a capivara chega perto", True)
+    x0 = pg.evaluate("() => window.__NDC__.engine.runner.x")
+    pg.wait_for_timeout(300)
+    check("tora: rola na direção da capivara", pg.evaluate("() => { const e = window.__NDC__.engine, t = e.track.level.logs[0]; return t.x0 - t.k * (e.runner.x - t.trig) < t.x0 - 50 }"))
+    pg.wait_for_function("() => window.__NDC__.engine.runner.x > window.__meet - 0.24 * window.__NDC__.engine.speed", timeout=4000)
+    pg.keyboard.down("Space"); pg.wait_for_timeout(60); pg.keyboard.up("Space")
+    pg.wait_for_timeout(900)
+    check("tora: pulando na hora certa, passa por cima", pg.evaluate("() => window.__NDC__.engine.state") == "PLAYING"
+          and pg.evaluate("() => window.__NDC__.engine.track.level.logs[0]?.passed ?? true"))
+    check("tora: sem erros", not errs, "; ".join(errs[:2]))
+    c.close()
+
     # Toca: buraco escondido sob folhas, túnel com capim e saída que lança de volta.
     c = browser.new_context(viewport={"width": 844, "height": 390})
     pg = c.new_page()

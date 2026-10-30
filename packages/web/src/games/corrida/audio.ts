@@ -359,6 +359,12 @@ export class RunnerSfx extends SynthAudio {
     }
   }
 
+  /** Tora começando a rolar: ronco grave de madeira batendo no chão. */
+  logRoll(): void {
+    for (let i = 0; i < 4; i++) this.tone(95 - i * 6, 70, 0.1, 'triangle', 0.32, i * 0.11);
+    this.noise(0.45, 0.07, 500, 200, 'lowpass');
+  }
+
   /** Capim dourado: arpejo brilhante subindo (ao pegar) ou descendo (acabou). */
   golden(on: boolean): void {
     const notes = on ? [784, 988, 1175, 1568] : [1175, 988, 784];

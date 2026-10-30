@@ -1,6 +1,6 @@
 import { BODY, DASH, JUMP, PIT_DEATH_Y, SWARM, TOCA, VINE, type JumpParams } from './config';
-import type { Level } from './Level';
-import type { Crate, DeathCause, Fruit, Rock, Runner, Spring, Thorns, Vine } from './types';
+import { logX, type Level } from './Level';
+import type { Crate, DeathCause, Fruit, Log, Rock, Runner, Spring, Thorns, Vine } from './types';
 
 /** Comandos de UM passo de simulação. */
 export interface Controls {
@@ -20,7 +20,7 @@ export interface StepSink {
   jump(r: Runner): void;
   land(r: Runner, hard: boolean): void;
   crate(c: Crate, stomp: boolean, r: Runner): void;
-  smash(o: Rock | Thorns, r: Runner): void;
+  smash(o: Rock | Thorns | Log, r: Runner): void;
   spring(s: Spring, r: Runner): void;
   fruit(f: Fruit, r: Runner): void;
   grab(v: Vine, r: Runner): void;
@@ -372,6 +372,30 @@ function collide(r: Runner, level: Level, sink: StepSink): DeathCause | null {
       continue;
     }
     return 'thorns';
+  }
+
+  // Toras rolando: pular por cima, quicar em cima (quebra) ou quebrar na Disparada.
+  for (const l of level.logs) {
+    if (l.broken) continue;
+    const cx = logX(l, r.x);
+    if (cx - l.r + 3 > right || cx + l.r - 3 < left) continue;
+    const lt = 2 * l.r;
+    if (bottom >= lt - 0.5 || top <= 0) continue;
+    if (!r.grounded && r.vy <= 0 && bottom >= lt - 12) {
+      r.y = lt;
+      r.vy = JUMP.crateBounceVelocity;
+      r.jumped = true;
+      r.cut = true;
+      r.glideTime = 0;
+      r.fastFall = false;
+      sink.smash(l, r);
+      continue;
+    }
+    if (dash) {
+      sink.smash(l, r);
+      continue;
+    }
+    return 'log';
   }
 
   for (const c of level.crates) {

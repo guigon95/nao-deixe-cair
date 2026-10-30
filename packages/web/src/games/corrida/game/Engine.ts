@@ -1,10 +1,11 @@
 import { CONTINUES, CRATE_LOOT, DASH, GOLDEN, ITEMS, JUMP, MAGNET, MOUNT, MOUNTS, SCORING, SHIELD, SIM, SWARM, TOCA, type JumpParams } from './config';
 import { speedAt, tierAt } from './Difficulty';
+import { logX } from './Level';
 import { createRunner, runnerSpeed, stepRunner, type Controls, type StepSink } from './Physics';
 import { CANOPY } from './patterns';
 import { Score } from './Score';
 import { Track } from './Track';
-import { GameState, type Crate, type DeathCause, type Fruit, type GameEvent, type ItemKind, type Loot, type Mount, type Rock, type Runner, type Spring, type Thorns } from './types';
+import { GameState, type Crate, type DeathCause, type Fruit, type GameEvent, type ItemKind, type Loot, type Log, type Mount, type Rock, type Runner, type Spring, type Thorns } from './types';
 import { createRng, randomSeed } from '../../../shared/random';
 import type { Storage } from '../../../shared/storage/storage';
 
@@ -339,6 +340,7 @@ export class Engine {
 
     this.stepItems(r, dt);
     this.stepMount(r, dt);
+    this.stepLogs(r);
     // Caiu no buraco escondido: a toca aparece e, um pouco mais fundo, entrou.
     if (!this.inBurrow && r.y < 0 && r.vy <= 0) {
       const b = this.track.level.burrowAt(r.x);
@@ -496,6 +498,20 @@ export class Engine {
     }
     this.emit({ type: 'mount', phase: 'off', animal: m.animal, x: r.x, y: r.y, reason: cause === 'toca' || cause === 'tired' || cause === 'river' ? cause : 'hit' });
     return true;
+  }
+
+  /** Toras: avisa quando uma começa a rolar e quando a capivara desviou dela. */
+  private stepLogs(r: Runner): void {
+    for (const l of this.track.level.logs) {
+      if (!l.rolling && r.x >= l.trig) {
+        l.rolling = true;
+        this.emit({ type: 'log', phase: 'roll', x: l.x0 });
+      }
+      if (!l.passed && !l.broken && logX(l, r.x) + l.r < r.x - 14) {
+        l.passed = true;
+        this.emit({ type: 'log', phase: 'dodge', x: r.x });
+      }
+    }
   }
 
   /** Efeito de um item especial pego (no percurso ou saído de um caixote). */
@@ -760,11 +776,12 @@ export class Engine {
         else r.slow = Math.min(r.slow, SWARM.slowFactor);
         this.emit({ type: 'crate', x: (c.x0 + c.x1) / 2, y: c.top / 2, stomp: stomp || dashing || r.tank });
       },
-      smash: (o: Rock | Thorns) => {
+      smash: (o: Rock | Thorns | Log, r) => {
         if (o.broken) return;
         o.broken = true;
         this.score.addBonus(SCORING.smash);
-        this.emit({ type: 'smash', x: (o.x0 + o.x1) / 2, y: o.top / 2 });
+        if ('k' in o) this.emit({ type: 'smash', x: logX(o, r.x), y: o.r });
+        else this.emit({ type: 'smash', x: (o.x0 + o.x1) / 2, y: o.top / 2 });
       },
       spring: (s: Spring, r) => {
         s.usedAt = this.elapsed;

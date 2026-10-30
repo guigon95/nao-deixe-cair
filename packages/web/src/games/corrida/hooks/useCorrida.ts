@@ -49,6 +49,7 @@ export const CAUSE_TEXT: Record<DeathCause, string> = {
   thorns: 'Caiu nos espinhos',
   river: 'O jacaré pegou!',
   swarm: 'Os marimbondos alcançaram',
+  log: 'Atropelada por uma tora rolando',
 };
 
 const RAINBOW = ['#ff5a5a', '#ffb347', '#ffe95a', '#6be36b', '#5ac8ff', '#c77dff'];
@@ -287,6 +288,10 @@ export function useCorrida(options: CorridaOptions = {}) {
             fx.shake = 0.4;
             vibrate([20, 30, 20]);
           }
+          break;
+        case 'log':
+          if (e.phase === 'roll') sfx.logRoll();
+          else completed(missions.log());
           break;
         case 'acai':
           sfx.acai();

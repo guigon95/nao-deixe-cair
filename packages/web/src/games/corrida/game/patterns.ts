@@ -1,4 +1,4 @@
-import { JUMP, TOCA } from './config';
+import { JUMP, LOG, TOCA } from './config';
 import type { Level } from './Level';
 import type { Rng } from '../../../shared/random';
 
@@ -98,6 +98,19 @@ export class Builder {
     this.pit(t0, t1 - t0);
     this.pit(t2, t3 - t2);
     this.level.burrows.push({ x0: this.X(t0), holeEnd: this.X(t1), exitStart: this.X(t2), x1: this.X(t3), floor: TOCA.floor, roof: TOCA.roof, opened: false });
+  }
+
+  /**
+   * Tora que encontra a capivara em `tm` (s do padrão). Fica parada fora da
+   * tela e começa a rolar `LOG.lead` s antes; rola por cima do trecho logo
+   * depois do encontro (por isso o padrão deixa esse trecho livre).
+   */
+  log(tm: number, k: number = LOG.k): number {
+    const meet = this.X(tm);
+    const lead = LOG.lead * this.v;
+    this.level.logs.push({ x0: meet + k * lead, trig: meet - lead, k, r: LOG.r, broken: false, rolling: false, passed: false });
+    // Até onde a tora parada fica: o padrão precisa durar até aqui.
+    return tm + k * LOG.lead;
   }
 
   /** Cipó pendurado em x(t), preso na altura `ay`, com comprimento `len`. */
@@ -440,6 +453,42 @@ export const PATTERNS: readonly Pattern[] = [
       b.row(2.0, 2.3, 0, 2);
       // Folga para a capivara voltar do lançamento da saída (~1 s no ar).
       return 3.72 + 0.65;
+    },
+  },
+  {
+    // Tora rolando: um toque curto passa por cima (ou quique nela).
+    id: 'tora',
+    tier: 1,
+    weight: 3,
+    build(b) {
+      const end = b.log(0.4);
+      b.arc(0.22, HOLD_TAP, 3);
+      return end;
+    },
+  },
+  {
+    // Duas toras seguidas: dois pulos no ritmo.
+    id: 'toras',
+    tier: 3,
+    weight: 2,
+    build(b) {
+      b.log(0.4);
+      const end = b.log(1.25);
+      b.arc(0.22, HOLD_TAP, 3);
+      b.arc(1.07, HOLD_TAP, 3);
+      return end;
+    },
+  },
+  {
+    // Pedra e logo depois uma tora rolando.
+    id: 'pedra-tora',
+    tier: 2,
+    weight: 2,
+    build(b) {
+      b.rock(0);
+      const end = b.log(1.0);
+      b.arc(0.82, HOLD_TAP, 3);
+      return end;
     },
   },
   {

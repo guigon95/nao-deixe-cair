@@ -56,6 +56,26 @@ export interface Burrow {
   opened: boolean;
 }
 
+/**
+ * Tora rolando em direção à capivara. A posição depende de ONDE a capivara
+ * está (e não do relógio): parada em `x0` até a capivara passar de `trig`;
+ * dali em diante anda `k` unidades para trás a cada unidade que a capivara
+ * anda. Assim o planejador (e os testes de justiça) enxergam a tora com a
+ * mesma física do jogo.
+ */
+export interface Log {
+  x0: number;
+  trig: number;
+  /** Velocidade da tora em relação à da capivara (0,7 = 70%). */
+  k: number;
+  /** Raio (a tora tem 2r de altura). */
+  r: number;
+  broken: boolean;
+  /** Já começou a rolar / já passou pela capivara (avisos e missão). */
+  rolling: boolean;
+  passed: boolean;
+}
+
 /** Caixote: atravessar atrasa (o enxame chega perto); cair em cima quica. */
 export interface Crate {
   x0: number;
@@ -185,7 +205,7 @@ export interface Runner {
   justLanded: boolean;
 }
 
-export type DeathCause = 'rock' | 'thorns' | 'river' | 'swarm';
+export type DeathCause = 'rock' | 'thorns' | 'river' | 'swarm' | 'log';
 
 export type GameEvent =
   | { type: 'state'; state: GameState; previous: GameState }
@@ -201,6 +221,7 @@ export type GameEvent =
   | { type: 'canopy'; x: number; y: number }
   | { type: 'magnet'; on: boolean; x: number; y: number }
   | { type: 'acai'; x: number; y: number }
+  | { type: 'log'; phase: 'roll' | 'dodge'; x: number }
   | { type: 'mount'; phase: 'appear' | 'ride' | 'off'; animal: MountAnimal; x: number; y: number; reason?: 'hit' | 'river' | 'toca' | 'timeout' | 'tired' }
   | { type: 'loot'; x: number; y: number; kind: 'capim' | ItemKind; n: number }
   | { type: 'burrow'; on: boolean; x: number; y: number }
