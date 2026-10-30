@@ -9,6 +9,7 @@ import { dominantSeason, mix, paletteAt, SEASONS, type Palette, type SeasonId } 
 import { drawCapivara, type Pose } from './capivara';
 import { drawMount, MOUNT_SEAT_DRAW, TUCANO_CARRY_DRAW } from './mounts';
 import { drawTucano } from './tucano';
+import { crateShake } from './crateShake';
 import { Weather } from './weather';
 import { boteShape, Gators, WATER_Y, type Gator } from './gators';
 
@@ -182,7 +183,22 @@ export class Renderer {
     for (const p of lvl.platforms) if (p.kind !== 'copa' && p.kind !== 'vitoria') this.drawPlatform(p, pal);
     for (const v of lvl.vines) this.drawVine(v, engine, opts.time);
     for (const sp of lvl.springs) this.drawSpring(sp, engine.elapsed);
-    for (const c of lvl.crates) if (!c.broken) this.drawCrate(c, opts.time);
+    for (const c of lvl.crates) {
+      if (c.broken) continue;
+      if (c.loot?.kind === 'mount') {
+        // Montaria lá dentro: o caixote dá trancos (gira na quina de baixo e pula um pouco).
+        const s = crateShake(c, opts.time);
+        const px = this.sx((c.x0 + c.x1) / 2) + (s.angle > 0 ? 18 : -18);
+        const py = this.sy(0);
+        this.ctx.save();
+        this.ctx.translate(px, py - s.hop);
+        this.ctx.rotate(s.angle);
+        this.ctx.translate(-px, -py);
+        this.drawCrate(c, opts.time);
+        this.ctx.restore();
+        if (s.hop > 1) this.drawCrateDust(this.sx((c.x0 + c.x1) / 2), py, s.hop);
+      } else this.drawCrate(c, opts.time);
+    }
     for (const r of lvl.rocks) if (!r.broken) this.drawRock(r);
     const rx = this.runnerPos(engine).x;
     for (const l of lvl.logs) if (!l.broken) this.drawLog(l, rx, opts.time);
@@ -809,6 +825,17 @@ export class Renderer {
       ctx.fillStyle = COLORS.moss;
       ctx.beginPath();
       ctx.ellipse(x0 + w * 0.5, top + 1, w * 0.3, 3.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  /** Poeirinha no chão a cada tranco do caixote de montaria. */
+  private drawCrateDust(cx: number, gy: number, hop: number): void {
+    const ctx = this.ctx;
+    ctx.fillStyle = `rgba(210, 185, 140, ${Math.min(0.6, hop / 5).toFixed(3)})`;
+    for (const dx of [-22, -16, 16, 22]) {
+      ctx.beginPath();
+      ctx.arc(cx + dx, gy - 2, 2 + hop * 0.5, 0, Math.PI * 2);
       ctx.fill();
     }
   }

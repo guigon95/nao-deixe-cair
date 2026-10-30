@@ -335,6 +335,22 @@ export class RunnerSfx extends SynthAudio {
     this.tone(base * 1.5, base * 2, 0.16, 'sine', 0.22, 0.08);
   }
 
+  /** Chamado abafado de dentro do caixote (mais baixo e grave que o normal). */
+  mountCall(animal: 'ema' | 'anta' | 'tucano'): void {
+    if (animal === 'ema') {
+      this.tone(105, 80, 0.2, 'sine', 0.28);
+      this.tone(98, 75, 0.22, 'sine', 0.24, 0.24);
+    } else if (animal === 'anta') {
+      this.tone(1200, 1600, 0.16, 'sine', 0.12);
+      this.tone(1250, 1700, 0.18, 'sine', 0.1, 0.22);
+    } else {
+      this.tone(430, 320, 0.08, 'square', 0.1);
+      this.tone(450, 340, 0.08, 'square', 0.1, 0.13);
+    }
+    // Pancada de madeira (o bicho empurrando a caixa).
+    this.tone(160, 90, 0.06, 'triangle', 0.25, 0.02, 0.002);
+  }
+
   /** Montaria: aparece (ema: "bum" grave; anta: assobio), monta (fanfarra curta) ou sai (piado). */
   mount(phase: 'appear' | 'ride' | 'off', animal: 'ema' | 'anta' | 'tucano' = 'ema'): void {
     if (phase === 'appear' && animal === 'tucano') {

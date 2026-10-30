@@ -8,6 +8,7 @@ import { Autopilot } from '../game/testing/planner';
 import { GameState, type DeathCause } from '../game/types';
 import { Effects } from '../rendering/effects';
 import { MOUNT_NAMES } from '../rendering/mounts';
+import { crateShakePhase } from '../rendering/crateShake';
 import { rainAt } from '../rendering/weather';
 import { WATER_Y } from '../rendering/gators';
 import { COLORS, Renderer } from '../rendering/Renderer';
@@ -141,6 +142,8 @@ export function useCorrida(options: CorridaOptions = {}) {
     const fx = new Effects();
     const sfx = new RunnerSfx();
     const renderer = new Renderer(canvas);
+    /** Última fase do tranco de cada caixote de montaria (para tocar o chamado na virada). */
+    const crateCalls = new WeakMap<object, number>();
     engineRef.current = engine;
     fxRef.current = fx;
     sfxRef.current = sfx;
@@ -451,6 +454,18 @@ export function useCorrida(options: CorridaOptions = {}) {
         sfx.rain(st === GameState.PLAYING ? renderer.weather.rain * (renderer.winter ? 0.3 : 1) : 0);
         fx.update(fdt);
         renderer.follow(engine, fdt);
+        // Caixote de montaria na tela: a cada tranco, o chamado abafado do bicho lá dentro.
+        if (st === GameState.PLAYING) {
+          const now = performance.now() / 1000;
+          const rx = engine.runner.x;
+          for (const c of engine.track.level.crates) {
+            if (c.broken || c.loot?.kind !== 'mount' || c.x0 < rx - 120 || c.x0 > rx + 560) continue;
+            const ph = crateShakePhase(c, now);
+            const last = crateCalls.get(c);
+            crateCalls.set(c, ph);
+            if (last !== undefined && ph < last) sfx.mountCall(c.loot.animal);
+          }
+        }
       }
       renderer.draw(engine, fx, { beat: st === GameState.PLAYING ? beat : null, showHud: st !== GameState.READY && st !== GameState.GAME_OVER && st !== GameState.CONTINUE, time: performance.now() / 1000 });
     });
