@@ -10,8 +10,8 @@ export type BiomeId = 'mata' | 'pantanal' | 'cerrado' | 'caatinga';
 export const BIOMES = {
   order: ['mata', 'pantanal', 'cerrado', 'caatinga'] as const satisfies readonly BiomeId[],
   /** Metros de cada bioma e da transição (no fim dele). */
-  length: 1300,
-  blend: 260,
+  length: 2200,
+  blend: 320,
   banner: { mata: 'MATA ATLÂNTICA', pantanal: 'PANTANAL', cerrado: 'CERRADO', caatinga: 'CAATINGA' } as Record<BiomeId, string>,
 } as const;
 

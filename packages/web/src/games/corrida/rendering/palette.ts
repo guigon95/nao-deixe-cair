@@ -25,7 +25,7 @@ export const SEASONS = {
 
 export const DAY = {
   /** Metros de um dia completo (dia → entardecer → noite → amanhecer). */
-  length: 3600,
+  length: 6000,
 } as const;
 
 export interface Palette {
